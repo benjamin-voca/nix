@@ -6,6 +6,10 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     deploy-rs.url = "github:serokell/deploy-rs";
+    crunchy-postgres-operator = {
+      url = "github:CrunchyData/postgres-operator";
+      ref = "v5.5.0";
+    };
   };
 
   outputs = { self, nixpkgs, sops-nix, deploy-rs, ... }: {
