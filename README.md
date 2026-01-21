@@ -1,4 +1,4 @@
-# QuadNix NixOS Configuration
+# NixOS Configuration
 
 A battle-tested NixOS configuration structure for multi-server deployments.
 
