@@ -3,5 +3,8 @@
 name: system:
 nixpkgs.lib.nixosSystem {
   inherit system;
-  modules = [ ../hosts/${name}/default.nix ];
+  modules = [
+    ../profiles/base.nix
+    ../hosts/${name}/default.nix
+  ];
 }
