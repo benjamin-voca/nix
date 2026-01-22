@@ -7,9 +7,7 @@
     ../../nix/modules/kubernetes/control-plane.nix
   ];
 
-  services.kubernetes = {
-    enable = true;
-    controlPlane = {
+  services.kubernetes.controlPlane = {
       enable = true;
       etcd.enable = true;
       apiServer.enable = true;
