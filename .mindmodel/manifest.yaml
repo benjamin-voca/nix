@@ -1,0 +1,21 @@
+name: QuadNix
+version: 2
+categories:
+  - path: patterns/host-configuration.md
+    description: Host-specific configuration patterns for NixOS machines
+    group: patterns
+  - path: patterns/role-composition.md
+    description: Role composition patterns for combining profiles into host configurations
+    group: patterns
+  - path: patterns/profile-structure.md
+    description: Reusable profile module patterns for configuration components
+    group: patterns
+  - path: patterns/service-module.md
+    description: Service module patterns for deploying applications
+    group: patterns
+  - path: patterns/hardware-configuration.md
+    description: Hardware-specific configuration patterns per host
+    group: patterns
+  - path: patterns/flake-pattern.md
+    description: Flake input/output configuration patterns
+    group: patterns
