@@ -14,5 +14,4 @@
       scheduler.enable = true;
       controllerManager.enable = true;
     };
-  };
 }
