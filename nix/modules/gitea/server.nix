@@ -48,10 +48,6 @@ in {
     enable = mkEnableOption "Gitea service";
 
     database = {
-      type = mkOption {
-        type = types.enum [ "postgres" "mysql" "sqlite3" ];
-        default = "postgres";
-      };
       host = mkOption { type = types.str; default = "localhost"; };
       port = mkOption { type = types.int; default = 5432; };
       name = mkOption { type = types.str; default = "gitea"; };
