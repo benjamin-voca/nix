@@ -13,7 +13,15 @@
     enable = true;
     settings.PasswordAuthentication = false;
   };
-  services.cloudflared.enable=true;
+  services.cloudflared.enable = true;
+
+  environment.systemPackages = with pkgs; [
+    vim
+    git
+    htop
+    curl
+    cloudflared
+  ];
 
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILaEuHKb7PS/LyaBxvNzIcVzMOW0aDVHFnauM9pSjxm8 benjamin@Benjamins-MacBook-Pro.local"
