@@ -4,7 +4,7 @@
   imports = [
     ../profiles/server.nix
     ../profiles/docker.nix
-    ../profiles/kubernetes/control-plane.nix
+    # ../profiles/kubernetes/control-plane.nix
     ../services/gitea.nix
     # ../services/clickhouse.nix
     # ../services/otel.nix
