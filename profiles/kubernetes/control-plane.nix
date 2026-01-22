@@ -2,9 +2,9 @@
 
 {
   imports = [
-    ../nix/modules/shared/common.nix
-    ../nix/modules/shared/kubernetes-common.nix
-    ../nix/modules/kubernetes/control-plane.nix
+    ../../nix/modules/shared/common.nix
+    ../../nix/modules/shared/kubernetes-common.nix
+    ../../nix/modules/kubernetes/control-plane.nix
   ];
 
   services.kubernetes = {
