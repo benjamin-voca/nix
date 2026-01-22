@@ -7,7 +7,7 @@ let
       ../../../nix/modules/shared/common.nix
       ../../../nix/modules/shared/kubernetes-common.nix
       {
-        services.kubernetes.enable = true;
+        services.kubernetes.roles = [ "master" ];
         services.kubernetes.common.clusterName = "alpha";
       }
     ];

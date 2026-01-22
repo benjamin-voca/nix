@@ -8,7 +8,6 @@ let
       ../../../nix/modules/shared/kubernetes-common.nix
       ../../../nix/modules/kubernetes/control-plane.nix
       {
-        services.kubernetes.enable = true;
         services.kubernetes.controlPlane.enable = true;
         services.kubernetes.controlPlane.etcd.enable = true;
         services.kubernetes.controlPlane.apiServer.enable = true;

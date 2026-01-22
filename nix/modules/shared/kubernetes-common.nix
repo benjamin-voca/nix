@@ -36,7 +36,12 @@ in {
     };
   };
 
-  config = mkIf (config.services.kubernetes.enable or false) {
+  # Guard: enabled when roles are defined, or control-plane/worker components are enabled
+  config = mkIf (
+    (config.services.kubernetes.roles or []) != []
+    || (config.services.kubernetes.controlPlane.enable or false)
+    || (config.services.kubernetes.worker.enable or false)
+  ) {
     environment.etc."kubernetes/common.json".text = builtins.toJSON {
       inherit (cfg) clusterName serviceCIDR podCIDR pkiDir version;
     };
