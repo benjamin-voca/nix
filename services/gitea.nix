@@ -4,6 +4,7 @@
   services.gitea = {
     enable = true;
     database.type = "postgres";
-    protocol = "https";
+    domain = "git.quadtech.dev";
+    rootUrl = "https://git.quadtech.dev";
   };
 }

@@ -1,7 +1,7 @@
 { config, pkgs, ... }:
 
 {
-  services.opentelemetry = {
+  services.otelcol = {
     enable = true;
   };
 }
