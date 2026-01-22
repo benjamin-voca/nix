@@ -14,5 +14,5 @@
     22 443 6443
   ];
 
-  services.kubernetes.roles = [ "master" ];
+  # services.kubernetes.roles = [ "master" ];
 }
