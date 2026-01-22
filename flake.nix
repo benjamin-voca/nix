@@ -30,7 +30,7 @@
     deploy = {
       nodes = {
         "backbone-01" = {
-          hostname = "192.168.1.10";
+          hostname = "mainssh.quadtech.dev";
           profiles = {
             system = "./result";
           };
