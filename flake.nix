@@ -21,7 +21,7 @@
     deploy-rs.url = "github:serokell/deploy-rs";
     nixhelm.url = "github:farcaller/nixhelm";
     nix-kube-generators.url = "github:farcaller/nix-kube-generators";
-    nix-kube-generators.inputs.nixpkgs.follows = "nixpkgs";
+    # Note: nix-kube-generators doesn't have a nixpkgs input to override
   };
 
   outputs = { self, nixpkgs, sops-nix, deploy-rs, nixhelm, nix-kube-generators, ... }:

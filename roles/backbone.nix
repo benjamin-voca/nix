@@ -14,6 +14,8 @@
 
   services.kubernetes = {
     roles = [ "master" ];
+    masterAddress = "${config.networking.hostName}.local";
+    
     controlPlane.enable = true;
   };
 }
