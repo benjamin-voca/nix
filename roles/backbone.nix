@@ -50,7 +50,7 @@
 
       # SSH access
       {
-        hostname = "ssh.quadtech.dev";
+        hostname = "mainssh.quadtech.dev";
         service = "ssh://localhost:22";
       }
 
