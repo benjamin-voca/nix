@@ -83,6 +83,11 @@ in {
         - service: ${cfg.catchAll}
     '';
 
+    # Create state directory
+    systemd.tmpfiles.rules = [
+      "d /var/lib/cloudflared 0755 root root -"
+    ];
+
     # Systemd service
     systemd.services.cloudflared = {
       description = "Cloudflare Tunnel";
