@@ -1,0 +1,73 @@
+# SOPS Configuration for QuadNix
+#
+# This file defines which age keys can decrypt which secrets.
+# Public keys are safe to commit to git.
+#
+# SETUP INSTRUCTIONS:
+# 1. Generate age keys on each host:
+#    sudo mkdir -p /etc/sops/age
+#    sudo age-keygen -o /etc/sops/age/keys.txt
+#
+# 2. Get the public key:
+#    sudo cat /etc/sops/age/keys.txt | grep "public key:"
+#
+# 3. Replace the placeholder keys below with your actual public keys
+# 4. Delete this comment block
+
+keys:
+  # Backbone hosts
+  - &backbone-01 age149k446qw7jhxszqs40y09a2n22um3056geunqm2mypg8e7dehgvsyn4ude
+
+  # Frontline hosts (optional)
+  # - &frontline-01 age1REPLACE_WITH_FRONTLINE_01_PUBLIC_KEY
+  # - &frontline-02 age1REPLACE_WITH_FRONTLINE_02_PUBLIC_KEY
+
+  # Your personal workstation (optional, for editing secrets)
+  # - &admin age1REPLACE_WITH_YOUR_PERSONAL_PUBLIC_KEY
+
+creation_rules:
+  # Backbone-01 specific secrets
+  - path_regex: secrets/backbone-01\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+        # - *admin  # Uncomment to allow editing from your workstation
+
+  # Backbone-02 specific secrets
+  # - path_regex: secrets/backbone-02\.yaml$
+  #   key_groups:
+  #   - age:
+  #     - *backbone-02
+  # - *admin
+
+  # Shared backbone secrets (both hosts can decrypt)
+  - path_regex: secrets/backbone-shared\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+        # - *backbone-02
+        # - *admin
+
+  # Frontline-01 specific secrets
+  # - path_regex: secrets/frontline-01\.yaml$
+  #   key_groups:
+  #   - age:
+  #     - *frontline-01
+  #     - *admin
+
+  # Frontline-02 specific secrets
+  # - path_regex: secrets/frontline-02\.yaml$
+  #   key_groups:
+  #   - age:
+  #     - *frontline-02
+  #     - *admin
+
+  # Global secrets (all hosts can decrypt)
+  - path_regex: secrets/global\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+        # - *backbone-02
+        # - *frontline-01
+        # - *frontline-02
+        # - *admin

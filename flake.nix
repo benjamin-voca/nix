@@ -40,16 +40,16 @@
     in
     {
       nixosConfigurations = {
-        backbone-01 = (import ./lib/mkHost.nix { inherit nixpkgs; })
+        backbone-01 = (import ./lib/mkHost.nix { inherit nixpkgs sops-nix; })
           "backbone-01" "x86_64-linux";
 
-        backbone-02 = (import ./lib/mkHost.nix { inherit nixpkgs; })
+        backbone-02 = (import ./lib/mkHost.nix { inherit nixpkgs sops-nix; })
           "backbone-02" "x86_64-linux";
 
-        frontline-01 = (import ./lib/mkHost.nix { inherit nixpkgs; })
+        frontline-01 = (import ./lib/mkHost.nix { inherit nixpkgs sops-nix; })
           "frontline-01" "x86_64-linux";
 
-        frontline-02 = (import ./lib/mkHost.nix { inherit nixpkgs; })
+        frontline-02 = (import ./lib/mkHost.nix { inherit nixpkgs sops-nix; })
           "frontline-02" "x86_64-linux";
       };
 

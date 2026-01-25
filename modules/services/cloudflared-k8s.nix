@@ -16,8 +16,13 @@ in {
 
     credentialsFile = mkOption {
       type = types.path;
-      description = "Path to the tunnel credentials JSON file";
-      example = "/home/klajd/.cloudflared/9832df66-f04a-40ea-b004-f6f9b100eb14.json";
+      description = ''
+        Path to the tunnel credentials JSON file.
+        
+        Can be a direct path like "/home/user/.cloudflared/credentials.json"
+        or a SOPS secret like "config.sops.secrets.cloudflared-credentials.path"
+      '';
+      example = "/run/secrets/cloudflared-credentials.json";
     };
 
     routes = mkOption {
