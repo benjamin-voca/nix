@@ -7,7 +7,7 @@ Backbone (Internal Services)
 ├── backbone-01 (192.168.1.10) - Primary control plane
 ├── backbone-02 (192.168.1.11) - Secondary control plane
 └── Services:
-    ├── Gitea       git.quadtech.dev
+    ├── Gitea       gitea.quadtech.dev
     ├── ClickHouse  clickhouse.quadtech.dev
     ├── Grafana     grafana.quadtech.dev
     └── Prometheus  prometheus.quadtech.dev
@@ -145,7 +145,7 @@ ClickHouse: admin / changeme
 ### Service URLs
 
 ```
-Gitea:      https://git.quadtech.dev
+Gitea:      https://gitea.quadtech.dev
 Grafana:    https://grafana.quadtech.dev
 ClickHouse: https://clickhouse.quadtech.dev
 Prometheus: https://prometheus.quadtech.dev (via Grafana)
@@ -155,7 +155,7 @@ Prometheus: https://prometheus.quadtech.dev (via Grafana)
 
 ```sh
 # Gitea SSH
-git clone git@git.quadtech.dev:2222/user/repo.git
+git clone git@gitea.quadtech.dev:2222/user/repo.git
 
 # Backbone nodes
 ssh root@mainssh.quadtech.dev  # backbone-01

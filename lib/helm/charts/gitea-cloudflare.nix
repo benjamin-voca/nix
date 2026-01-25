@@ -1,5 +1,10 @@
 { helmLib }:
 
+# Gitea configuration optimized for Cloudflare Tunnel
+# - No LoadBalancer (uses ClusterIP)
+# - No TLS configuration (Cloudflare handles it)
+# - Direct routing via Cloudflare Tunnel
+
 {
   # Gitea configuration
   gitea = helmLib.buildChart {
@@ -17,38 +22,36 @@
       # Replicas for high availability
       replicaCount = 2;
 
-      # Service configuration
+      # Service configuration - ClusterIP for Cloudflare Tunnel
       service = {
         http = {
-          type = "ClusterIP";
+          type = "ClusterIP";  # NOT LoadBalancer - Cloudflare Tunnel handles external access
           port = 3000;
         };
         ssh = {
-          type = "LoadBalancer";
+          type = "ClusterIP";  # SSH via Cloudflare Tunnel or separate tunnel
           port = 22;
           externalPort = 2222;
         };
       };
 
-      # Ingress configuration
+      # Ingress - Optional, can be disabled since Cloudflare Tunnel handles routing
       ingress = {
-        enabled = true;
-        className = "nginx";
-        annotations = {
-          "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
-          "nginx.ingress.kubernetes.io/proxy-body-size" = "512m";
-        };
-        hosts = [{
-          host = "gitea.quadtech.dev";
-          paths = [{
-            path = "/";
-            pathType = "Prefix";
-          }];
-        }];
-        tls = [{
-          secretName = "gitea-tls";
-          hosts = [ "gitea.quadtech.dev" ];
-        }];
+        enabled = false;  # Cloudflare Tunnel routes directly to service
+        # If you want to use ingress for internal routing:
+        # enabled = true;
+        # className = "nginx";
+        # annotations = {
+        #   # NO cert-manager annotation - Cloudflare handles TLS
+        # };
+        # hosts = [{
+        #   host = "gitea.quadtech.dev";
+        #   paths = [{
+        #     path = "/";
+        #     pathType = "Prefix";
+        #   }];
+        # }];
+        # # NO tls section - Cloudflare handles TLS termination
       };
 
       # Persistence
@@ -97,7 +100,7 @@
         config = {
           server = {
             DOMAIN = "gitea.quadtech.dev";
-            ROOT_URL = "https://gitea.quadtech.dev";
+            ROOT_URL = "https://gitea.quadtech.dev";  # Cloudflare provides HTTPS
             SSH_DOMAIN = "gitea.quadtech.dev";
             SSH_PORT = 2222;
             DISABLE_SSH = false;

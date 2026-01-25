@@ -17,7 +17,7 @@ in {
 
     registrationUrl = mkOption {
       type = types.str;
-      default = "https://git.quadtech.dev";
+      default = "https://gitea.quadtech.dev";
     };
 
     tokenFile = mkOption {

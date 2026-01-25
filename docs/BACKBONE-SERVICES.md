@@ -50,7 +50,7 @@ sudo nixos-rebuild switch --flake .#backbone-01
 ```
 
 **Access:**
-- Gitea: https://git.quadtech.dev (or http://192.168.1.10)
+- Gitea: https://gitea.quadtech.dev (or http://192.168.1.10)
 - ClickHouse: http://192.168.1.10:8123
 
 ---

@@ -49,7 +49,7 @@ Pre-configured Helm charts for the QuadNix infrastructure.
   - Actions enabled
 - **Storage**: 50Gi for git data, 20Gi for PostgreSQL
 - **Access**: `helmCharts.gitea`
-- **URL**: https://git.quadtech.dev
+- **URL**: https://gitea.quadtech.dev
 
 ### Databases & Analytics
 

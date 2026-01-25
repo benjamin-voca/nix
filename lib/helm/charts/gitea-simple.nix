@@ -1,7 +1,7 @@
 { helmLib }:
 
 {
-  # Gitea configuration
+  # Gitea - Single Instance Configuration for Cloudflare Tunnel
   gitea = helmLib.buildChart {
     name = "gitea";
     chart = helmLib.charts.gitea-charts.gitea;
@@ -14,41 +14,24 @@
         pullPolicy = "IfNotPresent";
       };
 
-      # Replicas for high availability
-      replicaCount = 2;
+      # Single replica (no HA)
+      replicaCount = 1;
 
-      # Service configuration
+      # Service configuration - ClusterIP only (Cloudflare Tunnel handles external access)
       service = {
         http = {
           type = "ClusterIP";
           port = 3000;
         };
         ssh = {
-          type = "LoadBalancer";
+          type = "ClusterIP";
           port = 22;
-          externalPort = 2222;
         };
       };
 
-      # Ingress configuration
+      # Ingress disabled - using Cloudflare Tunnel
       ingress = {
-        enabled = true;
-        className = "nginx";
-        annotations = {
-          "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
-          "nginx.ingress.kubernetes.io/proxy-body-size" = "512m";
-        };
-        hosts = [{
-          host = "gitea.quadtech.dev";
-          paths = [{
-            path = "/";
-            pathType = "Prefix";
-          }];
-        }];
-        tls = [{
-          secretName = "gitea-tls";
-          hosts = [ "gitea.quadtech.dev" ];
-        }];
+        enabled = false;
       };
 
       # Persistence
@@ -99,7 +82,7 @@
             DOMAIN = "gitea.quadtech.dev";
             ROOT_URL = "https://gitea.quadtech.dev";
             SSH_DOMAIN = "gitea.quadtech.dev";
-            SSH_PORT = 2222;
+            SSH_PORT = 22;
             DISABLE_SSH = false;
             START_SSH_SERVER = true;
             SSH_LISTEN_PORT = 22;
@@ -151,14 +134,14 @@
         };
       };
 
-      # Resource limits
+      # Resource limits (reduced for single instance)
       resources = {
         requests = {
           cpu = "200m";
           memory = "512Mi";
         };
         limits = {
-          cpu = "2000m";
+          cpu = "1000m";
           memory = "2Gi";
         };
       };
@@ -181,25 +164,6 @@
       # Security context
       podSecurityContext = {
         fsGroup = 1000;
-      };
-
-      # Node affinity for HA
-      affinity = {
-        podAntiAffinity = {
-          preferredDuringSchedulingIgnoredDuringExecution = [{
-            weight = 100;
-            podAffinityTerm = {
-              labelSelector = {
-                matchExpressions = [{
-                  key = "app";
-                  operator = "In";
-                  values = [ "gitea" ];
-                }];
-              };
-              topologyKey = "kubernetes.io/hostname";
-            };
-          }];
-        };
       };
     };
   };

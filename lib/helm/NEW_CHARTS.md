@@ -60,7 +60,7 @@ Added production-ready Helm chart configurations for Gitea, ClickHouse, and Graf
 - PostgreSQL database (20Gi storage)
 - Redis cluster for caching/sessions/queues
 - SSH service (LoadBalancer on port 2222)
-- HTTP service with ingress (git.quadtech.dev)
+- HTTP service with ingress (gitea.quadtech.dev)
 - Gitea Actions enabled
 - 50Gi persistent storage for repositories
 - Pod anti-affinity for node distribution

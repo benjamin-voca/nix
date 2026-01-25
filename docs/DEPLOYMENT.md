@@ -12,7 +12,7 @@ QuadNix Infrastructure
 │   ├── backbone-01  192.168.1.10  (Primary control plane)
 │   ├── backbone-02  192.168.1.11  (Secondary control plane, HA)
 │   └── Services:
-│       ├── Gitea         (git.quadtech.dev)
+│       ├── Gitea         (gitea.quadtech.dev)
 │       ├── ClickHouse    (clickhouse.quadtech.dev)
 │       ├── Grafana       (grafana.quadtech.dev)
 │       └── Prometheus    (prometheus.quadtech.dev)
@@ -264,7 +264,7 @@ kubectl get ingress --all-namespaces
 ```
 
 Expected ingresses:
-- gitea → git.quadtech.dev
+- gitea → gitea.quadtech.dev
 - grafana → grafana.quadtech.dev
 - clickhouse → clickhouse.quadtech.dev
 - prometheus → prometheus.quadtech.dev
@@ -274,7 +274,7 @@ Expected ingresses:
 Add DNS entries or update `/etc/hosts`:
 
 ```
-192.168.1.10  git.quadtech.dev
+192.168.1.10  gitea.quadtech.dev
 192.168.1.10  grafana.quadtech.dev
 192.168.1.10  clickhouse.quadtech.dev
 192.168.1.10  prometheus.quadtech.dev
@@ -285,9 +285,9 @@ Or use external DNS service pointing to your ingress load balancer.
 ## Step 6: Access Services
 
 ### Gitea
-- URL: https://git.quadtech.dev
+- URL: https://gitea.quadtech.dev
 - Default admin: `gitea_admin` / `changeme` (CHANGE THIS!)
-- SSH: `git.quadtech.dev:2222`
+- SSH: `gitea.quadtech.dev:2222`
 
 ### Grafana
 - URL: https://grafana.quadtech.dev
