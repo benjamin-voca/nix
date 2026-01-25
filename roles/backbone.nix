@@ -42,35 +42,37 @@
     credentialsFile = config.sops.secrets.cloudflared-credentials.path;
 
     routes = [
-      # Existing application (edukurs)
-      {
-        hostname = "edukurs.quadtech.dev";
-        service = "http://localhost:3000";
-      }
-
-      # SSH access
+      # SSH access - primary route
       {
         hostname = "mainssh.quadtech.dev";
         service = "ssh://localhost:22";
       }
 
-      # Gitea - currently on NixOS service, will move to K8s
-      {
-        hostname = "gitea.quadtech.dev";
-        service = "http://localhost:8080";  # Change to 30080 after K8s deployment
-      }
+      # Uncomment services below as they become available
+      
+      # Existing application (edukurs)
+      # {
+      #   hostname = "edukurs.quadtech.dev";
+      #   service = "http://localhost:3000";
+      # }
 
-      # ClickHouse (Kubernetes service - deploy first)
-      {
-        hostname = "clickhouse.quadtech.dev";
-        service = "http://localhost:30081";
-      }
+      # Gitea (enable when running)
+      # {
+      #   hostname = "gitea.quadtech.dev";
+      #   service = "http://localhost:8080";
+      # }
 
-      # Grafana (Kubernetes service - deploy first)
-      {
-        hostname = "grafana.quadtech.dev";
-        service = "http://localhost:30082";
-      }
+      # ClickHouse (enable after K8s deployment)
+      # {
+      #   hostname = "clickhouse.quadtech.dev";
+      #   service = "http://localhost:30081";
+      # }
+
+      # Grafana (enable after K8s deployment)
+      # {
+      #   hostname = "grafana.quadtech.dev";
+      #   service = "http://localhost:30082";
+      # }
     ];
 
     catchAll = "http_status:404";
