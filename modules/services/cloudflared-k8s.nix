@@ -4,6 +4,13 @@ with lib;
 
 let
   cfg = config.services.cloudflared-k8s;
+  
+  # Convert Nix values to YAML format
+  toYAML = v:
+    if builtins.isBool v then (if v then "true" else "false")
+    else if builtins.isInt v then toString v
+    else if builtins.isString v then v
+    else toString v;
 in {
   options.services.cloudflared-k8s = {
     enable = mkEnableOption "Cloudflare Tunnel with Kubernetes service routing";
@@ -77,7 +84,7 @@ in {
           service: ${route.service}
       ${optionalString (route.originRequest != null) ''
           originRequest:
-      ${concatStringsSep "\n" (mapAttrsToList (k: v: "      ${k}: ${toString v}") route.originRequest)}
+      ${concatStringsSep "\n" (mapAttrsToList (k: v: "      ${k}: ${toYAML v}") route.originRequest)}
       ''}
       '') cfg.routes}
         - service: ${cfg.catchAll}
