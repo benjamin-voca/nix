@@ -56,10 +56,7 @@
     },
     "haumea": {
       "inputs": {
-        "nixpkgs": [
-          "nixhelm",
-          "nixpkgs"
-        ]
+        "nixpkgs": ["nixhelm", "nixpkgs"]
       },
       "locked": {
         "lastModified": 1685133229,
@@ -180,18 +177,9 @@
     },
     "pyproject-build-systems": {
       "inputs": {
-        "nixpkgs": [
-          "nixhelm",
-          "nixpkgs"
-        ],
-        "pyproject-nix": [
-          "nixhelm",
-          "pyproject-nix"
-        ],
-        "uv2nix": [
-          "nixhelm",
-          "uv2nix"
-        ]
+        "nixpkgs": ["nixhelm", "nixpkgs"],
+        "pyproject-nix": ["nixhelm", "pyproject-nix"],
+        "uv2nix": ["nixhelm", "uv2nix"]
       },
       "locked": {
         "lastModified": 1763662255,
@@ -209,10 +197,7 @@
     },
     "pyproject-nix": {
       "inputs": {
-        "nixpkgs": [
-          "nixhelm",
-          "nixpkgs"
-        ]
+        "nixpkgs": ["nixhelm", "nixpkgs"]
       },
       "locked": {
         "lastModified": 1764134915,
@@ -239,9 +224,7 @@
     },
     "sops-nix": {
       "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
+        "nixpkgs": ["nixpkgs"]
       },
       "locked": {
         "lastModified": 1769314333,
@@ -307,14 +290,8 @@
     },
     "uv2nix": {
       "inputs": {
-        "nixpkgs": [
-          "nixhelm",
-          "nixpkgs"
-        ],
-        "pyproject-nix": [
-          "nixhelm",
-          "pyproject-nix"
-        ]
+        "nixpkgs": ["nixhelm", "nixpkgs"],
+        "pyproject-nix": ["nixhelm", "pyproject-nix"]
       },
       "locked": {
         "lastModified": 1767701098,
