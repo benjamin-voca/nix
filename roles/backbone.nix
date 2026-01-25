@@ -4,15 +4,16 @@
   imports = [
     ../profiles/server.nix
     ../profiles/docker.nix
-    # ../profiles/kubernetes/control-plane.nix
-    ../services/gitea.nix
-    # ../services/clickhouse.nix
-    # ../services/otel.nix
+    ../profiles/kubernetes/control-plane.nix
+    ../profiles/kubernetes/helm.nix
   ];
 
   networking.firewall.allowedTCPPorts = [
     22 443 6443
   ];
 
-  # services.kubernetes.roles = [ "master" ];
+  services.kubernetes = {
+    roles = [ "master" ];
+    controlPlane.enable = true;
+  };
 }

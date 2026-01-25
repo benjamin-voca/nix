@@ -1,0 +1,200 @@
+---
+# Example Web Application
+# A simple web application that runs on frontline nodes
+#
+# This demonstrates:
+# - Node selector for frontline nodes
+# - Multiple replicas for HA
+# - Resource limits
+# - Health checks
+# - Ingress configuration
+# - TLS with cert-manager
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: client-apps
+  labels:
+    environment: production
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: client-apps
+  labels:
+    app: web-app
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Run on frontline nodes only
+      nodeSelector:
+        kubernetes.io/role: node
+
+      # Spread across nodes for HA
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: web-app
+              topologyKey: kubernetes.io/hostname
+
+      containers:
+      - name: web-app
+        image: nginx:1.25-alpine  # Replace with your app image
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+
+        # Resource limits
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        # Environment variables
+        env:
+        - name: PORT
+          value: "8080"
+        - name: NODE_ENV
+          value: "production"
+
+        # Volume mounts (if needed)
+        # volumeMounts:
+        # - name: data
+        #   mountPath: /data
+
+      # Volumes (if needed)
+      # volumes:
+      # - name: data
+      #   persistentVolumeClaim:
+      #     claimName: web-app-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app
+  namespace: client-apps
+  labels:
+    app: web-app
+spec:
+  type: ClusterIP
+  selector:
+    app: web-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app
+  namespace: client-apps
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  labels:
+    app: web-app
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: myapp.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web-app
+            port:
+              number: 80
+  tls:
+  - secretName: web-app-tls
+    hosts:
+    - myapp.example.com  # Change to your domain
+
+---
+# Horizontal Pod Autoscaler (optional)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-app
+  namespace: client-apps
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-app
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# Pod Disruption Budget (optional)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: web-app
+  namespace: client-apps
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: web-app
