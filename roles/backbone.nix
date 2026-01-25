@@ -5,7 +5,7 @@
     ../profiles/server.nix
     ../profiles/docker.nix
     ../profiles/sops.nix
-    ../profiles/kubernetes/control-plane.nix
+    # ../profiles/kubernetes/control-plane.nix  # Disabled for now - complex NixOS K8s setup
     ../profiles/kubernetes/helm.nix
     ../modules/services/cloudflared-k8s.nix
   ];
@@ -14,12 +14,13 @@
     22 443 6443
   ];
 
-  services.kubernetes = {
-    roles = [ "master" ];
-    masterAddress = "${config.networking.hostName}.local";
-    
-    controlPlane.enable = true;
-  };
+  # Kubernetes disabled for now - will set up properly later
+  # services.kubernetes = {
+  #   roles = [ "master" ];
+  #   masterAddress = "${config.networking.hostName}.local";
+  #   
+  #   controlPlane.enable = true;
+  # };
 
   # SOPS secrets configuration
   sops.secrets = {
