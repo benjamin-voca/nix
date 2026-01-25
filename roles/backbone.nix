@@ -36,7 +36,7 @@
   # Cloudflare Tunnel configuration for K8s services
   services.cloudflared-k8s = {
     enable = true;
-    tunnelId = "9832df66-f04a-40ea-b004-f6f9b100eb14";
+    tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
     
     # Use SOPS-managed credentials
     credentialsFile = config.sops.secrets.cloudflared-credentials.path;
