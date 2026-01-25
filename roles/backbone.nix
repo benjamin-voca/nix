@@ -43,13 +43,9 @@
 
     routes = [
       # SSH access - primary route
-      # Using TCP service for compatibility with Cloudflare Access
       {
         hostname = "mainssh.quadtech.dev";
-        service = "tcp://localhost:22";
-        originRequest = {
-          noTLSVerify = true;
-        };
+        service = "ssh://localhost:22";
       }
 
       # Uncomment services below as they become available
