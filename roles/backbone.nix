@@ -46,6 +46,9 @@
       {
         hostname = "mainssh.quadtech.dev";
         service = "ssh://localhost:22";
+        originRequest = {
+          noTLSVerify = true;
+        };
       }
 
       # Uncomment services below as they become available
