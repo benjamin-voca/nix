@@ -1,12 +1,26 @@
+{ config, pkgs, ... }:
+
 {
   imports = [
     ../../shared/quad-common.nix
-    ../../shared/kubernetes-common.nix
-    ../../kubernetes/worker.nix
+  ];
+
+  environment.systemPackages = with pkgs; [
+    kubernetes
+    kubectl
+    kubeadm
+    cri-tools
+    containerd
   ];
 
   services.kubernetes = {
+    roles = [ "node" ];
+  };
+
+  virtualisation.containerd = {
     enable = true;
-    worker.enable = true;
+    settings = {
+      plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options.SystemdCgroup = true;
+    };
   };
 }

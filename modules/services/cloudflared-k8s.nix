@@ -51,16 +51,21 @@ in {
   config = mkIf cfg.enable {
     environment.etc."cloudflared/config.json".source = json.generate "cloudflared.json" configJson;
 
-    systemd.services.cloudflared-k8s = {
+    systemd.services.cloudflared = {
       description = "Cloudflare Tunnel for Kubernetes services";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
+      aliases = [ "cloudflared-k8s.service" ];
+      restartIfChanged = false;
+      reloadIfChanged = false;
+      stopIfChanged = false;
       serviceConfig = {
         ExecStart = "${pkgs.cloudflared}/bin/cloudflared --config /etc/cloudflared/config.json tunnel run";
         Restart = "always";
         RestartSec = 10;
-        DynamicUser = true;
+        User = "root";
+        Group = "root";
         NoNewPrivileges = true;
         PrivateTmp = true;
         ProtectSystem = "strict";

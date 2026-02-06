@@ -8,26 +8,35 @@ let
       default = {};
     };
   };
+  mockNetworking = {
+    options.networking = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = {};
+    };
+  };
+  mockServices = {
+    options.services = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = {};
+    };
+  };
+  mockVirtualisation = {
+    options.virtualisation = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = {};
+    };
+  };
   eval = lib.evalModules {
     specialArgs = { inherit pkgs; };
     modules = [
       mockEnvironment
-      ../../../modules/shared/quad-common.nix
-      ../../../modules/shared/kubernetes-common.nix
-      ../../../modules/kubernetes/control-plane.nix
-      {
-        services.kubernetes.controlPlane.enable = true;
-        services.kubernetes.controlPlane.etcd.enable = true;
-        services.kubernetes.controlPlane.apiServer.enable = true;
-        services.kubernetes.controlPlane.apiServer.advertiseAddress = "10.0.0.1";
-        services.kubernetes.controlPlane.etcd.cluster = [ "https://etcd-0:2379" ];
-      }
+      mockNetworking
+      mockServices
+      mockVirtualisation
+      ../../../modules/profiles/kubernetes/control-plane.nix
+      { networking.hostName = "backbone-01"; }
     ];
   };
-
-  apiServer = lib.attrByPath [ "environment" "etc" "kubernetes/api-server.yaml" "source" ] null eval.config;
-  etcdConf = lib.attrByPath [ "environment" "etc" "kubernetes/etcd.conf" "source" ] null eval.config;
 in
-assert apiServer != null;
-assert etcdConf != null;
+assert (eval.config.services.kubernetes.roles == [ "master" "node" ]);
 true

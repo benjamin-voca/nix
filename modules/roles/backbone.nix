@@ -7,6 +7,7 @@
     ../profiles/docker.nix
     ../profiles/sops.nix
     ../profiles/kubernetes/control-plane.nix
+    ../profiles/kubernetes/allow-master-workloads.nix
     ../profiles/kubernetes/helm.nix
     ../services/cloudflared-k8s.nix
   ];

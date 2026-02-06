@@ -15,6 +15,11 @@ let
         [
           inputs.sops-nix.nixosModules.sops
           ({ ... }: { networking.hostName = name; })
+          ({ pkgs, ... }: {
+            system.stateVersion = "26.05";
+            programs.fish.enable = true;
+            users.users.root.shell = pkgs.fish;
+          })
           hardwareModule
           roleModule
         ]

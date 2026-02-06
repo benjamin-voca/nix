@@ -6,8 +6,6 @@
     ../profiles/kubernetes/worker.nix
   ];
 
-  services.kubernetes.roles = [ "node" ];
-
   systemd.services.docker-prune = {
     script = "docker system prune -af";
     startAt = "daily";
