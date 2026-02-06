@@ -32,12 +32,12 @@ let
         };
         config = {
           nixpkgs.hostPlatform = "aarch64-darwin";
-          quadnix.environment = "dev";
+          quad.environment = "dev";
         };
       })
-      ../../../nix/modules/shared/common.nix
-      ../../../nix/modules/shared/gitea-common.nix
-      ../../../nix/modules/gitea/server.nix
+      ../../../modules/shared/quad-common.nix
+      ../../../modules/shared/gitea-common.nix
+      ../../../modules/gitea/server.nix
       {
         services.gitea.enable = true;
         services.gitea.database.host = "db.internal";

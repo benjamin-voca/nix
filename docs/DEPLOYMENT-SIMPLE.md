@@ -46,24 +46,27 @@ Choose one of these options:
 Update your host configuration to use the new role:
 
 ```nix
-# hosts/backbone-01/configuration.nix
+# modules/hosts/backbone-01.nix
 {
-  imports = [
-    ../../roles/backbone-k8s-cloudflare.nix
-  ];
+  quad.hosts.backbone-01 = config.quad.lib.mkClusterHost {
+    name = "backbone-01";
+    system = "x86_64-linux";
+    hardwareModule = ../hardware/backbone-01.nix;
+    roleModule = ../roles/backbone.nix;
+  };
 }
 ```
 
 ### Option B: Manual Configuration
 
-If you want to keep your existing `roles/backbone.nix`, add the Cloudflare module:
+If you want to keep your existing `modules/roles/backbone.nix`, add the Cloudflare module:
 
 ```nix
-# roles/backbone.nix
+# modules/roles/backbone.nix
 {
   imports = [
     # ... existing imports
-    ../modules/services/cloudflared-k8s.nix
+    ../services/cloudflared-k8s.nix
   ];
 
   services.cloudflared-k8s = {
@@ -95,7 +98,7 @@ nix store diff-closures
 sudo nixos-rebuild switch
 
 # Verify Cloudflare Tunnel is running
-systemctl status cloudflared
+systemctl status cloudflared-k8s
 ```
 
 ## Step 3: Verify Kubernetes Cluster

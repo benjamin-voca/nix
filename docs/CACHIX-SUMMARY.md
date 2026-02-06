@@ -6,10 +6,10 @@ Cachix is now fully integrated into QuadNix **declaratively** - no imperative co
 
 ## Files Created
 
-1. **profiles/cachix.nix** (30 lines)
+1. **modules/profiles/cachix.nix** (30 lines)
    - System-level Cachix configuration
    - Configures binary cache substituters and public keys
-   - Automatically imported via `profiles/base.nix`
+   - Automatically imported via `modules/profiles/base.nix`
 
 2. **docs/CACHIX.md** (comprehensive documentation)
    - Complete guide to Cachix integration
@@ -22,7 +22,7 @@ Cachix is now fully integrated into QuadNix **declaratively** - no imperative co
    - Added `nixConfig` section with flake-level cache configuration
    - Applies to all `nix flake` commands automatically
 
-2. **profiles/base.nix**
+2. **modules/profiles/base.nix**
    - Imports `./cachix.nix` for system-wide cache configuration
 
 3. **README.md**
@@ -64,7 +64,7 @@ nixConfig = {
 };
 ```
 
-**System Level** (`profiles/cachix.nix`):
+**System Level** (`modules/profiles/cachix.nix`):
 ```nix
 nix.settings = {
   substituters = [
@@ -104,7 +104,7 @@ cachix use nix-community    # ❌ Not in version control
 
 **New declarative way (automatic):**
 ```nix
-# ✅ In flake.nix and profiles/cachix.nix
+# ✅ In flake.nix and modules/profiles/cachix.nix
 # ✅ Version controlled
 # ✅ Automatically applied to all systems
 # ✅ No user intervention needed
@@ -187,7 +187,7 @@ accept-flake-config = true
 To add additional caches, edit both:
 
 1. **flake.nix** - Add to `nixConfig.extra-substituters` and `extra-trusted-public-keys`
-2. **profiles/cachix.nix** - Add to `substituters` and `trusted-public-keys`
+2. **modules/profiles/cachix.nix** - Add to `substituters` and `trusted-public-keys`
 
 See `docs/CACHIX.md` for detailed instructions.
 

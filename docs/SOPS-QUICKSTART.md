@@ -250,7 +250,7 @@ After successful setup:
    #   admin-password: "..."
    ```
 
-4. **Configure services to use SOPS secrets** in `roles/backbone.nix`:
+4. **Configure services to use SOPS secrets** in `modules/roles/backbone.nix`:
    ```nix
    sops.secrets.gitea-admin-password = {
      sopsFile = ../secrets/${config.networking.hostName}.yaml;

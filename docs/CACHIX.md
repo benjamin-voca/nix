@@ -7,7 +7,7 @@ QuadNix includes declarative Cachix configuration for faster builds by using pre
 Cachix is integrated at two levels:
 
 1. **Flake level** (`flake.nix`) - Applies to `nix flake` commands
-2. **System level** (`profiles/cachix.nix`) - Applies to NixOS systems
+2. **System level** (`modules/profiles/cachix.nix`) - Applies to NixOS systems
 
 This dual-level approach ensures that both flake operations and system rebuilds benefit from cached binaries.
 
@@ -56,7 +56,7 @@ This configuration:
 
 ### System-level Configuration
 
-File: `profiles/cachix.nix`
+File: `modules/profiles/cachix.nix`
 
 ```nix
 {
@@ -77,7 +77,7 @@ File: `profiles/cachix.nix`
 ```
 
 This configuration:
-- Applies to all NixOS systems via `profiles/base.nix`
+- Applies to all NixOS systems via `modules/profiles/base.nix`
 - Persists across system rebuilds
 - No imperative `cachix use` commands needed
 
@@ -173,7 +173,7 @@ nixConfig = {
 
 ### 2. Update System Configuration
 
-Edit `profiles/cachix.nix`:
+Edit `modules/profiles/cachix.nix`:
 
 ```nix
 nix.settings = {
@@ -223,7 +223,7 @@ cachix-auth-token: "your-secret-token"
 ```
 
 ```nix
-# profiles/cachix.nix
+# modules/profiles/cachix.nix
 { config, ... }:
 {
   sops.secrets."cachix-auth-token" = {

@@ -2,11 +2,19 @@
 
 let
   lib = pkgs.lib;
+  mockEnvironment = {
+    options.environment = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
   eval = lib.evalModules {
+    specialArgs = { inherit pkgs; };
     modules = [
-      ../../../nix/modules/shared/common.nix
-      ../../../nix/modules/shared/kubernetes-common.nix
-      ../../../nix/modules/kubernetes/control-plane.nix
+      mockEnvironment
+      ../../../modules/shared/quad-common.nix
+      ../../../modules/shared/kubernetes-common.nix
+      ../../../modules/kubernetes/control-plane.nix
       {
         services.kubernetes.controlPlane.enable = true;
         services.kubernetes.controlPlane.etcd.enable = true;

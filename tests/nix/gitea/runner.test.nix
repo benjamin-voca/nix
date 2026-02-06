@@ -2,11 +2,26 @@
 
 let
   lib = pkgs.lib;
+  mockEnvironment = {
+    options.environment = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
+  mockSystemd = {
+    options.systemd = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
   eval = lib.evalModules {
+    specialArgs = { inherit pkgs; };
     modules = [
-      ../../../nix/modules/shared/common.nix
-      ../../../nix/modules/shared/gitea-common.nix
-      ../../../nix/modules/gitea/runner.nix
+      mockEnvironment
+      mockSystemd
+      ../../../modules/shared/quad-common.nix
+      ../../../modules/shared/gitea-common.nix
+      ../../../modules/gitea/runner.nix
       {
         services.gitea.runner.enable = true;
         services.gitea.runner.tokenFile = builtins.toFile "token" "runner-token";

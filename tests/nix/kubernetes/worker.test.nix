@@ -2,11 +2,19 @@
 
 let
   lib = pkgs.lib;
+  mockEnvironment = {
+    options.environment = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
   eval = lib.evalModules {
+    specialArgs = { inherit pkgs; };
     modules = [
-      ../../nix/modules/shared/common.nix
-      ../../nix/modules/shared/kubernetes-common.nix
-      ../../nix/modules/kubernetes/worker.nix
+      mockEnvironment
+      ../../../modules/shared/quad-common.nix
+      ../../../modules/shared/kubernetes-common.nix
+      ../../../modules/kubernetes/worker.nix
       {
         services.kubernetes.worker.enable = true;
         services.kubernetes.worker.nodeIP = "10.1.0.5";

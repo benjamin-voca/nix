@@ -2,13 +2,20 @@
 
 let
   lib = pkgs.lib;
+  mockEnvironment = {
+    options.environment = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
   eval = lib.evalModules {
     modules = [
-      ../../../nix/modules/shared/common.nix
+      mockEnvironment
+      ../../../modules/shared/quad-common.nix
       {
-        quadnix.environment = "staging";
-        quadnix.versions.kubernetes = "1.28.1";
-        quadnix.paths.stateDir = "/data/quadnix";
+        quad.environment = "staging";
+        quad.versions.kubernetes = "1.28.1";
+        quad.paths.stateDir = "/data/quadnix";
       }
     ];
   };

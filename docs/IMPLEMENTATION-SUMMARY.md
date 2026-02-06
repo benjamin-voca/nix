@@ -34,7 +34,7 @@ modules/services/cloudflared-k8s.nix  # Declarative Cloudflare Tunnel configurat
 
 ### New Backbone Role
 ```
-roles/backbone-k8s-cloudflare.nix     # Complete K8s + Cloudflare setup
+modules/roles/backbone.nix            # Complete K8s + Cloudflare setup
 ```
 
 **Configuration:**
@@ -74,9 +74,9 @@ docs/DEPLOYMENT-SIMPLE.md             # Complete step-by-step guide
 
 ### Fixed Files
 ```
-profiles/kubernetes/helm.nix          # Removed invalid services.kubernetes.helm option
+modules/profiles/kubernetes/helm.nix  # Removed invalid services.kubernetes.helm option
 flake.nix                             # Removed invalid nix-kube-generators.inputs.nixpkgs.follows
-roles/backbone.nix                    # Added services.kubernetes.masterAddress
+modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 ```
 
 ## Architecture Diagram
@@ -235,7 +235,7 @@ kubectl port-forward -n gitea svc/gitea-http 3000:3000
 ### Adding a New Service to Cloudflare Tunnel
 
 ```nix
-# roles/backbone-k8s-cloudflare.nix
+# modules/roles/backbone.nix
 services.cloudflared-k8s.routes = [
   # ... existing routes
   {
@@ -279,12 +279,12 @@ affinity = {
 | `lib/helm/charts/clickhouse-simple.nix` | Single-instance ClickHouse chart | ✅ Created |
 | `lib/helm/charts/grafana-simple.nix` | Single-instance Grafana+Loki+Tempo | ✅ Created |
 | `modules/services/cloudflared-k8s.nix` | Cloudflare Tunnel NixOS module | ✅ Created |
-| `roles/backbone-k8s-cloudflare.nix` | K8s+Cloudflare backbone role | ✅ Created |
+| `modules/roles/backbone.nix` | K8s+Cloudflare backbone role | ✅ Created |
 | `scripts/deploy-simple.sh` | Deployment automation script | ✅ Created |
 | `docs/DEPLOYMENT-SIMPLE.md` | Complete deployment guide | ✅ Created |
-| `profiles/kubernetes/helm.nix` | Helm CLI installation | ✅ Fixed |
+| `modules/profiles/kubernetes/helm.nix` | Helm CLI installation | ✅ Fixed |
 | `flake.nix` | Nix flake configuration | ✅ Fixed |
-| `roles/backbone.nix` | Default backbone role | ✅ Fixed |
+| `modules/roles/backbone.nix` | Default backbone role | ✅ Fixed |
 
 ## Summary
 

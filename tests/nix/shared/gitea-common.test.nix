@@ -2,10 +2,24 @@
 
 let
   lib = pkgs.lib;
+  mockEnvironment = {
+    options.environment = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
+  mockGitea = {
+    options.services.gitea.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+    };
+  };
   eval = lib.evalModules {
     modules = [
-      ../../../nix/modules/shared/common.nix
-      ../../../nix/modules/shared/gitea-common.nix
+      mockEnvironment
+      mockGitea
+      ../../../modules/shared/quad-common.nix
+      ../../../modules/shared/gitea-common.nix
       {
         services.gitea.enable = true;
         services.gitea.common.stateDir = "/data/gitea";

@@ -15,9 +15,9 @@
 Based on your configuration:
 
 ```nix
-# hosts/backbone-01/systemd/cloudflared.nix
-systemd.services.cloudflared = {
-  ExecStart = "cloudflared --config /etc/cloudflared/config.yml tunnel run";
+# modules/services/cloudflared-k8s.nix (enabled from modules/roles/backbone.nix)
+systemd.services.cloudflared-k8s = {
+  ExecStart = "cloudflared --config /etc/cloudflared/config.json tunnel run";
 };
 ```
 
@@ -110,7 +110,7 @@ All inbound traffic comes through the Cloudflare Tunnel (outbound connection fro
 ### For NixOS Services (Option 1)
 
 ```nix
-# roles/backbone.nix
+# modules/roles/backbone.nix
 {
   imports = [
     ../profiles/server.nix
@@ -122,7 +122,7 @@ All inbound traffic comes through the Cloudflare Tunnel (outbound connection fro
   networking.firewall.allowedTCPPorts = [ 22 ];
   
   # Cloudflare Tunnel configuration
-  systemd.services.cloudflared.enable = true;
+  services.cloudflared-k8s.enable = true;
 }
 ```
 
@@ -335,8 +335,8 @@ helm install gitea ./result/*.tgz -n gitea
 Make sure `cloudflared` points to the right services:
 
 ```nix
-# hosts/backbone-01/systemd/cloudflared.nix
-# Ensure config.yml is up to date
+# modules/services/cloudflared-k8s.nix
+# Ensure config.json is up to date
 ```
 
 Or for Kubernetes services:
@@ -373,7 +373,7 @@ Given you have Cloudflare Tunnel, here's my **recommended approach**:
 **Configuration:**
 
 ```nix
-# roles/backbone.nix - NixOS Services
+# modules/roles/backbone.nix - NixOS Services
 {
   imports = [
     ../services/gitea.nix

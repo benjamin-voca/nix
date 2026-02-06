@@ -1,0 +1,19 @@
+{ config, ... }:
+
+{
+  services.gitea = {
+    enable = true;
+    settings = {
+      server = {
+        DOMAIN = "gitea.quadtech.dev";
+        ROOT_URL = "https://gitea.quadtech.dev";
+        HTTP_PORT = 443;
+        SSH_PORT = 2222;
+        DISABLE_SSH = false;
+      };
+      service = {
+        DISABLE_REGISTRATION = false;
+      };
+    };
+  };
+}

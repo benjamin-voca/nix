@@ -2,10 +2,24 @@
 
 let
   lib = pkgs.lib;
+  mockEnvironment = {
+    options.environment = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.attrsOf lib.types.anything);
+      default = {};
+    };
+  };
+  mockKubernetesRoles = {
+    options.services.kubernetes.roles = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+    };
+  };
   eval = lib.evalModules {
     modules = [
-      ../../../nix/modules/shared/common.nix
-      ../../../nix/modules/shared/kubernetes-common.nix
+      mockEnvironment
+      mockKubernetesRoles
+      ../../../modules/shared/quad-common.nix
+      ../../../modules/shared/kubernetes-common.nix
       {
         services.kubernetes.roles = [ "master" ];
         services.kubernetes.common.clusterName = "alpha";

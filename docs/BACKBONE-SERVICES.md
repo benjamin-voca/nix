@@ -4,9 +4,9 @@
 
 **NO**, the current config will **NOT** run Gitea/ClickHouse/Grafana on backbone-01 because:
 
-1. `roles/backbone.nix` has Kubernetes control plane **commented out** (line 7)
-2. Only `services/gitea.nix` is imported, but it runs as a **NixOS systemd service** (not Kubernetes)
-3. ClickHouse and other services are **commented out** (line 9-10)
+1. `modules/roles/backbone.nix` enables Kubernetes control plane
+2. No NixOS services are enabled by default
+3. Helm charts are deployed separately via `scripts/deploy.sh`
 
 ## Two Approaches to Run Services
 
@@ -31,7 +31,7 @@ Run services directly on the NixOS host as systemd services.
 **Configuration:**
 
 ```nix
-# roles/backbone.nix
+# modules/roles/backbone.nix
 {
   imports = [
     ../profiles/server.nix
@@ -75,7 +75,7 @@ Run services on Kubernetes using Helm charts.
 **Configuration:**
 
 ```nix
-# roles/backbone.nix
+# modules/roles/backbone.nix
 {
   imports = [
     ../profiles/server.nix
@@ -83,11 +83,6 @@ Run services on Kubernetes using Helm charts.
     ../profiles/kubernetes/control-plane.nix
     ../profiles/kubernetes/helm.nix
   ];
-  
-  services.kubernetes = {
-    roles = [ "master" ];
-    controlPlane.enable = true;
-  };
 }
 ```
 
@@ -119,7 +114,7 @@ Here's what to change to get services running:
 
 ### Quick Fix - Option 1 (NixOS Services)
 
-**1. Update `roles/backbone.nix`:**
+**1. Update `modules/roles/backbone.nix`:**
 
 ```nix
 { config, pkgs, ... }:
@@ -163,17 +158,14 @@ curl http://localhost:8123
 
 ### Proper Fix - Option 2 (Kubernetes)
 
-**1. Replace `roles/backbone.nix` with the updated version:**
+**1. Replace `modules/roles/backbone.nix` with the updated version:**
 
 ```sh
 # Backup current
-cp roles/backbone.nix roles/backbone.nix.backup
-
-# Use the updated version
-cp roles/backbone-updated.nix roles/backbone.nix
+cp modules/roles/backbone.nix modules/roles/backbone.nix.backup
 ```
 
-Or manually edit to uncomment the Kubernetes imports (see `roles/backbone-updated.nix`).
+Or manually edit to set the Kubernetes imports in `modules/roles/backbone.nix`.
 
 **2. Deploy NixOS:**
 
@@ -205,15 +197,13 @@ helm install gitea ./result/*.tgz -n gitea --create-namespace
 ### Current Files
 
 ```
-roles/backbone.nix
-├── Lines 7: # ../profiles/kubernetes/control-plane.nix  ← COMMENTED OUT
-├── Line 8:  ../services/gitea.nix                       ← ENABLED (NixOS service)
-└── Line 9:  # ../services/clickhouse.nix                ← COMMENTED OUT
+modules/roles/backbone.nix
+└── Imports K8s control-plane + cloudflared-k8s
 
-services/gitea.nix
+modules/services/gitea.nix
 └── Configures Gitea as a systemd service on the host
 
-services/clickhouse.nix
+modules/services/clickhouse.nix
 └── Configures ClickHouse as a systemd service on the host
 ```
 
@@ -221,20 +211,15 @@ services/clickhouse.nix
 
 **For NixOS Services (Option 1):**
 ```diff
-  roles/backbone.nix
-- # ../services/clickhouse.nix
+  modules/roles/backbone.nix
 + ../services/clickhouse.nix
 ```
 
 **For Kubernetes Services (Option 2):**
 ```diff
-  roles/backbone.nix
-- # ../profiles/kubernetes/control-plane.nix
+  modules/roles/backbone.nix
 + ../profiles/kubernetes/control-plane.nix
 + ../profiles/kubernetes/helm.nix
-
-- ../services/gitea.nix
-- # ../services/clickhouse.nix
 ```
 
 Then deploy Helm charts separately.
@@ -295,12 +280,12 @@ Given your setup (backbone for internal, frontline for clients):
 **Choose Your Path:**
 
 **Path A - Quick Start (NixOS Services):**
-1. Uncomment services in `roles/backbone.nix`
+1. Uncomment services in `modules/roles/backbone.nix`
 2. Deploy: `sudo nixos-rebuild switch --flake .#backbone-01`
 3. Access services directly on backbone-01
 
 **Path B - Production (Kubernetes):**
-1. Use `roles/backbone-updated.nix` as your `roles/backbone.nix`
+1. Use `modules/roles/backbone.nix` as your backbone role
 2. Deploy: `sudo nixos-rebuild switch --flake .#backbone-01`
 3. Run: `./scripts/deploy.sh` to deploy Helm charts
 4. Access services via ingress
