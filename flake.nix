@@ -28,7 +28,7 @@
     let
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-      
+      linuxSystems = [ "x86_64-linux" "aarch64-linux" ];
       # Helm library for each system
       helmLibFor = system:
         let
@@ -71,37 +71,50 @@
       deploy = {
         nodes = {
           "backbone-01" = {
-            hostname = "mainssh.quadtech.dev";
-            profiles = {
-              system = "./result";
+            hostname = "backbone01";
+            profiles.system = {
+              user = "root";
+              path = deploy-rs.lib.x86_64-linux.activate.nixos
+                self.nixosConfigurations.backbone-01;
             };
             sshUser = "root";
+            remoteBuild = true;
           };
 
           "backbone-02" = {
             hostname = "192.168.1.11";
-            profiles = {
-              system = "./result";
+            profiles.system = {
+              user = "root";
+              path = deploy-rs.lib.x86_64-linux.activate.nixos
+                self.nixosConfigurations.backbone-02;
             };
             sshUser = "root";
           };
 
           "frontline-01" = {
             hostname = "192.168.1.20";
-            profiles = {
-              system = "./result";
+            profiles.system = {
+              user = "root";
+              path = deploy-rs.lib.x86_64-linux.activate.nixos
+                self.nixosConfigurations.frontline-01;
             };
             sshUser = "root";
           };
 
           "frontline-02" = {
             hostname = "192.168.1.21";
-            profiles = {
-              system = "./result";
+            profiles.system = {
+              user = "root";
+              path = deploy-rs.lib.x86_64-linux.activate.nixos
+                self.nixosConfigurations.frontline-02;
             };
             sshUser = "root";
           };
         };
+      };
+
+      apps = {
+        deploy = deploy-rs.apps.x86_64-linux.deploy;
       };
     };
 }
