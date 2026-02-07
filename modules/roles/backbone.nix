@@ -51,7 +51,7 @@
   services.cloudflared-k8s-deploy = {
     enable = true;
     tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
-    replicas = 2;
+    replicas = 1;
     imageTag = "2025.2.0";
   };
 }
