@@ -111,6 +111,8 @@ let
       #!/bin/bash
       set -e
 
+      export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
+
       echo "Waiting for Kubernetes API..."
       until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
         echo "Waiting for Kubernetes API..."
@@ -132,6 +134,7 @@ let
     text = ''
       #!/bin/bash
       set -e
+      export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
       ${kubectl} delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found 2>/dev/null || true
       ${kubectl} delete -f ${manifests} --ignore-not-found 2>/dev/null || true
     '';
