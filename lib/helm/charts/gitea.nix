@@ -15,7 +15,7 @@
       # Gitea image configuration
       image = {
         registry = "docker.gitea.com";
-        repository = "gitea/gitea";
+        repository = "gitea";
         tag = "1.25.4";
         rootless = false;
         pullPolicy = "IfNotPresent";
