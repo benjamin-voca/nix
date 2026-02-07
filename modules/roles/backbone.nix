@@ -38,28 +38,6 @@
     };
   };
 
-  environment.etc."kubernetes/overlays/gitea-db.env" = {
-    mode = "0400";
-    text = ''
-      GITEA_DB_PASSWORD=${config.sops.placeholder.gitea-db-password}
-    '';
-  };
-
-  environment.etc."kubernetes/overlays/infisical-db.env" = {
-    mode = "0400";
-    text = ''
-      INFISICAL_DB_PASSWORD=${config.sops.placeholder.infisical-db-password}
-    '';
-  };
-
-  environment.etc."kubernetes/overlays/infisical-secrets.env" = {
-    mode = "0400";
-    text = ''
-      ENCRYPTION_KEY=${config.sops.placeholder.infisical-encryption-key}
-      AUTH_SECRET=${config.sops.placeholder.infisical-auth-secret}
-      INFISICAL_DB_PASSWORD=${config.sops.placeholder.infisical-db-password}
-    '';
-  };
 
   services.cloudflared-k8s = {
     enable = true;
