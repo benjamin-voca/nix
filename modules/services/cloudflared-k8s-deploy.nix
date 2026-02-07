@@ -25,11 +25,7 @@ let
       config.yml: |
         tunnel: ${cfg.tunnelId}
         credentials-file: /etc/cloudflared/credentials/credentials.json
-
-        ingress:
-          - hostname: "*.quadtech.dev"
-            service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
-          - service: http_status:404
+        loglevel: debug
     ---
     apiVersion: apps/v1
     kind: Deployment
@@ -56,6 +52,7 @@ let
                 - --config
                 - /etc/cloudflared/config.yml
                 - run
+                - ${cfg.tunnelId}
               resources:
                 requests:
                   cpu: 50m
