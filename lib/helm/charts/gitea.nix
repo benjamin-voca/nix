@@ -14,9 +14,10 @@
     values = {
       # Gitea image configuration
       image = {
-        registry = "docker.gitea.com";
+        registry = "";
         repository = "gitea";
         tag = "1.25.4";
+        fullOverride = "docker.gitea.com/gitea/gitea:1.25.4";
         rootless = false;
         pullPolicy = "IfNotPresent";
       };
