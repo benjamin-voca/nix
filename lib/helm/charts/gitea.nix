@@ -18,7 +18,7 @@
         repository = "gitea/gitea";
         tag = "1.25.4";
         fullOverride = "";
-        rootless = true;
+        rootless = false;
         pullPolicy = "IfNotPresent";
       };
 
@@ -155,6 +155,16 @@
           };
         };
       };
+
+      initPreScript = ''
+        export GITEA_TEMP=/tmp/gitea
+        mkdir -pv /tmp/gitea
+        chmod -v ug+rwx /tmp/gitea
+        if [ ! -d /data/git/.ssh ]; then
+          mkdir -pv /data/git/.ssh
+        fi
+        chmod -Rv 700 /data/git/.ssh || true
+      '';
 
       # Resource limits
       resources = {
