@@ -7,8 +7,8 @@
     chart = helmLib.kubelib.downloadHelmChart {
       repo = "https://dl.gitea.com/charts";
       chart = "gitea";
-      version = "12.4.0";
-      chartHash = "sha256-jIjCFb+v3/uzkxqC84mY48+X5ZrSeHTBssoB8XvsvHg=";
+      version = "12.5.0";
+      chartHash = "sha256-2d6f35f3d1ff0cfcab0f22142d20a1d6405fa974a79d7a18000904d233131823";
     };
     namespace = "gitea";
     values = {
@@ -107,7 +107,7 @@
             SSH_LISTEN_PORT = 22;
           };
           ssh = {
-            create = false;
+            create = true;
           };
 
           database = {
@@ -197,19 +197,6 @@
       # Security context
       podSecurityContext = {
         fsGroup = 1000;
-      };
-
-      # Disable broken init containers - let Gitea handle initialization
-      initContainers = {
-        initDirectories = {
-          enabled = false;
-        };
-        initAppIni = {
-          enabled = false;
-        };
-        configureGitea = {
-          enabled = false;
-        };
       };
 
       # Node affinity for HA
