@@ -22,11 +22,11 @@ let
       name: cloudflared-config
       namespace: cloudflared
     data:
-      config.yml: |
+      config.yaml: |
         tunnel: ${cfg.tunnelId}
-        credentials-file: /etc/cloudflared/credentials/credentials.json
-        loglevel: info
-        logfile: /tmp/cloudflared.log
+        credentials-file: /etc/cloudflared/creds/credentials.json
+        metrics: 0.0.0.0:2000
+        no-autoupdate: true
 
         ingress:
           - hostname: "*.quadtech.dev"
@@ -53,12 +53,18 @@ let
           containers:
             - name: cloudflared
               image: cloudflare/cloudflared:${cfg.imageTag}
-              command:
-                - /usr/bin/cloudflared
+              args:
                 - tunnel
                 - --config
-                - /etc/cloudflared/config.yml
+                - /etc/cloudflared/config/config.yaml
                 - run
+              livenessProbe:
+                httpGet:
+                  path: /ready
+                  port: 2000
+                failureThreshold: 1
+                initialDelaySeconds: 10
+                periodSeconds: 10
               resources:
                 requests:
                   cpu: 50m
@@ -68,17 +74,19 @@ let
                   memory: 256Mi
               volumeMounts:
                 - name: config
-                  mountPath: /etc/cloudflared
+                  mountPath: /etc/cloudflared/config
                   readOnly: true
-                - name: credentials
-                  mountPath: /etc/cloudflared/credentials
+                - name: creds
+                  mountPath: /etc/cloudflared/creds
                   readOnly: true
-
           volumes:
             - name: config
               configMap:
                 name: cloudflared-config
-            - name: credentials
+                items:
+                  - key: config.yaml
+                    path: config.yaml
+            - name: creds
               secret:
                 secretName: cloudflared-credentials
   '';
