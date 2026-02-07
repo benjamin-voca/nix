@@ -57,8 +57,11 @@
       # Persistence
       persistence = {
         enabled = true;
+        create = true;
+        mount = true;
         size = "50Gi";
         storageClass = "longhorn";
+        claimName = "gitea-shared-storage";
       };
 
       # PostgreSQL database
