@@ -93,7 +93,7 @@
         admin = {
           # Admin credentials should be managed via secrets
           username = "gitea_admin";
-          password = "${GITEA_ADMIN_PASSWORD}";
+          password = "REPLACE_ME";
           email = "admin@quadtech.dev";
         };
 
@@ -117,7 +117,7 @@
             HOST = "gitea-db-rw.gitea.svc.cluster.local:5432";
             NAME = "gitea";
             USER = "gitea";
-            PASSWD = "${GITEA_DB_PASSWORD}";
+            PASSWD = "REPLACE_ME";
             SSL_MODE = "disable";
           };
 
