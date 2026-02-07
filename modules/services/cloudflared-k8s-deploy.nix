@@ -24,7 +24,6 @@ let
     data:
       config.yaml: |
         tunnel: ${cfg.tunnelId}
-        no-autoupdate: true
         credentials-file: /etc/cloudflared/credentials/credentials.json
 
         ingress:
@@ -57,7 +56,6 @@ let
                 - --config
                 - /etc/cloudflared/config.yaml
                 - run
-                - ${cfg.tunnelId}
               resources:
                 requests:
                   cpu: 50m
@@ -72,6 +70,20 @@ let
                 - name: credentials
                   mountPath: /etc/cloudflared/credentials
                   readOnly: true
+              livenessProbe:
+                httpGet:
+                  path: /ready
+                  port: 2000
+                failureThreshold: 1
+                initialDelaySeconds: 10
+                periodSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /ready
+                  port: 2000
+                failureThreshold: 1
+                initialDelaySeconds: 5
+                periodSeconds: 10
           volumes:
             - name: config
               configMap:
