@@ -22,7 +22,7 @@ let
       name: cloudflared-config
       namespace: cloudflared
     data:
-      config.yaml: |
+      config.yml: |
         tunnel: ${cfg.tunnelId}
         credentials-file: /etc/cloudflared/credentials/credentials.json
 
@@ -54,7 +54,7 @@ let
               args:
                 - tunnel
                 - --config
-                - /etc/cloudflared/config.yaml
+                - /etc/cloudflared/config.yml
                 - run
               resources:
                 requests:
@@ -70,20 +70,7 @@ let
                 - name: credentials
                   mountPath: /etc/cloudflared/credentials
                   readOnly: true
-              livenessProbe:
-                httpGet:
-                  path: /ready
-                  port: 2000
-                failureThreshold: 1
-                initialDelaySeconds: 10
-                periodSeconds: 10
-              readinessProbe:
-                httpGet:
-                  path: /ready
-                  port: 2000
-                failureThreshold: 1
-                initialDelaySeconds: 5
-                periodSeconds: 10
+
           volumes:
             - name: config
               configMap:
