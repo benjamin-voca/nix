@@ -30,31 +30,23 @@ helm upgrade --install cloudnative-pg ./result/*.tgz -n cnpg-system --create-nam
 Create the Postgres clusters and app secrets:
 
 ```sh
-gitea_db_password=$(cat /etc/kubernetes/overlays/gitea-db.env | awk -F= '{print $2}')
-infisical_db_password=$(cat /etc/kubernetes/overlays/infisical-db.env | awk -F= '{print $2}')
-infisical_encryption_key=$(cat /etc/kubernetes/overlays/infisical-secrets.env | awk -F= '/ENCRYPTION_KEY/ {print $2}')
-infisical_auth_secret=$(cat /etc/kubernetes/overlays/infisical-secrets.env | awk -F= '/AUTH_SECRET/ {print $2}')
-sed -e "s/REPLACE_ME/${gitea_db_password}/g" \
-  -e "s/REPLACE_ME/${infisical_db_password}/g" \
-  -e "s/REPLACE_ME/${infisical_encryption_key}/g" \
-  -e "s/REPLACE_ME/${infisical_auth_secret}/g" \
-  manifests/backbone/cnpg.yaml | kubectl apply -f -
-```
+SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml \
+  | rg -n "gitea-db-password|infisical-db-password|infisical-encryption-key|infisical-auth-secret"
 
-Alternatively, copy `manifests/backbone/cnpg.yaml`, replace the placeholders, and apply.
+gitea_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "gitea-db-password: (.*)$" -r '$1')
+infisical_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-db-password: (.*)$" -r '$1')
+infisical_encryption_key=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-encryption-key: (.*)$" -r '$1')
+infisical_auth_secret=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-auth-secret: (.*)$" -r '$1')
 
-Update the Gitea/Infisical chart secrets before installing:
-
-```sh
-sed -e "s/REPLACE_ME/${gitea_db_password}/g" lib/helm/charts/gitea.nix
+GITEA_DB_PASSWORD="$gitea_db_password" \
+INFISICAL_DB_PASSWORD="$infisical_db_password" \
+INFISICAL_ENCRYPTION_KEY="$infisical_encryption_key" \
+INFISICAL_AUTH_SECRET="$infisical_auth_secret" \
+envsubst < manifests/backbone/cnpg.yaml | kubectl apply -f -
 ```
 
 If you prefer to keep secrets out of the chart values, set them via a k8s secret and patch
 the deployment after install.
-
-```
-kubectl apply -f manifests/backbone/cnpg.yaml
-```
 
 Replace all `REPLACE_ME` values in `manifests/backbone/cnpg.yaml` before applying.
 
