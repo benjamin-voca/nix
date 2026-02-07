@@ -108,7 +108,7 @@
             SSH_LISTEN_PORT = 22;
           };
           ssh = {
-            create = true;
+            create = false;
           };
 
           database = {
