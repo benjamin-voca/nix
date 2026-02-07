@@ -39,13 +39,6 @@
           };
         };
 
-        # Metrics
-        metrics = {
-          enabled = true;
-          serviceMonitor = {
-            enabled = true;
-          };
-        };
 
         # Pod disruption budget
         podDisruptionBudget = {
