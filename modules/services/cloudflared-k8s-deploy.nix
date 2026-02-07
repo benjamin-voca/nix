@@ -24,6 +24,7 @@ let
     data:
       config.yaml: |
         tunnel: ${cfg.tunnelId}
+        no-autoupdate: true
         credentials-file: /etc/cloudflared/credentials/credentials.json
 
         ingress:
@@ -56,7 +57,7 @@ let
                 - --config
                 - /etc/cloudflared/config.yaml
                 - run
-                - --no-autoupdate
+                - ${cfg.tunnelId}
               resources:
                 requests:
                   cpu: 50m
