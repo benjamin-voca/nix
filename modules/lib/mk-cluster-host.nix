@@ -19,6 +19,11 @@ let
             system.stateVersion = "26.05";
             programs.fish.enable = true;
             users.users.root.shell = pkgs.fish;
+            networking.domain = "local";
+            networking.fqdn = "${name}.local";
+            systemd.services.dhcpcd.restartIfChanged = false;
+            systemd.services.dhcpcd.reloadIfChanged = false;
+            systemd.services.dhcpcd.stopIfChanged = false;
           })
           hardwareModule
           roleModule

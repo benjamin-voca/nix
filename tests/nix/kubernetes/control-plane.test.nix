@@ -34,7 +34,11 @@ let
       mockServices
       mockVirtualisation
       ../../../modules/profiles/kubernetes/control-plane.nix
-      { networking.hostName = "backbone-01"; }
+      {
+        networking.hostName = "backbone-01";
+        networking.fqdnOrHostName = "backbone-01";
+        networking.fqdn = "backbone-01.local";
+      }
     ];
   };
 in

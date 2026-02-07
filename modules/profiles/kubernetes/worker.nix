@@ -8,7 +8,6 @@
   environment.systemPackages = with pkgs; [
     kubernetes
     kubectl
-    kubeadm
     cri-tools
     containerd
   ];
