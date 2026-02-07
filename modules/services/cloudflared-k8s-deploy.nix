@@ -24,7 +24,6 @@ let
     data:
       ingress.yaml: |
         tunnel: ${cfg.tunnelId}
-        credentials-file: /etc/cloudflared/credentials.json
 
         ingress:
           - hostname: "*.quadtech.dev"
@@ -56,6 +55,12 @@ let
                 - --config
                 - /etc/cloudflared/ingress.yaml
                 - run
+              env:
+                - name: TUNNEL_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflared-tunnel-credentials
+                      key: token
               ports:
                 - containerPort: 2000
                   name: metrics
@@ -77,20 +82,10 @@ let
                 - name: config
                   mountPath: /etc/cloudflared
                   readOnly: true
-                - name: credentials
-                  mountPath: /etc/cloudflared/credentials.json
-                  subPath: credentials.json
-                  readOnly: true
           volumes:
             - name: config
               configMap:
                 name: cloudflared-config
-            - name: credentials
-              secret:
-                secretName: cloudflared-tunnel-credentials
-                items:
-                  - key: credentials.json
-                    path: credentials.json
     ---
     apiVersion: v1
     kind: Service
@@ -125,10 +120,14 @@ let
 
       echo "Kubernetes API is ready!"
       ${kubectl} apply -f ${manifests} --validate=false
+
+      # Extract token from credentials file and create secret
+      TOKEN=$(cat ${tunnelCredentials})
       ${kubectl} create secret generic cloudflared-tunnel-credentials \
-        --from-file=credentials.json=${tunnelCredentials} \
+        --from-literal=token="$TOKEN" \
         --namespace=cloudflared \
         --dry-run=client -o yaml | ${kubectl} apply -f -
+
       echo "Cloudflare Tunnel deployed successfully!"
     '';
   };
