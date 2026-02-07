@@ -56,8 +56,6 @@ let
                 - --config
                 - /etc/cloudflared/config.yaml
                 - run
-                - --metrics
-                - 0.0.0.0:2000
                 - --no-autoupdate
               ports:
                 - containerPort: 2000
