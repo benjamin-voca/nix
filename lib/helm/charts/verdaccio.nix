@@ -5,7 +5,7 @@ let
     repo = "https://charts.verdaccio.org";
     chart = "verdaccio";
     version = "4.29.0";
-    chartHash = "sha256-1yfn749nxpi0agsah74gl7324mibma6kj3azb74ni78lavkw2136";
+    chartHash = "sha256-ZgTB51YUnWjJWV8NOY2qK1YixqGPHKj0UyDebhM51vk=";
   };
 in
 {
