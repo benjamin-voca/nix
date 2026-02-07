@@ -15,7 +15,7 @@
       # Gitea image configuration
       image = {
         registry = "";
-        repository = "docker.gitea.com/gitea/gitea";
+        repository = "gitea/gitea";
         tag = "1.25.4";
         fullOverride = "";
         rootless = false;
