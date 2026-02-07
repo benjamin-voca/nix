@@ -84,12 +84,6 @@
 
       # Gitea configuration
       gitea = {
-        paths = {
-          data = "/data";
-          custom = "/data/gitea/custom";
-          temp = "/tmp/gitea";
-          logs = "/data/gitea/custom/log";
-        };
         admin = {
           # Admin credentials should be managed via secrets
           username = "gitea_admin";
@@ -156,15 +150,16 @@
         };
       };
 
-      initPreScript = ''
-        export GITEA_TEMP=/tmp/gitea
-        mkdir -pv /tmp/gitea
-        chmod -v ug+rwx /tmp/gitea
-        if [ ! -d /data/git/.ssh ]; then
-          mkdir -pv /data/git/.ssh
-        fi
-        chmod -Rv 700 /data/git/.ssh || true
-      '';
+      deployment = {
+        env = {
+          GITEA_APP_INI = "/data/gitea/conf/app.ini";
+          GITEA_CUSTOM = "/data/gitea";
+          GITEA_WORK_DIR = "/data";
+          GITEA_TEMP = "/tmp/gitea";
+          TMP_EXISTING_ENVS_FILE = "/tmp/existing-envs";
+          ENV_TO_INI_MOUNT_POINT = "/env-to-ini-mounts";
+        };
+      };
 
       # Resource limits
       resources = {
