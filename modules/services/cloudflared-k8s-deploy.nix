@@ -57,16 +57,6 @@ let
                 - /etc/cloudflared/config.yaml
                 - run
                 - --no-autoupdate
-              ports:
-                - containerPort: 2000
-                  name: metrics
-              livenessProbe:
-                httpGet:
-                  path: /ready
-                  port: 2000
-                initialDelaySeconds: 30
-                periodSeconds: 10
-                failureThreshold: 3
               resources:
                 requests:
                   cpu: 50m
@@ -88,22 +78,6 @@ let
             - name: credentials
               secret:
                 secretName: cloudflared-credentials
-    ---
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: cloudflared
-      namespace: cloudflared
-      labels:
-        app: cloudflared
-    spec:
-      type: ClusterIP
-      selector:
-        app: cloudflared
-      ports:
-        - port: 2000
-          targetPort: 2000
-          name: metrics
   '';
 
   deploySh = pkgs.writeShellApplication {
