@@ -18,7 +18,7 @@
         repository = "gitea/gitea";
         tag = "1.25.4";
         fullOverride = "";
-        rootless = false;
+        rootless = true;
         pullPolicy = "IfNotPresent";
       };
 
