@@ -97,7 +97,7 @@
             MODE = "console";
             ROOT_PATH = "/data/gitea/custom/log";
           };
-          server = {
+            server = {
             DOMAIN = "gitea.quadtech.dev";
             ROOT_URL = "https://gitea.quadtech.dev";
             SSH_DOMAIN = "gitea.quadtech.dev";
@@ -105,6 +105,9 @@
             DISABLE_SSH = false;
             START_SSH_SERVER = true;
             SSH_LISTEN_PORT = 22;
+          };
+          ssh = {
+            create = true;
           };
 
           database = {
