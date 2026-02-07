@@ -24,7 +24,7 @@ let
     data:
       config.yaml: |
         tunnel: ${cfg.tunnelId}
-        credentials-file: /etc/cloudflared/credentials.json
+        credentials-file: /etc/cloudflared/credentials/credentials.json
 
         ingress:
           - hostname: "*.quadtech.dev"
@@ -78,8 +78,7 @@ let
                   mountPath: /etc/cloudflared
                   readOnly: true
                 - name: credentials
-                  mountPath: /etc/cloudflared/credentials.json
-                  subPath: credentials.json
+                  mountPath: /etc/cloudflared/credentials
                   readOnly: true
           volumes:
             - name: config
@@ -88,9 +87,6 @@ let
             - name: credentials
               secret:
                 secretName: cloudflared-credentials
-                items:
-                  - key: credentials.json
-                    path: credentials.json
     ---
     apiVersion: v1
     kind: Service
