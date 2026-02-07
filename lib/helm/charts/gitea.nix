@@ -150,16 +150,6 @@
         };
       };
 
-      deployment = {
-        env = {
-          GITEA_APP_INI = "/data/gitea/conf/app.ini";
-          GITEA_CUSTOM = "/data/gitea";
-          GITEA_WORK_DIR = "/data";
-          GITEA_TEMP = "/tmp/gitea";
-          TMP_EXISTING_ENVS_FILE = "/tmp/existing-envs";
-          ENV_TO_INI_MOUNT_POINT = "/env-to-ini-mounts";
-        };
-      };
 
       # Resource limits
       resources = {
