@@ -7,28 +7,33 @@
     chart = helmLib.charts.argoproj.argo-cd;
     namespace = "argocd";
     values = {
+      global = {
+        domain = "argocd.quadtech.dev";
+      };
+
+      configs = {
+        cm = {
+          "server.insecure" = "true";
+        };
+      };
+
       # Server configuration
       server = {
-        replicas = 2;
+        replicas = 1;
         service = {
           type = "ClusterIP";
         };
         ingress = {
           enabled = true;
           ingressClassName = "nginx";
-          hosts = [
-            "argocd.example.com"
-          ];
-          tls = [{
-            secretName = "argocd-tls";
-            hosts = [ "argocd.example.com" ];
-          }];
+          hostname = "argocd.quadtech.dev";
+          tls = false;
         };
       };
 
       # Redis HA for high availability
       redis-ha = {
-        enabled = true;
+        enabled = false;
       };
 
       # Controller configuration
@@ -38,7 +43,7 @@
 
       # Repo server configuration
       repoServer = {
-        replicas = 2;
+        replicas = 1;
       };
 
       # ApplicationSet controller

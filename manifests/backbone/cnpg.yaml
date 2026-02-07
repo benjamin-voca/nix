@@ -1,0 +1,74 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: gitea-db
+  namespace: gitea
+spec:
+  instances: 1
+  storage:
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: gitea
+      owner: gitea
+      secret:
+        name: gitea-db
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea-db
+  namespace: gitea
+type: kubernetes.io/basic-auth
+stringData:
+  username: gitea
+  password: REPLACE_ME
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: infisical-db
+  namespace: infisical
+spec:
+  instances: 1
+  storage:
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: infisical
+      owner: infisical
+      secret:
+        name: infisical-db
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infisical-db
+  namespace: infisical
+type: kubernetes.io/basic-auth
+stringData:
+  username: infisical
+  password: REPLACE_ME
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infisical-db
+  namespace: infisical
+type: Opaque
+stringData:
+  connectionString: "postgresql://infisical:REPLACE_ME@infisical-db-rw.infisical.svc.cluster.local:5432/infisical"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: infisical-secrets
+  namespace: infisical
+type: Opaque
+stringData:
+  ENCRYPTION_KEY: REPLACE_ME
+  AUTH_SECRET: REPLACE_ME
+  DB_CONNECTION_URI: "postgresql://infisical:REPLACE_ME@infisical-db-rw.infisical.svc.cluster.local:5432/infisical"
+  REDIS_URL: ""
+  SITE_URL: "https://infisical.quadtech.dev"

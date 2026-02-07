@@ -8,14 +8,11 @@
     namespace = "ingress-nginx";
     values = {
       controller = {
-        replicaCount = 2;
+        replicaCount = 1;
         
         # Service configuration
         service = {
-          type = "LoadBalancer";
-          annotations = {
-            "service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol" = "true";
-          };
+          type = "ClusterIP";
         };
 
         # Resource limits
@@ -40,24 +37,19 @@
 
         # Pod disruption budget
         podDisruptionBudget = {
-          enabled = true;
-          minAvailable = 1;
+          enabled = false;
         };
 
         # Auto-scaling
         autoscaling = {
-          enabled = true;
-          minReplicas = 2;
-          maxReplicas = 5;
-          targetCPUUtilizationPercentage = 80;
-          targetMemoryUtilizationPercentage = 80;
+          enabled = false;
         };
       };
 
       # Default backend
       defaultBackend = {
         enabled = true;
-        replicaCount = 2;
+        replicaCount = 1;
       };
     };
   };

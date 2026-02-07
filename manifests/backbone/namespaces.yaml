@@ -61,3 +61,39 @@ metadata:
     app.kubernetes.io/name: cert-manager
     app.kubernetes.io/component: security
     environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: gitops
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: verdaccio
+  labels:
+    app.kubernetes.io/name: verdaccio
+    app.kubernetes.io/component: registry
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: infisical
+  labels:
+    app.kubernetes.io/name: infisical
+    app.kubernetes.io/component: secrets
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: database
+    environment: production

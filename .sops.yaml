@@ -23,7 +23,7 @@ keys:
   # - &frontline-02 age1REPLACE_WITH_FRONTLINE_02_PUBLIC_KEY
 
   # Your personal workstation (optional, for editing secrets)
-  # - &admin age1REPLACE_WITH_YOUR_PERSONAL_PUBLIC_KEY
+  - &admin age1un9trx63mfny5kt8fsac3flqjsc7cree0eq2v4gtfn0zvfmx2dmsqgyetf
 
 creation_rules:
   # Backbone-01 specific secrets
@@ -31,7 +31,7 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-        # - *admin  # Uncomment to allow editing from your workstation
+          - *admin
 
   # Backbone-02 specific secrets
   # - path_regex: secrets/backbone-02\.yaml$
@@ -45,8 +45,8 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-        # - *backbone-02
-        # - *admin
+          # - *backbone-02
+          - *admin
 
   # Frontline-01 specific secrets
   # - path_regex: secrets/frontline-01\.yaml$
@@ -67,7 +67,7 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-        # - *backbone-02
-        # - *frontline-01
-        # - *frontline-02
-        # - *admin
+          # - *backbone-02
+          # - *frontline-01
+          # - *frontline-02
+          - *admin

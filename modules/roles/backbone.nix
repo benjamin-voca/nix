@@ -24,12 +24,48 @@
       group = "root";
       mode = "0400";
     };
+    gitea-db-password = {
+      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+    };
+    infisical-db-password = {
+      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+    };
+    infisical-encryption-key = {
+      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+    };
+    infisical-auth-secret = {
+      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+    };
+  };
+
+  environment.etc."kubernetes/overlays/gitea-db.env" = {
+    mode = "0400";
+    text = ''
+      GITEA_DB_PASSWORD=${config.sops.placeholder.gitea-db-password}
+    '';
+  };
+
+  environment.etc."kubernetes/overlays/infisical-db.env" = {
+    mode = "0400";
+    text = ''
+      INFISICAL_DB_PASSWORD=${config.sops.placeholder.infisical-db-password}
+    '';
+  };
+
+  environment.etc."kubernetes/overlays/infisical-secrets.env" = {
+    mode = "0400";
+    text = ''
+      ENCRYPTION_KEY=${config.sops.placeholder.infisical-encryption-key}
+      AUTH_SECRET=${config.sops.placeholder.infisical-auth-secret}
+      INFISICAL_DB_PASSWORD=${config.sops.placeholder.infisical-db-password}
+    '';
   };
 
   services.cloudflared-k8s = {
     enable = true;
     tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
     credentialsFile = config.sops.secrets.cloudflared-credentials.path;
+    wildcardHostname = "*.quadtech.dev";
 
     routes = [
       {

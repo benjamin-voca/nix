@@ -15,7 +15,7 @@
       };
 
       # Replicas for high availability
-      replicaCount = 2;
+      replicaCount = 1;
 
       # Service configuration
       service = {
@@ -24,9 +24,8 @@
           port = 3000;
         };
         ssh = {
-          type = "LoadBalancer";
+          type = "ClusterIP";
           port = 22;
-          externalPort = 2222;
         };
       };
 
@@ -35,7 +34,6 @@
         enabled = true;
         className = "nginx";
         annotations = {
-          "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
           "nginx.ingress.kubernetes.io/proxy-body-size" = "512m";
         };
         hosts = [{
@@ -45,10 +43,7 @@
             pathType = "Prefix";
           }];
         }];
-        tls = [{
-          secretName = "gitea-tls";
-          hosts = [ "gitea.quadtech.dev" ];
-        }];
+        tls = [ ];
       };
 
       # Persistence
@@ -60,29 +55,20 @@
 
       # PostgreSQL database
       postgresql = {
-        enabled = true;
-        global = {
-          postgresql = {
-            auth = {
-              database = "gitea";
-              username = "gitea";
-              # Password should be managed via secrets
-              password = "changeme";
-            };
-          };
-        };
-        primary = {
-          persistence = {
-            enabled = true;
-            size = "20Gi";
-          };
-        };
+        enabled = false;
+      };
+
+      postgresql-ha = {
+        enabled = false;
       };
 
       # Redis for caching
       redis-cluster = {
-        enabled = true;
-        usePassword = false;
+        enabled = false;
+      };
+
+      valkey-cluster = {
+        enabled = false;
       };
 
       # Gitea configuration
@@ -90,7 +76,7 @@
         admin = {
           # Admin credentials should be managed via secrets
           username = "gitea_admin";
-          password = "changeme";
+          password = "REPLACE_ME";
           email = "admin@quadtech.dev";
         };
 
@@ -107,26 +93,24 @@
 
           database = {
             DB_TYPE = "postgres";
-            HOST = "gitea-postgresql:5432";
+            HOST = "gitea-db-rw.gitea.svc.cluster.local:5432";
             NAME = "gitea";
             USER = "gitea";
-            # Password from secret
+            PASSWD = "REPLACE_ME";
+            SSL_MODE = "disable";
           };
 
           cache = {
             ENABLED = true;
-            ADAPTER = "redis";
-            HOST = "redis://gitea-redis-cluster:6379/0";
+            ADAPTER = "memory";
           };
 
           session = {
-            PROVIDER = "redis";
-            PROVIDER_CONFIG = "redis://gitea-redis-cluster:6379/1";
+            PROVIDER = "memory";
           };
 
           queue = {
-            TYPE = "redis";
-            CONN_STR = "redis://gitea-redis-cluster:6379/2";
+            TYPE = "level";
           };
 
           service = {
@@ -184,23 +168,7 @@
       };
 
       # Node affinity for HA
-      affinity = {
-        podAntiAffinity = {
-          preferredDuringSchedulingIgnoredDuringExecution = [{
-            weight = 100;
-            podAffinityTerm = {
-              labelSelector = {
-                matchExpressions = [{
-                  key = "app";
-                  operator = "In";
-                  values = [ "gitea" ];
-                }];
-              };
-              topologyKey = "kubernetes.io/hostname";
-            };
-          }];
-        };
-      };
+      affinity = { };
     };
   };
 }

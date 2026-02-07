@@ -7,6 +7,9 @@ let
   gitea = import ./gitea.nix { inherit helmLib; };
   clickhouse = import ./clickhouse.nix { inherit helmLib; };
   grafana = import ./grafana.nix { inherit helmLib; };
+  cloudnative-pg = import ./cloudnative-pg.nix { inherit helmLib; };
+  verdaccio = import ./verdaccio.nix { inherit helmLib; };
+  infisical = import ./infisical.nix { inherit helmLib; };
 in
 {
   # Re-export all charts
@@ -16,6 +19,9 @@ in
   inherit (gitea) gitea;
   inherit (clickhouse) clickhouse clickhouse-operator;
   inherit (grafana) grafana loki tempo;
+  inherit (cloudnative-pg) cloudnative-pg;
+  inherit (verdaccio) verdaccio;
+  inherit (infisical) infisical;
 
   # Convenience function to get all charts
   all = {
@@ -25,5 +31,8 @@ in
     inherit (gitea) gitea;
     inherit (clickhouse) clickhouse clickhouse-operator;
     inherit (grafana) grafana loki tempo;
+    inherit (cloudnative-pg) cloudnative-pg;
+    inherit (verdaccio) verdaccio;
+    inherit (infisical) infisical;
   };
 }

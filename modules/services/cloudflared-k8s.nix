@@ -12,7 +12,12 @@ let
       if route.originRequest == null
       then { inherit (route) hostname service; }
       else { inherit (route) hostname service originRequest; }
-    ) cfg.routes ++ [ { service = cfg.catchAll; } ];
+    ) cfg.routes
+    ++ lib.optional (cfg.wildcardHostname != null) {
+      hostname = cfg.wildcardHostname;
+      service = "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80";
+    }
+    ++ [ { service = cfg.catchAll; } ];
   };
 
   routeType = types.submodule {
@@ -35,6 +40,11 @@ in {
     routes = mkOption {
       type = types.listOf routeType;
       default = [ ];
+    };
+
+    wildcardHostname = mkOption {
+      type = types.nullOr types.str;
+      default = null;
     };
 
     catchAll = mkOption {
