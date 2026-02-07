@@ -104,6 +104,38 @@ let
           targetPort: 2000
           name: metrics
   '';
+
+  deploySh = pkgs.writeShellApplication {
+    name = "cloudflared-deploy";
+    text = ''
+      #!/bin/bash
+      set -e
+
+      echo "Waiting for Kubernetes API..."
+      until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
+        echo "Waiting for Kubernetes API..."
+        sleep 5
+      done
+
+      echo "Kubernetes API is ready!"
+      ${kubectl} apply -f ${manifests} --validate=false
+      ${kubectl} create secret generic cloudflared-tunnel-credentials \
+        --from-file=credentials.json=${tunnelCredentials} \
+        --namespace=cloudflared \
+        --dry-run=client -o yaml | ${kubectl} apply -f -
+      echo "Cloudflare Tunnel deployed successfully!"
+    '';
+  };
+
+  cleanupSh = pkgs.writeShellApplication {
+    name = "cloudflared-cleanup";
+    text = ''
+      #!/bin/bash
+      set -e
+      ${kubectl} delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete -f ${manifests} --ignore-not-found 2>/dev/null || true
+    '';
+  };
 in {
   options.services.cloudflared-k8s-deploy = {
     enable = lib.mkEnableOption "Deploy Cloudflare Tunnel to Kubernetes";
@@ -127,7 +159,11 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = [ pkgs.kubectl ];
+    environment.systemPackages = [
+      pkgs.kubectl
+      deploySh
+      cleanupSh
+    ];
 
     systemd.services.cloudflared-k8s-deploy = {
       description = "Deploy Cloudflare Tunnel to Kubernetes";
@@ -137,19 +173,8 @@ in {
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${pkgs.bash}/bin/bash -c '"
-          echo \"Waiting for Kubernetes API...\";
-          until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
-            echo \"Waiting for Kubernetes API...\";
-            sleep 5;
-          done;
-          ${kubectl} apply -f ${manifests} --validate=false;
-          ${kubectl} create secret generic cloudflared-tunnel-credentials --from-file=credentials.json=${tunnelCredentials} --namespace=cloudflared --dry-run=client -o yaml | ${kubectl} apply -f -
-        '";
-        ExecStop = "${pkgs.bash}/bin/bash -c '"
-          ${kubectl} delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found 2>/dev/null || true;
-          ${kubectl} delete -f ${manifests} --ignore-not-found 2>/dev/null || true
-        '";
+        ExecStart = "${deploySh}/bin/cloudflared-deploy";
+        ExecStop = "${cleanupSh}/bin/cloudflared-cleanup";
       };
     };
   };
