@@ -130,16 +130,20 @@ in {
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ pkgs.kubectl ];
 
-    systemd.services.cloudflared-k8s = {
+    systemd.services.cloudflared-k8s-deploy = {
       description = "Deploy Cloudflare Tunnel to Kubernetes";
-      after = [ "network-online.target" "kubernetes.target" ];
-      wants = [ "network-online.target" ];
+      after = [ "network-online.target" "kube-apiserver.service" ];
+      wants = [ "network-online.target" "kube-apiserver.service" ];
       wantedBy = [ "multi-user.target" ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
         ExecStart = ''
-          ${pkgs.kubectl}/bin/kubectl apply -f ${manifestTemplate}/cloudflared-manifests.yaml
+          until ${pkgs.kubectl}/bin/kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
+            echo "Waiting for Kubernetes API..."
+            sleep 5
+          done
+          ${pkgs.kubectl}/bin/kubectl apply -f ${manifestTemplate}/cloudflared-manifests.yaml --validate=false
           ${pkgs.kubectl}/bin/kubectl apply -f - <<'EOF'
           apiVersion: v1
           kind: Secret
@@ -153,8 +157,8 @@ in {
           EOF
         '';
         ExecStop = ''
-          ${pkgs.kubectl}/bin/kubectl delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found
-          ${pkgs.kubectl}/bin/kubectl delete -f ${manifestTemplate}/cloudflared-manifests.yaml --ignore-not-found
+          ${pkgs.kubectl}/bin/kubectl delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found 2>/dev/null || true
+          ${pkgs.kubectl}/bin/kubectl delete -f ${manifestTemplate}/cloudflared-manifests.yaml --ignore-not-found 2>/dev/null || true
         '';
       };
     };
