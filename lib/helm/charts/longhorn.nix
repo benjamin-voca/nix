@@ -14,6 +14,8 @@ in
     inherit chart;
     namespace = "longhorn-system";
     values = {
+      namespaceOverride = "longhorn-system";
+
       persistence = {
         defaultClass = true;
         defaultClassReplicaCount = 1;
