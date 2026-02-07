@@ -7,7 +7,8 @@
     chart = helmLib.kubelib.downloadHelmChart {
       repo = "https://dl.gitea.com/charts";
       chart = "gitea";
-      version = "12.5.0";
+      version = "12.4.0";
+      chartHash = "sha256-9BzCMIJo7i/zlktH17aQxQvMB7xPnVS1PxWJ4vxnw0U=";
       chartHash = "sha256-6sG9xCpbbRMMDlsZtHzqrNWuqsT/NHalUVUv0Ltx/zA=";
     };
     namespace = "gitea";
