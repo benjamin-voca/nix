@@ -24,6 +24,7 @@
     vim
     git
     helix
+    ripgrep
     k9s
     envsubst
     sops
