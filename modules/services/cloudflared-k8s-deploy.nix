@@ -29,7 +29,7 @@ let
         no-autoupdate: true
 
         ingress:
-          - hostname: "ssh.quadtech.dev"
+          - hostname: "backbone-01.quadtech.dev"
             service: ssh://localhost:22
           - hostname: "*.quadtech.dev"
             service: http://localhost:30080
