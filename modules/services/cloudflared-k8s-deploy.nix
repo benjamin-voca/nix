@@ -2,8 +2,6 @@
 
 let
   cfg = config.services.cloudflared-k8s-deploy;
-  json = pkgs.formats.json { };
-
   tunnelCredentials = config.sops.secrets.cloudflared-credentials.path;
 
   manifestTemplate = pkgs.writeTextDir "cloudflared-manifests.yaml" ''
@@ -105,6 +103,47 @@ let
           targetPort: 2000
           name: metrics
   '';
+
+  deployScript = pkgs.writeScriptBin "cloudflared-deploy.sh" ''
+    #!/bin/bash
+    set -e
+
+    echo "Waiting for Kubernetes API..."
+    until ${pkgs.kubectl}/bin/kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
+      echo "Waiting for Kubernetes API..."
+      sleep 5
+    done
+    echo "Kubernetes API is ready!"
+
+    echo "Deploying Cloudflare Tunnel manifests..."
+    ${pkgs.kubectl}/bin/kubectl apply -f ${manifestTemplate}/cloudflared-manifests.yaml --validate=false
+
+    echo "Creating tunnel credentials secret..."
+    ${pkgs.kubectl}/bin/kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: cloudflared-tunnel-credentials
+      namespace: cloudflared
+    type: Opaque
+    stringData:
+      credentials.json: |
+        $(cat ${tunnelCredentials})
+    EOF
+
+    echo "Cloudflare Tunnel deployed successfully!"
+  '';
+
+  cleanupScript = pkgs.writeScriptBin "cloudflared-cleanup.sh" ''
+    #!/bin/bash
+    set -e
+
+    echo "Cleaning up Cloudflare Tunnel..."
+    ${pkgs.kubectl}/bin/kubectl delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found 2>/dev/null || true
+    ${pkgs.kubectl}/bin/kubectl delete -f ${manifestTemplate}/cloudflared-manifests.yaml --ignore-not-found 2>/dev/null || true
+
+    echo "Cleanup complete!"
+  '';
 in {
   options.services.cloudflared-k8s-deploy = {
     enable = lib.mkEnableOption "Deploy Cloudflare Tunnel to Kubernetes";
@@ -138,28 +177,8 @@ in {
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = ''
-          until ${pkgs.kubectl}/bin/kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
-            echo "Waiting for Kubernetes API..."
-            sleep 5
-          done
-          ${pkgs.kubectl}/bin/kubectl apply -f ${manifestTemplate}/cloudflared-manifests.yaml --validate=false
-          ${pkgs.kubectl}/bin/kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: Secret
-          metadata:
-            name: cloudflared-tunnel-credentials
-            namespace: cloudflared
-          type: Opaque
-          stringData:
-            credentials.json: |
-              $(cat ${tunnelCredentials})
-          EOF
-        '';
-        ExecStop = ''
-          ${pkgs.kubectl}/bin/kubectl delete secret cloudflared-tunnel-credentials -n cloudflared --ignore-not-found 2>/dev/null || true
-          ${pkgs.kubectl}/bin/kubectl delete -f ${manifestTemplate}/cloudflared-manifests.yaml --ignore-not-found 2>/dev/null || true
-        '';
+        ExecStart = "${deployScript}/bin/cloudflared-deploy.sh";
+        ExecStop = "${cleanupScript}/bin/cloudflared-cleanup.sh";
       };
     };
   };
