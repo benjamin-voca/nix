@@ -86,6 +86,7 @@
       gitea = {
         admin = {
           # Admin credentials should be managed via secrets
+          existingSecret = "gitea-admin";
           username = "gitea_admin";
           password = "REPLACE_ME";
           email = "admin@quadtech.dev";
@@ -148,6 +149,18 @@
             ALLOWED_HOST_LIST = "*";
           };
         };
+
+        additionalConfigFromEnvs = [
+          {
+            name = "GITEA__DATABASE__PASSWD";
+            valueFrom = {
+              secretKeyRef = {
+                name = "gitea-db";
+                key = "password";
+              };
+            };
+          }
+        ];
       };
 
 
