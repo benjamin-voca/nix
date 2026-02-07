@@ -97,3 +97,12 @@ metadata:
     app.kubernetes.io/name: cloudnative-pg
     app.kubernetes.io/component: database
     environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: longhorn-system
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: storage
+    environment: production

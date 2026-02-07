@@ -10,6 +10,7 @@ let
   cloudnative-pg = import ./cloudnative-pg.nix { inherit helmLib; };
   verdaccio = import ./verdaccio.nix { inherit helmLib; };
   infisical = import ./infisical.nix { inherit helmLib; };
+  longhorn = import ./longhorn.nix { inherit helmLib; };
 in
 {
   # Re-export all charts
@@ -22,6 +23,7 @@ in
   inherit (cloudnative-pg) cloudnative-pg;
   inherit (verdaccio) verdaccio;
   inherit (infisical) infisical;
+  inherit (longhorn) longhorn;
 
   # Convenience function to get all charts
   all = {
@@ -34,5 +36,6 @@ in
     inherit (cloudnative-pg) cloudnative-pg;
     inherit (verdaccio) verdaccio;
     inherit (infisical) infisical;
+    inherit (longhorn) longhorn;
   };
 }

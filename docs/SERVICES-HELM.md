@@ -100,6 +100,15 @@ helm upgrade --install infisical ./result/*.tgz -n infisical --create-namespace
 - https://verdaccio.quadtech.dev
 - https://infisical.quadtech.dev
 
+## Storage (Longhorn)
+
+Longhorn provides the default StorageClass used by CNPG and other workloads.
+
+```sh
+nix build .#helmCharts.x86_64-linux.all.longhorn
+kubectl apply -f ./result
+```
+
 ## Notes
 
 - `lib/helm/charts/verdaccio.nix` and `lib/helm/charts/infisical.nix` vendor
