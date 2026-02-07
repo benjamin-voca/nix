@@ -55,7 +55,7 @@
       persistence = {
         enabled = true;
         size = "50Gi";
-        storageClass = "local-path";
+        storageClass = "longhorn";
       };
 
       # PostgreSQL database
