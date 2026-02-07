@@ -15,7 +15,7 @@ let
     ) cfg.routes
     ++ lib.optional (cfg.wildcardHostname != null) {
       hostname = cfg.wildcardHostname;
-      service = "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80";
+      service = "http://backbone-01.local:30080";
     }
     ++ [ { service = cfg.catchAll; } ];
   };

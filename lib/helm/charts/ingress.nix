@@ -17,7 +17,11 @@
 
         # Service configuration
         service = {
-          type = "ClusterIP";
+          type = "NodePort";
+          ports = {
+            http = 30080;
+            https = 30443;
+          };
         };
 
         metrics = {
