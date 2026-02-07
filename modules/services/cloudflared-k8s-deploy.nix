@@ -56,12 +56,6 @@ let
                 - --config
                 - /etc/cloudflared/ingress.yaml
                 - run
-              env:
-                - name: TUNNEL_TOKEN
-                  valueFrom:
-                    secretKeyRef:
-                      name: cloudflared-tunnel-credentials
-                      key: credentials.json
               ports:
                 - containerPort: 2000
                   name: metrics
@@ -83,10 +77,20 @@ let
                 - name: config
                   mountPath: /etc/cloudflared
                   readOnly: true
+                - name: credentials
+                  mountPath: /etc/cloudflared/credentials.json
+                  subPath: credentials.json
+                  readOnly: true
           volumes:
             - name: config
               configMap:
                 name: cloudflared-config
+            - name: credentials
+              secret:
+                secretName: cloudflared-tunnel-credentials
+                items:
+                  - key: credentials.json
+                    path: credentials.json
     ---
     apiVersion: v1
     kind: Service
