@@ -140,8 +140,8 @@ in {
 
     replicas = lib.mkOption {
       type = lib.types.int;
-      default = 2;
-      description = "Number of cloudflared replicas";
+      default = 1;
+      description = "Number of cloudflared replicas (must be 1 when using hostNetwork for SSH)";
     };
 
     imageTag = lib.mkOption {
