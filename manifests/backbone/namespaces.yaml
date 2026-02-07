@@ -101,6 +101,15 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: cloudflared
+  labels:
+    app.kubernetes.io/name: cloudflared
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/managed-by: quadnix
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: longhorn-system
   labels:
     app.kubernetes.io/name: longhorn

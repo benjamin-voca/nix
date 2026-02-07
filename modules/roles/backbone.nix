@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   imports = [
@@ -9,7 +9,7 @@
     ../profiles/kubernetes/control-plane.nix
     ../profiles/kubernetes/allow-master-workloads.nix
     ../profiles/kubernetes/helm.nix
-    ../services/cloudflared-k8s.nix
+    ../services/cloudflared-k8s-deploy.nix
   ];
 
   services.openiscsi = {
@@ -48,21 +48,10 @@
     };
   };
 
-
-  services.cloudflared-k8s = {
+  services.cloudflared-k8s-deploy = {
     enable = true;
     tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
-    credentialsFile = config.sops.secrets.cloudflared-credentials.path;
-    wildcardHostname = "*.quadtech.dev";
-
-    routes = [
-      {
-        hostname = "mainssh.quadtech.dev";
-        service = "ssh://localhost:22";
-      }
-    ];
-
-    catchAll = "http_status:404";
-    logLevel = "info";
+    replicas = 2;
+    imageTag = "2025.2.0";
   };
 }
