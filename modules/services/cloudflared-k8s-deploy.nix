@@ -177,6 +177,9 @@ in {
       after = [ "network-online.target" "kube-apiserver.service" ];
       wants = [ "network-online.target" "kube-apiserver.service" ];
       wantedBy = [ "multi-user.target" ];
+      environment = {
+        KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
+      };
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
