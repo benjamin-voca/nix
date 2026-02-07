@@ -8,8 +8,7 @@
       repo = "https://dl.gitea.com/charts";
       chart = "gitea";
       version = "12.4.0";
-      chartHash = "sha256-9BzCMIJo7i/zlktH17aQxQvMB7xPnVS1PxWJ4vxnw0U=";
-      chartHash = "sha256-6sG9xCpbbRMMDlsZtHzqrNWuqsT/NHalUVUv0Ltx/zA=";
+      chartHash = "sha256-jIjCFb+v3/uzkxqC84mY48+X5ZrSeHTBssoB8XvsvHg=";
     };
     namespace = "gitea";
     values = {
@@ -198,6 +197,19 @@
       # Security context
       podSecurityContext = {
         fsGroup = 1000;
+      };
+
+      # Disable broken init containers - let Gitea handle initialization
+      initContainers = {
+        initDirectories = {
+          enabled = false;
+        };
+        initAppIni = {
+          enabled = false;
+        };
+        configureGitea = {
+          enabled = false;
+        };
       };
 
       # Node affinity for HA
