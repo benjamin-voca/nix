@@ -14,10 +14,17 @@
     values = {
       controller = {
         replicaCount = 1;
-        
+
         # Service configuration
         service = {
           type = "ClusterIP";
+        };
+
+        metrics = {
+          enabled = false;
+          serviceMonitor = {
+            enabled = false;
+          };
         };
 
         # Resource limits
