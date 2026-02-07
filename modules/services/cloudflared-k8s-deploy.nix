@@ -30,7 +30,7 @@ let
 
         ingress:
           - hostname: "*.quadtech.dev"
-            service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
+            service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:30080
           - service: http_status:404
     ---
     apiVersion: apps/v1
