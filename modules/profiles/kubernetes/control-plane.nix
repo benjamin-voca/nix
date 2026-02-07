@@ -21,9 +21,7 @@
       config.networking.hostName
       config.networking.fqdn
     ];
-    apiserver.extraOptions = {
-      "allow-privileged" = "true";
-    };
+    apiserver.extraOpts = "--allow-privileged=true";
   };
 
 
