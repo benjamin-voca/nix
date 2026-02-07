@@ -12,6 +12,11 @@
     ../services/cloudflared-k8s.nix
   ];
 
+  services.openiscsi = {
+    enable = true;
+    name = "iqn.2004-10.org.debian:${config.networking.hostName}";
+  };
+
   networking.firewall.allowedTCPPorts = [
     22 443 6443
   ];
