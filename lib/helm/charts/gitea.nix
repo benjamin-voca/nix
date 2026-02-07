@@ -14,8 +14,9 @@
     values = {
       # Gitea image configuration
       image = {
-        repository = "gitea/gitea";
-        tag = "1.21.3";
+        repository = "docker.gitea.com/gitea/gitea";
+        tag = "1.25.4";
+        rootless = false;
         pullPolicy = "IfNotPresent";
       };
 
