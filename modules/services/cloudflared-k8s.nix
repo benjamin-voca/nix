@@ -15,7 +15,7 @@ let
     ) cfg.routes
     ++ lib.optional (cfg.wildcardHostname != null) {
       hostname = cfg.wildcardHostname;
-      service = "http://backbone-01.local:30080";
+      service = "http://backbone-01.local:30856";
     }
     ++ [ { service = cfg.catchAll; } ];
   };
