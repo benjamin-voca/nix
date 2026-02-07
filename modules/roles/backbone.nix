@@ -17,6 +17,11 @@
     name = "iqn.2004-10.org.debian:${config.networking.hostName}";
   };
 
+  systemd.tmpfiles.rules = [
+    "L+ /usr/bin/iscsiadm - - - - /run/current-system/sw/bin/iscsiadm"
+    "L+ /usr/sbin/iscsiadm - - - - /run/current-system/sw/bin/iscsiadm"
+  ];
+
   networking.firewall.allowedTCPPorts = [
     22 443 6443
   ];

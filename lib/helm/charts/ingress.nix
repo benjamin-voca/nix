@@ -4,7 +4,12 @@
   # Ingress NGINX configuration
   ingress-nginx = helmLib.buildChart {
     name = "ingress-nginx";
-    chart = helmLib.charts.ingress-nginx.ingress-nginx;
+    chart = helmLib.kubelib.downloadHelmChart {
+      repo = "https://kubernetes.github.io/ingress-nginx";
+      chart = "ingress-nginx";
+      version = "4.14.3";
+      chartHash = "sha256-dBFf0R8UHfAQEc2tVLdj6044GRHKFvsOuWbtFsoi4t0=";
+    };
     namespace = "ingress-nginx";
     values = {
       controller = {

@@ -24,7 +24,7 @@ Install the operator:
 
 ```sh
 nix build .#helmCharts.x86_64-linux.all.cloudnative-pg
-helm upgrade --install cloudnative-pg ./result/*.tgz -n cnpg-system --create-namespace
+kubectl apply -f ./result
 ```
 
 Create the Postgres clusters and app secrets:
@@ -56,7 +56,7 @@ Install ingress-nginx (ClusterIP):
 
 ```sh
 nix build .#helmCharts.x86_64-linux.all.ingress-nginx
-helm upgrade --install ingress-nginx ./result/*.tgz -n ingress-nginx --create-namespace
+kubectl apply -f ./result
 ```
 
 Cloudflare Tunnel should include a wildcard rule:
@@ -69,28 +69,28 @@ Cloudflare Tunnel should include a wildcard rule:
 
 ```sh
 nix build .#helmCharts.x86_64-linux.all.argocd
-helm upgrade --install argocd ./result/*.tgz -n argocd --create-namespace
+kubectl apply -f ./result
 ```
 
 ## Gitea
 
 ```sh
 nix build .#helmCharts.x86_64-linux.all.gitea
-helm upgrade --install gitea ./result/*.tgz -n gitea --create-namespace
+kubectl apply -f ./result
 ```
 
 ## Verdaccio
 
 ```sh
 nix build .#helmCharts.x86_64-linux.all.verdaccio
-helm upgrade --install verdaccio ./result/*.tgz -n verdaccio --create-namespace
+kubectl apply -f ./result
 ```
 
 ## Infisical
 
 ```sh
 nix build .#helmCharts.x86_64-linux.all.infisical
-helm upgrade --install infisical ./result/*.tgz -n infisical --create-namespace
+kubectl apply -f ./result
 ```
 
 ## Endpoints
