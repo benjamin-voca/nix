@@ -29,8 +29,10 @@ let
         no-autoupdate: true
 
         ingress:
+          - hostname: "ssh.quadtech.dev"
+            service: ssh://localhost:22
           - hostname: "*.quadtech.dev"
-            service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:30080
+            service: http://localhost:30080
           - service: http_status:404
     ---
     apiVersion: apps/v1
@@ -50,6 +52,8 @@ let
           labels:
             app: cloudflared
         spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           containers:
             - name: cloudflared
               image: cloudflare/cloudflared:${cfg.imageTag}
