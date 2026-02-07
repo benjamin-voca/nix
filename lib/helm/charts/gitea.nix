@@ -81,6 +81,12 @@
 
       # Gitea configuration
       gitea = {
+        paths = {
+          data = "/data";
+          custom = "/data/gitea/custom";
+          temp = "/tmp/gitea";
+          logs = "/data/gitea/custom/log";
+        };
         admin = {
           # Admin credentials should be managed via secrets
           username = "gitea_admin";
