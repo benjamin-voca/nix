@@ -58,6 +58,7 @@ let
                 - run
                 - --metrics
                 - 0.0.0.0:2000
+                - --no-autoupdate
               ports:
                 - containerPort: 2000
                   name: metrics
@@ -65,7 +66,7 @@ let
                 httpGet:
                   path: /ready
                   port: 2000
-                initialDelaySeconds: 10
+                initialDelaySeconds: 30
                 periodSeconds: 10
                 failureThreshold: 3
               resources:
