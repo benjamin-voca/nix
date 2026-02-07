@@ -56,6 +56,8 @@ let
                 - --config
                 - /etc/cloudflared/config.yaml
                 - run
+                - --metrics
+                - 0.0.0.0:2000
               ports:
                 - containerPort: 2000
                   name: metrics
@@ -65,7 +67,7 @@ let
                   port: 2000
                 initialDelaySeconds: 10
                 periodSeconds: 10
-                failureThreshold: 1
+                failureThreshold: 3
               resources:
                 requests:
                   cpu: 50m
