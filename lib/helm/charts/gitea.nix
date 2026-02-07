@@ -95,6 +95,10 @@
         };
 
         config = {
+          log = {
+            MODE = "console";
+            ROOT_PATH = "/data/gitea/custom/log";
+          };
           server = {
             DOMAIN = "gitea.quadtech.dev";
             ROOT_URL = "https://gitea.quadtech.dev";
