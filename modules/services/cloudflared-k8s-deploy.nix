@@ -52,11 +52,8 @@ let
             - name: cloudflared
               image: cloudflare/cloudflared:${cfg.imageTag}
               args:
-                - tunnel
                 - --config
                 - /etc/cloudflared/config.yaml
-                - run
-                - --no-autoupdate
               resources:
                 requests:
                   cpu: 50m
