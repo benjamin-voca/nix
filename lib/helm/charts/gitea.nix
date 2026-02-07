@@ -8,7 +8,7 @@
       repo = "https://dl.gitea.com/charts";
       chart = "gitea";
       version = "12.5.0";
-      chartHash = "sha256-2d6f35f3d1ff0cfcab0f22142d20a1d6405fa974a79d7a18000904d233131823";
+      chartHash = "sha256-LW8189H/DPyrDyIULSCh1kBfqXSnnXoYAAkE0jMTGCM=";
     };
     namespace = "gitea";
     values = {
