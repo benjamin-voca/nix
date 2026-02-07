@@ -23,6 +23,10 @@
   environment.systemPackages = with pkgs; [
     vim
     git
+    helix
+    k9s
+    envsubst
+    sops
     htop
     curl
     cloudflared
