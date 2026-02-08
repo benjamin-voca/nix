@@ -145,7 +145,7 @@ in
 
     systemd.services.verdaccio-deploy = {
       description = "Deploy Verdaccio npm registry to Kubernetes";
-      after = [ "network-online.target" "kube-apiserver.service" "ingress-nginx-controller.service" ];
+      after = [ "network-online.target" "kube-apiserver.service" ];
       wants = [ "network-online.target" "kube-apiserver.service" ];
       wantedBy = [ "multi-user.target" ];
       environment = {
