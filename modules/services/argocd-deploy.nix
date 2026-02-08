@@ -5,74 +5,70 @@ let
   kubectl = "${pkgs.kubectl}/bin/kubectl";
   system = pkgs.stdenv.system;
 
-  helmLib = lib.mkIf cfg.enable (
-    import ../../lib/helm {
-      inherit pkgs system;
-      nixhelm = config._module.args.inputs.nixhelm;
-      nix-kube-generators = config._module.args.inputs.nix-kube-generators;
-    }
-  );
+  helmLib = import ../../lib/helm {
+    inherit pkgs system;
+    nixhelm = config._module.args.inputs.nixhelm;
+    nix-kube-generators = config._module.args.inputs.nix-kube-generators;
+  };
 
-  argocdChart = lib.mkIf cfg.enable (
-    helmLib.buildChart {
-      name = "argocd";
-      chart = helmLib.charts.argoproj.argo-cd;
-      namespace = "argocd";
-      values = {
-        global = {
-          domain = "argocd.quadtech.dev";
-        };
-
-        configs = {
-          cm = {
-            "server.insecure" = true;
-            url = "https://argocd.quadtech.dev";
-          };
-          params = {
-            "server.insecure" = true;
-          };
-          secret = {
-            argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
-          };
-        };
-
-        server = {
-          replicas = 1;
-          service = {
-            type = "ClusterIP";
-          };
-        };
-
-        redis = {
-          enabled = true;
-        };
-
-        redis-ha = {
-          enabled = false;
-        };
-
-        controller = {
-          replicas = 1;
-        };
-
-        repoServer = {
-          replicas = 1;
-        };
-
-        applicationSet = {
-          enabled = true;
-        };
-
-        notifications = {
-          enabled = true;
-        };
-
-        global.image.tag = "v2.9.3";
+  argocdChart = helmLib.buildChart {
+    name = "argocd";
+    chart = helmLib.charts.argoproj.argo-cd;
+    namespace = "argocd";
+    values = {
+      global = {
+        domain = "argocd.quadtech.dev";
       };
-    }
-  );
 
-  deploySh = lib.mkIf cfg.enable (pkgs.writeShellApplication {
+      configs = {
+        cm = {
+          "server.insecure" = true;
+          url = "https://argocd.quadtech.dev";
+        };
+        params = {
+          "server.insecure" = true;
+        };
+        secret = {
+          argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+        };
+      };
+
+      server = {
+        replicas = 1;
+        service = {
+          type = "ClusterIP";
+        };
+      };
+
+      redis = {
+        enabled = true;
+      };
+
+      redis-ha = {
+        enabled = false;
+      };
+
+      controller = {
+        replicas = 1;
+      };
+
+      repoServer = {
+        replicas = 1;
+      };
+
+      applicationSet = {
+        enabled = true;
+      };
+
+      notifications = {
+        enabled = true;
+      };
+
+      global.image.tag = "v2.9.3";
+    };
+  };
+
+  deployScript = lib.mkIf cfg.enable (pkgs.writeShellApplication {
     name = "argocd-deploy";
     text = ''
       #!/bin/bash
@@ -114,7 +110,7 @@ let
     '';
   });
 
-  cleanupSh = lib.mkIf cfg.enable (pkgs.writeShellApplication {
+  cleanupScript = lib.mkIf cfg.enable (pkgs.writeShellApplication {
     name = "argocd-cleanup";
     text = ''
       #!/bin/bash
@@ -139,8 +135,8 @@ in
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [
-      deploySh
-      cleanupSh
+      deployScript
+      cleanupScript
       pkgs.kubectl
     ];
 
@@ -155,8 +151,8 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${deploySh}/bin/argocd-deploy";
-        ExecStop = "${cleanupSh}/bin/argocd-cleanup";
+        ExecStart = "${deployScript}/bin/argocd-deploy";
+        ExecStop = "${cleanupScript}/bin/argocd-cleanup";
       };
     };
   };
