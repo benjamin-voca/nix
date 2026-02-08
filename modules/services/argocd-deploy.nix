@@ -87,8 +87,8 @@ in
           done
 
           echo "Cleaning up any existing ArgoCD installation..."
+          ${pkgs.kubernetes-helm}/bin/helm uninstall argocd -n argocd --ignore-not-found 2>/dev/null || true
           $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-          $kubectl delete -f ${chart} --ignore-not-found 2>/dev/null || true
 
           echo "Cleaning up ArgoCD CRDs and cluster resources..."
           $kubectl delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
@@ -102,11 +102,63 @@ in
           echo "Creating ArgoCD namespace..."
           $kubectl create namespace argocd --dry-run=client -o yaml | $kubectl apply -f - || true
 
-          echo "Deploying ArgoCD manifests..."
-          $kubectl apply -f ${chart} --validate=false
+          echo "Adding ArgoCD helm repo..."
+          ${pkgs.kubernetes-helm}/bin/helm repo add argoproj https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
+          ${pkgs.kubernetes-helm}/bin/helm repo update
 
-          echo "Waiting for ArgoCD to be ready..."
-          $kubectl rollout status deployment/argocd-server -n argocd --timeout=300s || true
+          echo "Deploying ArgoCD..."
+          ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
+            --namespace argocd \
+            --version 5.46.0 \
+            --set global.domain=argocd.quadtech.dev \
+            --set configs.cm.'server\.insecure'=true \
+            --set configs.cm.url=https://argocd.quadtech.dev \
+            --set configs.params.'server\.insecure'=true \
+            --set configs.secret.argocdServerAdminPassword='$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC' \
+            --set server.replicas=1 \
+            --set server.service.type=ClusterIP \
+            --set redis.enabled=true \
+            --set redis-ha.enabled=false \
+            --set controller.replicas=1 \
+            --set repoServer.replicas=1 \
+            --set applicationSet.enabled=true \
+            --set notifications.enabled=true \
+            --set global.image.tag=v2.9.3 \
+            --set server.ingress.enabled=true \
+            --set server.ingress.className=nginx \
+            --set server.ingress.hosts[0]=argocd.quadtech.dev \
+            --set server.ingress.tls[0].secretName=argocd-tls \
+            --set server.ingress.tls[0].hosts[0]=argocd.quadtech.dev \
+            --wait --timeout 5m || true
+
+          echo "Creating ArgoCD ingress..."
+          $kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: argocd.quadtech.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+  tls:
+  - hosts:
+    - argocd.quadtech.dev
+    secretName: argocd-tls
+EOF
 
           echo "ArgoCD deployed successfully!"
           echo "URL: https://argocd.quadtech.dev"
