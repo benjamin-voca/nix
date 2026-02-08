@@ -54,7 +54,6 @@ in
              --set ingress.hosts[0].host=infiscal.quadtech.dev \
              --set ingress.hosts[0].paths[0].path=/ \
              --set ingress.hosts[0].paths[0].pathType=Prefix \
-             --set ingress.tls=[] \
              --wait --timeout 5m || true
 
           echo "Infisical deployed successfully!"
