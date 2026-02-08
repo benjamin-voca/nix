@@ -41,7 +41,7 @@ in
            ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
            AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
-            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
+            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical-standalone \
               --namespace default \
               --set global.domain=infisical.quadtech.dev \
               --set global.encryptionKey="$ENCRYPTION_KEY" \
