@@ -5,5 +5,4 @@ let
 in
 {
   imports = imports;
-  _module.args = { inherit inputs; };
 }
