@@ -27,7 +27,33 @@ in
       };
       persistence = {
         enabled = true;
-        size = "10Gi";
+        existingClaim = "verdaccio-data";
+      };
+      volumes = [
+        {
+          name = "verdaccio-data";
+          hostPath = {
+            path = "/var/lib/verdaccio";
+            type = "Directory";
+          };
+        }
+      ];
+      volumeMounts = [
+        {
+          name = "verdaccio-data";
+          mountPath = "/verdaccio/storage";
+          subPath = "storage";
+        }
+        {
+          name = "verdaccio-data";
+          mountPath = "/verdaccio/conf";
+          subPath = "conf";
+        }
+      ];
+      securityContext = {
+        fsGroup = 10001;
+        runAsUser = 10001;
+        runAsGroup = 10001;
       };
     };
   };
