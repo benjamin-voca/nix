@@ -11,11 +11,87 @@ let
     nix-kube-generators = inputs.nix-kube-generators;
   };
 
-  argocdChart = import ../../lib/helm/charts/argocd.nix {
-    inherit helmLib pkgs lib;
-  };
+  argocdManifests = helmLib.buildChart {
+    name = "argocd";
+    chart = helmLib.charts.argoproj.argo-cd;
+    namespace = "argocd";
+    values = {
+      global = {
+        domain = "argocd.quadtech.dev";
+      };
 
-  argocdManifests = argocdChart.argocd;
+      configs = {
+        cm = {
+          "server.insecure" = true;
+          url = "https://argocd.quadtech.dev";
+        };
+        params = {
+          "server.insecure" = true;
+        };
+        secret = {
+          argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+        };
+      };
+
+      server = {
+        replicas = 1;
+        service = {
+          type = "ClusterIP";
+        };
+        ingress = {
+          enabled = true;
+          ingressClassName = "nginx";
+          hostname = "argocd.quadtech.dev";
+          tls = false;
+          annotations = {
+            "nginx.ingress.kubernetes.io/proxy-body-size" = "0";
+            "nginx.ingress.kubernetes.io/proxy-read-timeout" = "600";
+            "nginx.ingress.kubernetes.io/proxy-send-timeout" = "600";
+          };
+          pathType = "Prefix";
+          paths = [
+            {
+              path = "/";
+              backend = {
+                service = {
+                  name = "argocd-server";
+                  port = {
+                    number = 80;
+                  };
+                };
+              };
+            }
+          ];
+        };
+      };
+
+      redis = {
+        enabled = true;
+      };
+
+      redis-ha = {
+        enabled = false;
+      };
+
+      controller = {
+        replicas = 1;
+      };
+
+      repoServer = {
+        replicas = 1;
+      };
+
+      applicationSet = {
+        enabled = true;
+      };
+
+      notifications = {
+        enabled = true;
+      };
+
+      global.image.tag = "v2.9.3";
+    };
+  };
 
   deploySh = pkgs.writeShellApplication {
     name = "argocd-deploy";
