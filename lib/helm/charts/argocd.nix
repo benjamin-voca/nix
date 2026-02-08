@@ -20,7 +20,7 @@ in
 
       configs = {
         cm = {
-          "server.insecure" = "true";
+          "server.insecure" = true;
           url = "https://argocd.quadtech.dev";
         };
         params = {
