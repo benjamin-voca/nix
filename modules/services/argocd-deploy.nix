@@ -1,74 +1,78 @@
-{ config, lib, pkgs, inputs, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.quadnix.argocd-deploy;
   kubectl = "${pkgs.kubectl}/bin/kubectl";
   system = pkgs.stdenv.system;
 
-  helmLib = import ../../lib/helm {
-    inherit pkgs system;
-    nixhelm = inputs.nixhelm;
-    nix-kube-generators = inputs.nix-kube-generators;
-  };
+  helmLib = lib.mkIf cfg.enable (
+    import ../../lib/helm {
+      inherit pkgs system;
+      nixhelm = config._module.args.inputs.nixhelm;
+      nix-kube-generators = config._module.args.inputs.nix-kube-generators;
+    }
+  );
 
-  argocdChart = helmLib.buildChart {
-    name = "argocd";
-    chart = helmLib.charts.argoproj.argo-cd;
-    namespace = "argocd";
-    values = {
-      global = {
-        domain = "argocd.quadtech.dev";
-      };
-
-      configs = {
-        cm = {
-          "server.insecure" = true;
-          url = "https://argocd.quadtech.dev";
+  argocdChart = lib.mkIf cfg.enable (
+    helmLib.buildChart {
+      name = "argocd";
+      chart = helmLib.charts.argoproj.argo-cd;
+      namespace = "argocd";
+      values = {
+        global = {
+          domain = "argocd.quadtech.dev";
         };
-        params = {
-          "server.insecure" = true;
+
+        configs = {
+          cm = {
+            "server.insecure" = true;
+            url = "https://argocd.quadtech.dev";
+          };
+          params = {
+            "server.insecure" = true;
+          };
+          secret = {
+            argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+          };
         };
-        secret = {
-          argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+
+        server = {
+          replicas = 1;
+          service = {
+            type = "ClusterIP";
+          };
         };
-      };
 
-      server = {
-        replicas = 1;
-        service = {
-          type = "ClusterIP";
+        redis = {
+          enabled = true;
         };
+
+        redis-ha = {
+          enabled = false;
+        };
+
+        controller = {
+          replicas = 1;
+        };
+
+        repoServer = {
+          replicas = 1;
+        };
+
+        applicationSet = {
+          enabled = true;
+        };
+
+        notifications = {
+          enabled = true;
+        };
+
+        global.image.tag = "v2.9.3";
       };
+    }
+  );
 
-      redis = {
-        enabled = true;
-      };
-
-      redis-ha = {
-        enabled = false;
-      };
-
-      controller = {
-        replicas = 1;
-      };
-
-      repoServer = {
-        replicas = 1;
-      };
-
-      applicationSet = {
-        enabled = true;
-      };
-
-      notifications = {
-        enabled = true;
-      };
-
-      global.image.tag = "v2.9.3";
-    };
-  };
-
-  deploySh = pkgs.writeShellApplication {
+  deploySh = lib.mkIf cfg.enable (pkgs.writeShellApplication {
     name = "argocd-deploy";
     text = ''
       #!/bin/bash
@@ -108,9 +112,9 @@ let
       echo "Admin username: admin"
       echo "Admin password: admin"
     '';
-  };
+  });
 
-  cleanupSh = pkgs.writeShellApplication {
+  cleanupSh = lib.mkIf cfg.enable (pkgs.writeShellApplication {
     name = "argocd-cleanup";
     text = ''
       #!/bin/bash
@@ -126,7 +130,7 @@ let
       ${kubectl} delete clusterrolebinding argocd-application-controller --ignore-not-found 2>/dev/null || true
       ${kubectl} delete clusterrolebinding argocd-server --ignore-not-found 2>/dev/null || true
     '';
-  };
+  });
 in
 {
   options.services.quadnix.argocd-deploy = {
