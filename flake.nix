@@ -28,7 +28,7 @@
         helmLib = import ./modules/outputs/helm.nix { inherit inputs lib; };
       };
       eval = lib.evalModules {
-        specialArgs = { inherit inputs; flake = flakeOutputs; };
+        specialArgs = { inherit inputs; };
         modules = [
           ./modules/top.nix
         ];
