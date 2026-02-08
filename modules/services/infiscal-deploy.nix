@@ -23,9 +23,11 @@ in
             sleep 5
           done
 
-          echo "Cleaning up any existing Infisical installation..."
-          ${pkgs.kubernetes-helm}/bin/helm uninstall infisical -n infisical --ignore-not-found 2>/dev/null || true
-          $kubectl delete ingress infisical -n infisical --ignore-not-found 2>/dev/null || true
+           echo "Cleaning up any existing Infisical installation..."
+           ${pkgs.kubernetes-helm}/bin/helm uninstall infisical -n infisical --ignore-not-found 2>/dev/null || true
+           $kubectl delete ingress infisical -n infisical --ignore-not-found 2>/dev/null || true
+           $kubectl delete ingress infisical-ingress -n default --ignore-not-found 2>/dev/null || true
+           $kubectl delete secret infisical-secrets -n default --ignore-not-found 2>/dev/null || true
 
           echo "Creating Infisical namespace..."
           $kubectl create namespace infisical --dry-run=client -o yaml | $kubectl apply -f - || true
@@ -35,26 +37,21 @@ in
           ${pkgs.kubernetes-helm}/bin/helm repo update
 
           echo "Deploying Infisical..."
-          DB_PASSWORD=$(cat /run/secrets/infisical-db-password)
-          ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
-          AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
+            DB_PASSWORD=$(cat /run/secrets/infisical-db-password)
+           ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
+           AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
-           ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
-             --namespace default \
-             --version 0.1.17 \
-             --set global.domain=infisical.quadtech.dev \
-             --set global.postgresql.auth.password="$DB_PASSWORD" \
-             --set global.postgresql.auth.database=infisical \
-             --set global.postgresql.host=infisical-db-rw \
-             --set global.postgresql.port=5432 \
-             --set global.encryptionKey="$ENCRYPTION_KEY" \
-             --set global.authJwtSecret="$AUTH_SECRET" \
-             --set ingress.enabled=true \
-             --set ingress.className=nginx \
-             --set ingress.hosts[0].host=infisical.quadtech.dev \
-             --set ingress.hosts[0].paths[0].path=/ \
-             --set ingress.hosts[0].paths[0].pathType=Prefix \
-             --wait --timeout 5m || true
+            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
+              --namespace default \
+              --set global.domain=infisical.quadtech.dev \
+              --set global.encryptionKey="$ENCRYPTION_KEY" \
+              --set global.authJwtSecret="$AUTH_SECRET" \
+              --set ingress.enabled=true \
+              --set ingress.className=nginx \
+              --set ingress.hosts[0].host=infisical.quadtech.dev \
+              --set ingress.hosts[0].paths[0].path=/ \
+              --set ingress.hosts[0].paths[0].pathType=Prefix \
+              --wait --timeout 5m || true
 
            $kubectl create secret generic infisical-secrets \
              --from-literal=DB_PASSWORD="$DB_PASSWORD" \
