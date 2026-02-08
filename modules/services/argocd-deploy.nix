@@ -1,11 +1,13 @@
-{ config, lib, pkgs, inputs, system, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.quadnix.argocd-deploy;
   kubectl = "${pkgs.kubectl}/bin/kubectl";
+  inputs = config._module.args.inputs;
 
   helmLib = import ../../lib/helm {
-    inherit pkgs system;
+    inherit pkgs;
+    system = pkgs.stdenv.system;
     nixhelm = inputs.nixhelm;
     nix-kube-generators = inputs.nix-kube-generators;
   };
