@@ -2,7 +2,7 @@
 
 {
   environment.systemPackages = with pkgs; [
-    pkgs.kubectl
-    pkgs.kubernetes-helm
+    kubectl
+    kubernetes-helm
   ];
 }

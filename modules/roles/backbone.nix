@@ -9,12 +9,9 @@
     ../profiles/kubernetes/control-plane.nix
     ../profiles/kubernetes/allow-master-workloads.nix
     ../profiles/kubernetes/helm.nix
-    ../services/cloudflared-k8s-deploy.nix
     ../services/argocd-deploy.nix
-    ../services/verdaccio-deploy.nix
     ../services/helm-charts.nix
-    ../services/charts-app.nix
-    ../services/backbone-services.nix
+    ../services/verdaccio-deploy.nix
     ../gitea/runner.nix
   ];
 
@@ -32,41 +29,34 @@
     22 443 6443
   ];
 
-  sops.secrets = {
-    cloudflared-credentials = {
-      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-      path = "/run/secrets/cloudflared-credentials.json";
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
-    gitea-db-password = {
-      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-    };
-    infisical-db-password = {
-      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-    };
-    infisical-encryption-key = {
-      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-    };
-    infisical-auth-secret = {
-      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-    };
-    gitea-runner-token = {
-      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-      path = "/run/secrets/gitea-runner-token";
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
-  };
-
-  services.cloudflared-k8s-deploy = {
-    enable = true;
-    tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
-    replicas = 1;
-    imageTag = "2025.2.0";
-  };
+   sops.secrets = {
+     cloudflared-credentials = {
+       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+       path = "/run/secrets/cloudflared-credentials.json";
+       owner = "root";
+       group = "root";
+       mode = "0400";
+     };
+     gitea-db-password = {
+       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+     };
+     infisical-db-password = {
+       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+     };
+     infisical-encryption-key = {
+       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+     };
+     infisical-auth-secret = {
+       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+     };
+     gitea-runner-token = {
+       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+       path = "/run/secrets/gitea-runner-token";
+       owner = "root";
+       group = "root";
+       mode = "0400";
+     };
+   };
 
   services.quadnix.argocd-deploy = {
     enable = true;
