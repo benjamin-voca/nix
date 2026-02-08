@@ -1,9 +1,9 @@
-{ inputs, flake, lib, ... }:
+{ inputs, lib, ... }:
 
 let
   imports = import ./imports.nix { inherit lib; };
 in
 {
   imports = imports;
-  _module.args = { inherit inputs flake; };
+  _module.args = { inherit inputs; };
 }

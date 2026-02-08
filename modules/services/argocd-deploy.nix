@@ -1,10 +1,15 @@
-{ config, lib, pkgs, flake, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 let
   cfg = config.services.quadnix.argocd-deploy;
   kubectl = "${pkgs.kubectl}/bin/kubectl";
 
-  helmLib = flake.helmLib.${pkgs.stdenv.system};
+  helmLib = import ../../lib/helm {
+    inherit pkgs;
+    system = pkgs.stdenv.system;
+    nixhelm = inputs.nixhelm;
+    nix-kube-generators = inputs.nix-kube-generators;
+  };
 
   argocdManifests = helmLib.buildChart {
     name = "argocd";
