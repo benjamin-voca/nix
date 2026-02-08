@@ -93,28 +93,28 @@ let
       ${pkgs.kubernetes-helm}/bin/helm repo update
       
       # Deploy using helm
-       ${pkgs.kubernetes-helm}/bin/helm upgrade --install verdaccio verdaccio/verdaccio \
-         --namespace verdaccio \
-         --version 4.29.0 \
-         --set service.type=ClusterIP \
-         --set ingress.enabled=true \
-         --set ingress.className=nginx \
-         --set ingress.hosts[0]=verdaccio.quadtech.dev \
-         --set ingress.tls=[] \
-         --set persistence.enabled=false \
-         --set volumes[0].name=config \
-         --set volumes[0].secret.secretName=verdaccio-config \
-         --set volumeMounts[0].name=config \
-         --set volumeMounts[0].mountPath=/verdaccio/conf \
-         --set volumes[1].name=htpasswd \
-         --set volumes[1].secret.secretName=verdaccio-htpasswd \
-         --set volumeMounts[1].name=htpasswd \
-         --set volumeMounts[1].mountPath=/verdaccio/conf \
-         --set volumeMounts[1].subPath=htpasswd \
-         --set securityContext.fsGroup=10001 \
-         --set securityContext.runAsUser=10001 \
-         --set securityContext.runAsGroup=10001 \
-         --wait --timeout 5m || true
+        ${pkgs.kubernetes-helm}/bin/helm upgrade --install verdaccio verdaccio/verdaccio \
+          --namespace verdaccio \
+          --version 4.29.0 \
+          --set service.type=ClusterIP \
+          --set ingress.enabled=true \
+          --set ingress.className=nginx \
+          --set ingress.hosts[0]=verdaccio.quadtech.dev \
+          --set ingress.tls=null \
+          --set persistence.enabled=false \
+          --set volumes[0].name=config \
+          --set volumes[0].secret.secretName=verdaccio-config \
+          --set volumeMounts[0].name=config \
+          --set volumeMounts[0].mountPath=/verdaccio/conf \
+          --set volumes[1].name=htpasswd \
+          --set volumes[1].secret.secretName=verdaccio-htpasswd \
+          --set volumeMounts[1].name=htpasswd \
+          --set volumeMounts[1].mountPath=/verdaccio/conf \
+          --set volumeMounts[1].subPath=htpasswd \
+          --set securityContext.fsGroup=10001 \
+          --set securityContext.runAsUser=10001 \
+          --set securityContext.runAsGroup=10001 \
+          --wait --timeout 5m || true
       
       echo "Verdaccio deployed successfully!"
       echo "Admin username: admin"
