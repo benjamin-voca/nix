@@ -70,9 +70,13 @@
     enable = true;
   };
 
-  services.quadnix.infisical-deploy = {
-    enable = true;
-  };
+   services.quadnix.infisical-deploy = {
+     enable = true;
+   };
+
+   services.quadnix.verdaccio-deploy = {
+     enable = true;
+   };
 
   # Additional packages
   environment.systemPackages = with pkgs; [
