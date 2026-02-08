@@ -126,12 +126,10 @@ in
             --set applicationSet.enabled=true \
             --set notifications.enabled=true \
             --set global.image.tag=v2.9.3 \
-            --set server.ingress.enabled=true \
-            --set server.ingress.className=nginx \
-            --set server.ingress.hosts[0]=argocd.quadtech.dev \
-            --set server.ingress.tls[0].secretName=argocd-tls \
-            --set server.ingress.tls[0].hosts[0]=argocd.quadtech.dev \
-            --wait --timeout 5m || true
+             --set server.ingress.enabled=true \
+             --set server.ingress.className=nginx \
+             --set server.ingress.hosts[0]=argocd.quadtech.dev \
+             --wait --timeout 5m || true
 
           echo "Creating ArgoCD ingress..."
           $kubectl apply -f - <<EOF
@@ -190,7 +188,7 @@ EOF
 
     systemd.services.argocd-deploy = {
       description = "Deploy ArgoCD to Kubernetes";
-      after = [ "network-online.target" "kube-apiserver.service" "ingress-nginx-controller.service" ];
+      after = [ "network-online.target" "kube-apiserver.service" ];
       wants = [ "network-online.target" "kube-apiserver.service" ];
       wantedBy = [ "multi-user.target" ];
       environment = {

@@ -12,6 +12,7 @@
     ../services/argocd-deploy.nix
     ../services/helm-charts.nix
     ../services/verdaccio-deploy.nix
+    ../services/infiscal-deploy.nix
     ../gitea/runner.nix
   ];
 
@@ -69,7 +70,7 @@
     enable = true;
   };
 
-  services.quadnix.verdaccio-deploy = {
+  services.quadnix.infisical-deploy = {
     enable = true;
   };
 
