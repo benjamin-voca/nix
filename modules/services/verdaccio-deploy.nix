@@ -10,9 +10,7 @@ let
       #!/bin/bash
       set -e
       sleep 120
-      mkdir -p /root/.kube
-      cp /etc/kubernetes/cluster-admin.kubeconfig /root/.kube/config || true
-      export KUBECONFIG=/root/.kube/config
+      kubectl="${pkgs.kubectl}/bin/kubectl"
       
       echo "Waiting for Kubernetes API..."
       until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
