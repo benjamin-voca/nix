@@ -1,5 +1,5 @@
-{ config, lib, ... }:
+{ config, inputs, ... }:
 
 {
-  config.flake.nixosConfigurations = lib.mapAttrs (_: host: host) config.quad.hosts;
+  config.flake.nixosConfigurations = inputs.nixpkgs.lib.mapAttrs (_: host: host) config.quad.hosts;
 }
