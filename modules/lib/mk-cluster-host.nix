@@ -1,6 +1,7 @@
 { config, inputs, ... }:
 
 let
+  lib = inputs.nixpkgs.lib;
   mkClusterHost =
     { name
     , system
@@ -28,7 +29,7 @@ let
             
             # Apply taints if any
             systemd.services.kubelet.serviceConfig = {
-              Environment = [ "KUBELET_EXTRA_ARGS=--register-with-taints=${toString (lib.concatMapStringsSep "," (taint: "${taint.key}=${taint.value}:${taint.effect}") taints)}" ];
+              Environment = [ "KUBELET_EXTRA_ARGS=--register-with-taints=${toString (lib.concatMapStringsSep ",", (taint: "${taint.key}=${taint.value}:${taint.effect}") taints)}" ];
             };
           })
           hardwareModule
