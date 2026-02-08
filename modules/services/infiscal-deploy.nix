@@ -42,8 +42,9 @@ in
            ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
            AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
-            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical-standalone \
+            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
               --namespace infisical \
+              --version 0.1.17 \
               --set global.domain=infisical.quadtech.dev \
               --set global.encryptionKey="$ENCRYPTION_KEY" \
               --set global.authJwtSecret="$AUTH_SECRET" \
@@ -52,6 +53,9 @@ in
               --set ingress.hosts[0].host=infisical.quadtech.dev \
               --set ingress.hosts[0].paths[0].path=/ \
               --set ingress.hosts[0].paths[0].pathType=Prefix \
+              --set ingress-nginx.enabled=false \
+              --set ingressClass.enabled=false \
+              --set ingressClass.create=false \
               --wait --timeout 5m || true
 
             $kubectl create secret generic infisical-secrets \
