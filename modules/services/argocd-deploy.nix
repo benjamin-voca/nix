@@ -2,7 +2,6 @@
 
 let
   cfg = config.services.quadnix.argocd-deploy;
-  kubectl = "${pkgs.kubectl}/bin/kubectl";
   system = pkgs.stdenv.system;
 
   helmLib = import ../../lib/helm {
@@ -67,66 +66,6 @@ let
       global.image.tag = "v2.9.3";
     };
   };
-
-  deployScript = lib.mkIf cfg.enable (pkgs.writeShellApplication {
-    name = "argocd-deploy";
-    text = ''
-      #!/bin/bash
-      set -e
-      export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
-
-      echo "Waiting for Kubernetes API..."
-      until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
-        echo "Waiting for Kubernetes API..."
-        sleep 5
-      done
-
-      echo "Cleaning up any existing ArgoCD installation..."
-      ${kubectl} delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
-
-      echo "Cleaning up ArgoCD CRDs and cluster resources..."
-      ${kubectl} delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrole argocd-application-controller --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrole argocd-server --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrolebinding argocd-application-controller --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrolebinding argocd-server --ignore-not-found 2>/dev/null || true
-
-      echo "Creating ArgoCD namespace..."
-      ${kubectl} create namespace argocd --dry-run=client -o yaml | ${kubectl} apply -f - || true
-
-      echo "Deploying ArgoCD manifests..."
-      ${kubectl} apply -f ${argocdChart} --validate=false
-
-      echo "Waiting for ArgoCD to be ready..."
-      ${kubectl} rollout status deployment/argocd-server -n argocd --timeout=300s || true
-
-      echo "ArgoCD deployed successfully!"
-      echo "URL: https://argocd.quadtech.dev"
-      echo "Admin username: admin"
-      echo "Admin password: admin"
-    '';
-  });
-
-  cleanupScript = lib.mkIf cfg.enable (pkgs.writeShellApplication {
-    name = "argocd-cleanup";
-    text = ''
-      #!/bin/bash
-      set -e
-      export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
-      ${kubectl} delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrole argocd-application-controller --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrole argocd-server --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrolebinding argocd-application-controller --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete clusterrolebinding argocd-server --ignore-not-found 2>/dev/null || true
-    '';
-  });
 in
 {
   options.services.quadnix.argocd-deploy = {
@@ -135,8 +74,69 @@ in
 
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [
-      deployScript
-      cleanupScript
+      (pkgs.writeShellApplication {
+        name = "argocd-deploy";
+        text = ''
+          #!/bin/bash
+          set -e
+          export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
+
+          kubectl="${pkgs.kubectl}/bin/kubectl"
+
+          echo "Waiting for Kubernetes API..."
+          until $kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
+            echo "Waiting for Kubernetes API..."
+            sleep 5
+          done
+
+          echo "Cleaning up any existing ArgoCD installation..."
+          $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
+          $kubectl delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
+
+          echo "Cleaning up ArgoCD CRDs and cluster resources..."
+          $kubectl delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
+          $kubectl delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
+          $kubectl delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrole argocd-application-controller --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrole argocd-server --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrolebinding argocd-application-controller --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrolebinding argocd-server --ignore-not-found 2>/dev/null || true
+
+          echo "Creating ArgoCD namespace..."
+          $kubectl create namespace argocd --dry-run=client -o yaml | $kubectl apply -f - || true
+
+          echo "Deploying ArgoCD manifests..."
+          $kubectl apply -f ${argocdChart} --validate=false
+
+          echo "Waiting for ArgoCD to be ready..."
+          $kubectl rollout status deployment/argocd-server -n argocd --timeout=300s || true
+
+          echo "ArgoCD deployed successfully!"
+          echo "URL: https://argocd.quadtech.dev"
+          echo "Admin username: admin"
+          echo "Admin password: admin"
+        '';
+      })
+      (pkgs.writeShellApplication {
+        name = "argocd-cleanup";
+        text = ''
+          #!/bin/bash
+          set -e
+          export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
+
+          kubectl="${pkgs.kubectl}/bin/kubectl"
+
+          $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
+          $kubectl delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
+          $kubectl delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
+          $kubectl delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
+          $kubectl delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrole argocd-application-controller --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrole argocd-server --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrolebinding argocd-application-controller --ignore-not-found 2>/dev/null || true
+          $kubectl delete clusterrolebinding argocd-server --ignore-not-found 2>/dev/null || true
+        '';
+      })
       pkgs.kubectl
     ];
 
@@ -151,8 +151,8 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${deployScript}/bin/argocd-deploy";
-        ExecStop = "${cleanupScript}/bin/argocd-cleanup";
+        ExecStart = "/run/current-system/sw/bin/argocd-deploy";
+        ExecStop = "/run/current-system/sw/bin/argocd-cleanup";
       };
     };
   };
