@@ -140,7 +140,22 @@ EOF
     fi
   '';
 
-  systemd.services.gitea-runner-3.preStart = ''
+  systemd.timers.git-pull = {
+    description = "Pull git repo hourly";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "hourly";
+      Persistent = true;
+    };
+  };
+
+  systemd.services.git-pull = {
+    script = "cd /etc/nixos && git pull";
+    serviceConfig = {
+      Type = "oneshot";
+      User = "root";
+    };
+  };
     mkdir -p /etc/gitea/runner /var/lib/gitea-runner-3
     cat > /etc/gitea/runner/config-3.yaml << EOF
 runner:
@@ -162,3 +177,4 @@ EOF
     fi
   '';
 }
+
