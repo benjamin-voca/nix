@@ -1,9 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 let
   cfg = config.services.quadnix.argocd-deploy;
   kubectl = "${pkgs.kubectl}/bin/kubectl";
-  inputs = config._module.args.inputs;
 
   helmLib = import ../../lib/helm {
     inherit pkgs;
