@@ -8,6 +8,7 @@ let
     , roleModule
     , serviceModules ? [ ]
     , extraModules ? [ ]
+    , taints ? [ ]
     }:
     inputs.nixpkgs.lib.nixosSystem {
       inherit system;
@@ -24,6 +25,11 @@ let
             systemd.services.dhcpcd.restartIfChanged = false;
             systemd.services.dhcpcd.reloadIfChanged = false;
             systemd.services.dhcpcd.stopIfChanged = false;
+            
+            # Apply taints if any
+            systemd.services.kubelet.serviceConfig = {
+              Environment = [ "KUBELET_EXTRA_ARGS=--register-with-taints=${toString (lib.concatMapStringsSep "," (taint: "${taint.key}=${taint.value}:${taint.effect}") taints)}" ];
+            };
           })
           hardwareModule
           roleModule

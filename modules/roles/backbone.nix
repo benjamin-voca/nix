@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, ... }:
 
 {
   imports = [
@@ -12,6 +12,9 @@
     ../services/cloudflared-k8s-deploy.nix
     ../services/argocd-deploy.nix
     ../services/verdaccio-deploy.nix
+    ../services/helm-charts.nix
+    ../services/charts-app.nix
+    ../services/backbone-services.nix
     ../gitea/runner.nix
   ];
 

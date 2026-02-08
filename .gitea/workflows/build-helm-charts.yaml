@@ -1,0 +1,94 @@
+name: Build and Publish Nix-built Helm Charts
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for proper version detection
+      
+      - name: Install Nix
+        uses: cachix/install-nix-action@v18
+        with:
+          nix_path: nixpkgs=github:NixOS/nixpkgs/nixos-unstable
+          extra_nix_config: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: quadnix
+          signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+      
+      - name: Build ArgoCD Chart
+        run: nix build .#argocd --out-link argocd-chart
+      
+      - name: Build Gitea Chart
+        run: nix build .#gitea --out-link gitea-chart
+      
+      - name: Test Chart Validation
+        run: |
+          # Validate ArgoCD chart
+          helm lint argocd-chart/*.tgz
+          
+          # Validate Gitea chart
+          helm lint gitea-chart/*.tgz
+      
+      - name: Publish to Gitea
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: https://gitea.quadtech.dev
+          ORG_NAME: quadnix
+        run: |
+          # Publish ArgoCD chart
+          curl -u "${{ github.actor }}:$GITEA_TOKEN" -X POST "$GITEA_URL/api/packages/$ORG_NAME/helm" \
+            -F "file=@argocd-chart/*.tgz"
+          
+          # Publish Gitea chart
+          curl -u "${{ github.actor }}:$GITEA_TOKEN" -X POST "$GITEA_URL/api/packages/$ORG_NAME/helm" \
+            -F "file=@gitea-chart/*.tgz"
+      
+      - name: Update Helm Repository Index
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: https://gitea.quadtech.dev
+          ORG_NAME: quadnix
+        run: |
+          # Get all chart files from the package registry
+          curl -s -u "${{ github.actor }}:$GITEA_TOKEN" "$GITEA_URL/api/packages/$ORG_NAME/helm" \
+            | jq -r '.[].name' > chart-list.txt
+          
+          # Generate index.yaml
+          helm repo index . --url "$GITEA_URL/chartrepo/$ORG_NAME"
+          
+          # Upload index.yaml to Gitea
+          curl -u "${{ github.actor }}:$GITEA_TOKEN" -X PUT "$GITEA_URL/api/packages/$ORG_NAME/helm/index.yaml" \
+            -H "Content-Type: application/yaml" \
+            --data-binary "@index.yaml"
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/tags/latest'
+        with:
+          files: |
+            argocd-chart/*.tgz
+            gitea-chart/*.tgz
+            index.yaml
+
+      - name: Notify ArgoCD
+        env:
+          ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+          ARGOCD_URL: https://argocd.quadtech.dev
+        run: |
+          # Trigger ArgoCD sync for the charts application
+          curl -X POST "$ARGOCD_URL/api/v1/applications/charts-app/sync" \
+            -H "Authorization: Bearer $ARGOCD_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"prune":true,"dryRun":false,"force":true}'
