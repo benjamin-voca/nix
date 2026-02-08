@@ -7,11 +7,10 @@ let
   deployScript = pkgs.writeShellApplication {
     name = "verdaccio-deploy";
     text = ''
-      #!/bin/bash
-      set -e
-      #!/bin/bash
-      set -e
-      kubectl="${pkgs.kubectl}/bin/kubectl"
+       #!/bin/bash
+       set -e
+       # shellcheck disable=SC2034
+       kubectl="${pkgs.kubectl}/bin/kubectl"
       
       echo "Waiting for Kubernetes API..."
       until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
