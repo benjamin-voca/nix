@@ -37,9 +37,9 @@ in
           ${pkgs.kubernetes-helm}/bin/helm repo update
 
           echo "Deploying Infisical..."
-          DB_PASSWORD=$(cat /run/secrets/infiscal-db-password)
-          ENCRYPTION_KEY=$(cat /run/secrets/infiscal-encryption-key)
-          AUTH_SECRET=$(cat /run/secrets/infiscal-auth-secret)
+          DB_PASSWORD=$(cat /run/secrets/infisical-db-password)
+          ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
+          AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
           ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
             --namespace infisical \
