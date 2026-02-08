@@ -40,7 +40,7 @@ in
           AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
-             --namespace infisical \
+             --namespace default \
              --version 0.1.17 \
              --set global.domain=infisical.quadtech.dev \
              --set global.postgresql.auth.password="$DB_PASSWORD" \
@@ -55,6 +55,12 @@ in
              --set ingress.hosts[0].paths[0].path=/ \
              --set ingress.hosts[0].paths[0].pathType=Prefix \
              --wait --timeout 5m || true
+
+           $kubectl create secret generic infisical-secrets \
+             --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+             --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+             --from-literal=AUTH_SECRET="$AUTH_SECRET" \
+             -n default || true
 
           echo "Infisical deployed successfully!"
           echo "URL: https://infiscal.quadtech.dev"
