@@ -24,12 +24,15 @@
   outputs = inputs:
     let
       lib = inputs.nixpkgs.lib;
+      flakeOutputs = {
+        helmLib = import ./modules/outputs/helm.nix { inherit inputs lib; };
+      };
       eval = lib.evalModules {
-        specialArgs = { inherit inputs; };
+        specialArgs = { inherit inputs; flake = flakeOutputs; };
         modules = [
           ./modules/top.nix
         ];
       };
     in
-      eval.config.flake;
+      eval.config.flake // flakeOutputs;
 }
