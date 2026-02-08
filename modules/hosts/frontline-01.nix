@@ -6,5 +6,8 @@
     system = "x86_64-linux";
     hardwareModule = ../hardware/frontline-01.nix;
     roleModule = ../roles/frontline.nix;
+    taints = [
+      { key = "role"; value = "frontline"; effect = "NoSchedule"; }
+    ];
   };
 }
