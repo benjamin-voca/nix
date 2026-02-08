@@ -39,22 +39,23 @@ in
           ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
           AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
-          ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
-            --namespace infisical \
-            --version 1.0.0 \
-            --set global.domain=infiscal.quadtech.dev \
-            --set global.postgresql.auth.password="$DB_PASSWORD" \
-            --set global.postgresql.auth.database=infisical \
-            --set global.postgresql.host=infisical-db-rw \
-            --set global.postgresql.port=5432 \
-            --set global.encryptionKey="$ENCRYPTION_KEY" \
-            --set global.authJwtSecret="$AUTH_SECRET" \
-            --set ingress.enabled=true \
-            --set ingress.className=nginx \
-            --set ingress.hosts[0].host=infiscal.quadtech.dev \
-            --set ingress.hosts[0].paths[0].path=/ \
-            --set ingress.hosts[0].paths[0].pathType=Prefix \
-            --wait --timeout 5m || true
+           ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
+             --namespace infisical \
+             --version 1.0.0 \
+             --set global.domain=infiscal.quadtech.dev \
+             --set global.postgresql.auth.password="$DB_PASSWORD" \
+             --set global.postgresql.auth.database=infisical \
+             --set global.postgresql.host=infisical-db-rw \
+             --set global.postgresql.port=5432 \
+             --set global.encryptionKey="$ENCRYPTION_KEY" \
+             --set global.authJwtSecret="$AUTH_SECRET" \
+             --set ingress.enabled=true \
+             --set ingress.className=nginx \
+             --set ingress.hosts[0].host=infiscal.quadtech.dev \
+             --set ingress.hosts[0].paths[0].path=/ \
+             --set ingress.hosts[0].paths[0].pathType=Prefix \
+             --set ingress.tls=[] \
+             --wait --timeout 5m || true
 
           echo "Infisical deployed successfully!"
           echo "URL: https://infiscal.quadtech.dev"
