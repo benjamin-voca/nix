@@ -28,6 +28,7 @@ in
            $kubectl delete ingress infisical -n infisical --ignore-not-found 2>/dev/null || true
            $kubectl delete ingress infisical-ingress -n default --ignore-not-found 2>/dev/null || true
            $kubectl delete secret infisical-secrets -n default --ignore-not-found 2>/dev/null || true
+           $kubectl delete secret infisical-secrets -n infisical --ignore-not-found 2>/dev/null || true
 
           echo "Creating Infisical namespace..."
           $kubectl create namespace infisical --dry-run=client -o yaml | $kubectl apply -f - || true
@@ -42,7 +43,7 @@ in
            AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
             ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical-standalone \
-              --namespace default \
+              --namespace infisical \
               --set global.domain=infisical.quadtech.dev \
               --set global.encryptionKey="$ENCRYPTION_KEY" \
               --set global.authJwtSecret="$AUTH_SECRET" \
@@ -53,11 +54,11 @@ in
               --set ingress.hosts[0].paths[0].pathType=Prefix \
               --wait --timeout 5m || true
 
-           $kubectl create secret generic infisical-secrets \
-             --from-literal=DB_PASSWORD="$DB_PASSWORD" \
-             --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
-             --from-literal=AUTH_SECRET="$AUTH_SECRET" \
-             -n default || true
+            $kubectl create secret generic infisical-secrets \
+              --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+              --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+              --from-literal=AUTH_SECRET="$AUTH_SECRET" \
+              -n infisical || true
 
           echo "Infisical deployed successfully!"
           echo "URL: https://infiscal.quadtech.dev"
