@@ -41,7 +41,7 @@ in
 
            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
              --namespace infisical \
-             --version 1.0.0 \
+             --version 0.4.2 \
              --set global.domain=infiscal.quadtech.dev \
              --set global.postgresql.auth.password="$DB_PASSWORD" \
              --set global.postgresql.auth.database=infisical \
