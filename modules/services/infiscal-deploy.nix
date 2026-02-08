@@ -42,7 +42,7 @@ in
            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
              --namespace infisical \
              --version 0.1.17 \
-             --set global.domain=infiscal.quadtech.dev \
+             --set global.domain=infisical.quadtech.dev \
              --set global.postgresql.auth.password="$DB_PASSWORD" \
              --set global.postgresql.auth.database=infisical \
              --set global.postgresql.host=infisical-db-rw \
@@ -51,7 +51,7 @@ in
              --set global.authJwtSecret="$AUTH_SECRET" \
              --set ingress.enabled=true \
              --set ingress.className=nginx \
-             --set ingress.hosts[0].host=infiscal.quadtech.dev \
+             --set ingress.hosts[0].host=infisical.quadtech.dev \
              --set ingress.hosts[0].paths[0].path=/ \
              --set ingress.hosts[0].paths[0].pathType=Prefix \
              --wait --timeout 5m || true
