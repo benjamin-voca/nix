@@ -15,7 +15,7 @@ in
         text = ''
           #!/bin/bash
           set -e
-          sleep 60
+          sleep 120
           export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
 
           kubectl="${pkgs.kubectl}/bin/kubectl"
