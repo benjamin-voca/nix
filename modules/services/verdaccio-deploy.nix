@@ -9,6 +9,7 @@ let
     text = ''
       #!/bin/bash
       set -e
+      sleep 30
       export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
       
       echo "Waiting for Kubernetes API..."
