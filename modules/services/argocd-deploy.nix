@@ -157,10 +157,6 @@ spec:
             name: argocd-server
             port:
               number: 443
-  tls:
-  - hosts:
-    - argocd.quadtech.dev
-    secretName: argocd-tls
 EOF
 
           echo "ArgoCD deployed successfully!"
