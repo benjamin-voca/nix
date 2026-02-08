@@ -17,9 +17,19 @@ let
         sleep 5
       done
       
-      echo "Creating ArgoCD prerequisites..."
+      # Uninstall any existing ArgoCD first
+      echo "Cleaning up any existing ArgoCD installation..."
+      ${kubectl} delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
+      ${pkgs.kubernetes-helm}/bin/helm uninstall argocd -n argocd --ignore-not-found 2>/dev/null || true
+      
+      # Delete ArgoCD CRDs that block reinstall
+      echo "Cleaning up ArgoCD CRDs..."
+      ${kubectl} delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
       
       # Create namespace
+      echo "Creating ArgoCD namespace..."
       ${kubectl} create namespace argocd --dry-run=client -o yaml | ${kubectl} apply -f - || true
       
       # Generate and create redis secret
@@ -45,10 +55,6 @@ let
         --set configs.secret.argocdServerAdminPassword="\$2a\$10\$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC" \
         --set server.replicas=1 \
         --set server.service.type=ClusterIP \
-        --set server.ingress.enabled=true \
-        --set server.ingress.ingressClassName=nginx \
-        --set server.ingress.hostname=argocd.quadtech.dev \
-        --set server.ingress.tls=false \
         --set redis.enabled=true \
         --set redis-ha.enabled=false \
         --set controller.replicas=1 \
@@ -86,6 +92,7 @@ spec:
 EOF
       
       echo "ArgoCD deployed successfully!"
+      echo "URL: https://argocd.quadtech.dev"
       echo "Admin username: admin"
       echo "Admin password: admin"
     '';
@@ -99,6 +106,9 @@ EOF
       export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
       ${kubectl} delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
       ${pkgs.kubernetes-helm}/bin/helm uninstall argocd -n argocd --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
     '';
   };
 in
