@@ -1,9 +1,9 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, argocdChart, ... }:
 
 let
   cfg = config.services.quadnix.argocd-deploy;
   system = pkgs.stdenv.system;
-  argocdChart = config.flake.helmCharts.${system}.argocd;
+  chart = argocdChart.${system};
 in
 {
   options.services.quadnix.argocd-deploy = {
@@ -29,7 +29,7 @@ in
 
           echo "Cleaning up any existing ArgoCD installation..."
           $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-          $kubectl delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
+          $kubectl delete -f ${chart} --ignore-not-found 2>/dev/null || true
 
           echo "Cleaning up ArgoCD CRDs and cluster resources..."
           $kubectl delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
@@ -44,7 +44,7 @@ in
           $kubectl create namespace argocd --dry-run=client -o yaml | $kubectl apply -f - || true
 
           echo "Deploying ArgoCD manifests..."
-          $kubectl apply -f ${argocdChart} --validate=false
+          $kubectl apply -f ${chart} --validate=false
 
           echo "Waiting for ArgoCD to be ready..."
           $kubectl rollout status deployment/argocd-server -n argocd --timeout=300s || true
@@ -65,7 +65,7 @@ in
           kubectl="${pkgs.kubectl}/bin/kubectl"
 
           $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-          $kubectl delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
+          $kubectl delete -f ${chart} --ignore-not-found 2>/dev/null || true
           $kubectl delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
           $kubectl delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
           $kubectl delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
