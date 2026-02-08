@@ -29,34 +29,41 @@
     22 443 6443
   ];
 
-   sops.secrets = {
-     cloudflared-credentials = {
-       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-       path = "/run/secrets/cloudflared-credentials.json";
-       owner = "root";
-       group = "root";
-       mode = "0400";
-     };
-     gitea-db-password = {
-       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-     };
-     infisical-db-password = {
-       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-     };
-     infisical-encryption-key = {
-       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-     };
-     infisical-auth-secret = {
-       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-     };
-     gitea-runner-token = {
-       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-       path = "/run/secrets/gitea-runner-token";
-       owner = "root";
-       group = "root";
-       mode = "0400";
-     };
-   };
+    sops.secrets = {
+      cloudflared-credentials = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/cloudflared-credentials.json";
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      gitea-db-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+      };
+      infisical-db-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+      };
+      infisical-encryption-key = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+      };
+      infisical-auth-secret = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+      };
+      argocd-admin-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/argocd-admin-password";
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      gitea-runner-token = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/gitea-runner-token";
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+    };
 
   services.quadnix.argocd-deploy = {
     enable = true;
