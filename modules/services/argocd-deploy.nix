@@ -109,27 +109,25 @@ in
 
           echo "Deploying ArgoCD..."
           PASSWORD=$(cat /run/secrets/argocd-admin-password)
-          ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
-            --namespace argocd \
-            --version 5.46.0 \
-            --set global.domain=argocd.quadtech.dev \
-            --set configs.cm.'server\.insecure'=true \
-            --set configs.cm.url=https://argocd.quadtech.dev \
-            --set configs.params.'server\.insecure'=true \
-            --set configs.secret.argocdServerAdminPassword="$PASSWORD" \
-            --set server.replicas=1 \
-            --set server.service.type=ClusterIP \
-            --set redis.enabled=true \
-            --set redis-ha.enabled=false \
-            --set controller.replicas=1 \
-            --set repoServer.replicas=1 \
-            --set applicationSet.enabled=true \
-            --set notifications.enabled=true \
-            --set global.image.tag=v2.9.3 \
-             --set server.ingress.enabled=true \
-             --set server.ingress.className=nginx \
-             --set server.ingress.hosts[0]=argocd.quadtech.dev \
-             --wait --timeout 5m || true
+           ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
+             --namespace argocd \
+             --version 5.46.0 \
+             --set global.domain=argocd.quadtech.dev \
+             --set configs.cm.'server\.insecure'=true \
+             --set configs.cm.url=http://argocd.quadtech.dev \
+             --set configs.params.'server\.insecure'=true \
+             --set configs.secret.argocdServerAdminPassword="$PASSWORD" \
+             --set server.replicas=1 \
+             --set server.service.type=ClusterIP \
+             --set redis.enabled=true \
+             --set redis-ha.enabled=false \
+             --set controller.replicas=1 \
+             --set repoServer.replicas=1 \
+             --set applicationSet.enabled=true \
+             --set notifications.enabled=true \
+             --set global.image.tag=v2.9.3 \
+             --set server.ingress.enabled=false \
+              --wait --timeout 5m || true
 
           echo "Creating ArgoCD ingress..."
           $kubectl apply -f - <<EOF
