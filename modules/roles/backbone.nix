@@ -156,6 +156,7 @@ EOF
       User = "root";
     };
   };
+  systemd.services.gitea-runner-3.preStart = ''
     mkdir -p /etc/gitea/runner /var/lib/gitea-runner-3
     cat > /etc/gitea/runner/config-3.yaml << EOF
 runner:
