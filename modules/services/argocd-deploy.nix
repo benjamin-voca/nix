@@ -1,11 +1,72 @@
-{ config, lib, pkgs, argocdChart, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 let
   cfg = config.services.quadnix.argocd-deploy;
   kubectl = "${pkgs.kubectl}/bin/kubectl";
-
   system = pkgs.stdenv.system;
-  argocdManifests = argocdChart.${system};
+
+  helmLib = import ../../lib/helm {
+    inherit pkgs system;
+    nixhelm = inputs.nixhelm;
+    nix-kube-generators = inputs.nix-kube-generators;
+  };
+
+  argocdChart = helmLib.buildChart {
+    name = "argocd";
+    chart = helmLib.charts.argoproj.argo-cd;
+    namespace = "argocd";
+    values = {
+      global = {
+        domain = "argocd.quadtech.dev";
+      };
+
+      configs = {
+        cm = {
+          "server.insecure" = true;
+          url = "https://argocd.quadtech.dev";
+        };
+        params = {
+          "server.insecure" = true;
+        };
+        secret = {
+          argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+        };
+      };
+
+      server = {
+        replicas = 1;
+        service = {
+          type = "ClusterIP";
+        };
+      };
+
+      redis = {
+        enabled = true;
+      };
+
+      redis-ha = {
+        enabled = false;
+      };
+
+      controller = {
+        replicas = 1;
+      };
+
+      repoServer = {
+        replicas = 1;
+      };
+
+      applicationSet = {
+        enabled = true;
+      };
+
+      notifications = {
+        enabled = true;
+      };
+
+      global.image.tag = "v2.9.3";
+    };
+  };
 
   deploySh = pkgs.writeShellApplication {
     name = "argocd-deploy";
@@ -22,7 +83,7 @@ let
 
       echo "Cleaning up any existing ArgoCD installation..."
       ${kubectl} delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete -f ${argocdManifests} --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
 
       echo "Cleaning up ArgoCD CRDs and cluster resources..."
       ${kubectl} delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
@@ -37,7 +98,7 @@ let
       ${kubectl} create namespace argocd --dry-run=client -o yaml | ${kubectl} apply -f - || true
 
       echo "Deploying ArgoCD manifests..."
-      ${kubectl} apply -f ${argocdManifests} --validate=false
+      ${kubectl} apply -f ${argocdChart} --validate=false
 
       echo "Waiting for ArgoCD to be ready..."
       ${kubectl} rollout status deployment/argocd-server -n argocd --timeout=300s || true
@@ -56,7 +117,7 @@ let
       set -e
       export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
       ${kubectl} delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-      ${kubectl} delete -f ${argocdManifests} --ignore-not-found 2>/dev/null || true
+      ${kubectl} delete -f ${argocdChart} --ignore-not-found 2>/dev/null || true
       ${kubectl} delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
       ${kubectl} delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
       ${kubectl} delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
