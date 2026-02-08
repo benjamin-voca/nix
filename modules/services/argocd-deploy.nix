@@ -35,6 +35,13 @@ let
       ${pkgs.kubernetes-helm}/bin/helm repo add argo https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
       ${pkgs.kubernetes-helm}/bin/helm repo update
       
+      # Uninstall any existing ArgoCD first (in case of partial install)
+      echo "Cleaning up any existing ArgoCD installation..."
+      ${pkgs.kubernetes-helm}/bin/helm uninstall argocd -n argocd --ignore-not-found 2>/dev/null || true
+      
+      # Wait for cleanup to complete
+      sleep 5
+      
       # Deploy using helm with values
       ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argo/argo-cd \
         --namespace argocd \
