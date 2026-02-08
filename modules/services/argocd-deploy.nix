@@ -107,6 +107,7 @@ in
           ${pkgs.kubernetes-helm}/bin/helm repo update
 
           echo "Deploying ArgoCD..."
+          PASSWORD='$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC'
           ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
             --namespace argocd \
             --version 5.46.0 \
@@ -114,7 +115,7 @@ in
             --set configs.cm.'server\.insecure'=true \
             --set configs.cm.url=https://argocd.quadtech.dev \
             --set configs.params.'server\.insecure'=true \
-            --set configs.secret.argocdServerAdminPassword="$2a$10\$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC" \
+            --set configs.secret.argocdServerAdminPassword="$PASSWORD" \
             --set server.replicas=1 \
             --set server.service.type=ClusterIP \
             --set redis.enabled=true \
