@@ -133,8 +133,8 @@
           };
 
           service = {
-            DISABLE_REGISTRATION = false;
-            REQUIRE_SIGNIN_VIEW = false;
+            DISABLE_REGISTRATION = true;
+            REQUIRE_SIGNIN_VIEW = true;
             ENABLE_NOTIFY_MAIL = false;
           };
 

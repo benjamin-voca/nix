@@ -1,0 +1,35 @@
+storage: /verdaccio/storage
+
+auth:
+  htpasswd:
+    file: /verdaccio/conf/htpasswd
+    max_users: 1000
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+
+packages:
+  "@quadcoretech/*":
+    access: $all
+    publish: $authenticated
+    proxy: npmjs
+
+  "**":
+    access: $all
+    publish: $authenticated
+    proxy: npmjs
+
+web:
+  enable: true
+  title: QuadTech NPM Registry
+  logo: https://verdaccio.org/img/logo/symbol/svg/verdaccio-tiny.svg
+
+middlewares:
+  audit:
+    enabled: true
+
+logs:
+  - { type: stdout, format: pretty, level: http }
+
+listen: 0.0.0.0:4873

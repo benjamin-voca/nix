@@ -42,16 +42,6 @@ in {
   };
 
   config = mkIf cfg.enable {
-    environment.etc."gitea/runner/config.yaml".source = yaml.generate "gitea-runner.yaml" {
-      runner = {
-        name = cfg.instanceName;
-        labels = cfg.labels;
-        token = "${builtins.readFile cfg.tokenFile}";
-        url = cfg.registrationUrl;
-        state_dir = cfg.stateDir;
-      };
-    };
-
     systemd.services.gitea-runner = {
       description = "Gitea actions runner";
       wantedBy = [ "multi-user.target" ];
@@ -60,7 +50,25 @@ in {
         ExecStart = "${runnerPkg}/bin/act_runner daemon --config /etc/gitea/runner/config.yaml";
         Restart = "always";
         StateDirectory = "gitea-runner";
+        WorkingDirectory = "/var/lib/gitea-runner";
       };
+      preStart = ''
+        mkdir -p /etc/gitea/runner /var/lib/gitea-runner
+        cat > /etc/gitea/runner/config.yaml << EOF
+runner:
+  name: ${cfg.instanceName}
+  labels:
+${lib.concatMapStrings (l: "    - ${l}\n") cfg.labels}  token: $(cat ${cfg.tokenFile})
+  url: ${cfg.registrationUrl}
+  state_dir: ${cfg.stateDir}
+EOF
+        # Register runner if not already registered
+        if [ ! -f /var/lib/gitea-runner/.runner ]; then
+          cd /var/lib/gitea-runner
+          TOKEN=$(cat ${cfg.tokenFile})
+          ${runnerPkg}/bin/act_runner register --instance ${cfg.registrationUrl} --token "$TOKEN" --name ${cfg.instanceName} --no-interactive || true
+        fi
+      '';
     };
   };
 }
