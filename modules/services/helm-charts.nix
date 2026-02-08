@@ -21,30 +21,6 @@
     environment.systemPackages = with pkgs; [
       kubernetes-helm
       helm-push  # For pushing charts to OCI registries
-    ];
-
-    # Create Helm repository configuration
-    environment.etc."helm/repositories.yaml".text = lib.generators.toYAML {} {
-      repositories = [
-        {
-          name = "quadnix-charts";
-          url = config.services.quadnix.helm-charts.giteaRepo;
-        }
-      ];
-    };
-
-    # Set up cron job to update Helm repository index
-    systemd.services.helm-repo-index = {
-      description = "Update Helm repository index";
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "${pkgs.kubernetes-helm}/bin/helm repo index ${config.services.quadnix.helm-charts.giteaRepo}";
-      };
-      startAt = "daily";
-    };
-
-    # Expose charts as system packages
-    environment.systemPackages = with pkgs; [
       (writeShellScriptBin "publish-helm-chart" 
         ''
           #!/bin/bash

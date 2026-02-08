@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, config, ... }:
 
 let
   lib = inputs.nixpkgs.lib;
@@ -13,6 +13,7 @@ let
     }:
     inputs.nixpkgs.lib.nixosSystem {
       inherit system;
+      specialArgs = { inherit inputs; };
       modules =
         [
           inputs.sops-nix.nixosModules.sops

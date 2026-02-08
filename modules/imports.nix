@@ -1,4 +1,4 @@
-{ lib }:
+{ lib, inputs }:
 
 let
   inherit (lib) hasSuffix;
