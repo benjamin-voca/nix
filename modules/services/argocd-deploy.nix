@@ -74,6 +74,7 @@ in
       (pkgs.writeShellApplication {
         name = "argocd-deploy";
         text = ''
+          # shellcheck disable=SC2016
           #!/bin/bash
           set -e
           export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
@@ -107,7 +108,7 @@ in
           ${pkgs.kubernetes-helm}/bin/helm repo update
 
           echo "Deploying ArgoCD..."
-          PASSWORD='$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC'
+          PASSWORD=$(cat /run/secrets/argocd-admin-password)
           ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
             --namespace argocd \
             --version 5.46.0 \
