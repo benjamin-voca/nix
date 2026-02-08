@@ -9,7 +9,8 @@ let
     text = ''
       #!/bin/bash
       set -e
-      sleep 120
+      #!/bin/bash
+      set -e
       kubectl="${pkgs.kubectl}/bin/kubectl"
       
       echo "Waiting for Kubernetes API..."

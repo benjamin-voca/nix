@@ -15,7 +15,6 @@ in
         text = ''
           #!/bin/bash
           set -e
-          sleep 120
           kubectl="${pkgs.kubectl}/bin/kubectl"
 
           echo "Waiting for Kubernetes API..."
@@ -55,8 +54,6 @@ in
             --set ingress.hosts[0].host=infiscal.quadtech.dev \
             --set ingress.hosts[0].paths[0].path=/ \
             --set ingress.hosts[0].paths[0].pathType=Prefix \
-            --set ingress.tls[0].secretName=infisical-tls \
-            --set ingress.tls[0].hosts[0]=infiscal.quadtech.dev \
             --wait --timeout 5m || true
 
           echo "Infisical deployed successfully!"

@@ -77,7 +77,8 @@ in
           # shellcheck disable=SC2016
           #!/bin/bash
           set -e
-          sleep 120
+          export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
+
           kubectl="${pkgs.kubectl}/bin/kubectl"
 
           echo "Waiting for Kubernetes API..."
@@ -138,9 +139,7 @@ metadata:
   name: argocd-server
   namespace: argocd
   annotations:
-    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
 spec:
   ingressClassName: nginx
   rules:
@@ -153,7 +152,7 @@ spec:
           service:
             name: argocd-server
             port:
-              number: 443
+              number: 80
 EOF
 
           echo "ArgoCD deployed successfully!"
