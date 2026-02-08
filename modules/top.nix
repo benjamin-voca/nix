@@ -1,7 +1,7 @@
-{ inputs, lib, ... }:
+{ inputs, ... }:
 
 let
-  imports = import ./imports.nix { inherit lib; };
+  imports = import ./imports.nix { inherit lib inputs; };
 in
 {
   imports = imports;
