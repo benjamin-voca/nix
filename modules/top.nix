@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, lib, ... }:
 
 let
   imports = import ./imports.nix { inherit lib inputs; };
