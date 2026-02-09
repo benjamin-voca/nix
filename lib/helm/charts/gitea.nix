@@ -34,8 +34,10 @@
         ssh = {
           create = true;
           type = "ClusterIP";
-          clusterIP = "None"; # <-- remove or set "" instead
           port = 22;
+          annotations = {
+            "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
+          };
         };
       };
 
