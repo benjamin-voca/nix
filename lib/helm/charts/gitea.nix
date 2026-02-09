@@ -32,7 +32,9 @@
           port = 3000;
         };
         ssh = {
+          create = true;
           type = "ClusterIP";
+          clusterIP = "None"; # <-- remove or set "" instead
           port = 22;
         };
       };
