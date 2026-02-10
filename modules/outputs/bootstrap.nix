@@ -199,22 +199,24 @@ let
       # Note: cloudflared credentials are mounted via Kubernetes secret
       # The secret 'cloudflared-credentials' should be created from sops-decrypted credentials
 
-      # LoadBalancer service for direct SSH access (bypass Cloudflare Tunnel)
-      giteaSSHLoadBalancer = pkgs.writeText "gitea-ssh-lb.yaml" (builtins.toJSON {
+      # NodePort service for direct SSH access on fixed port 2222
+      # Configure your router to forward port 2222 to the node's IP
+      giteaSSHNodePort = pkgs.writeText "gitea-ssh-nodeport.yaml" (builtins.toJSON {
         apiVersion = "v1";
         kind = "Service";
         metadata = {
-          name = "gitea-ssh-lb";
+          name = "gitea-ssh-nodeport";
           namespace = "gitea";
           annotations = {
-            "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-direct.quadtech.dev";
+            "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh.quadtech.dev";
           };
         };
         spec = {
-          type = "LoadBalancer";
+          type = "NodePort";
           ports = [{
-            port = 2222;
+            port = 22;
             targetPort = 22;
+            nodePort = 2222;
             protocol = "TCP";
           }];
           selector = {
@@ -244,8 +246,8 @@ let
         # Write cloudflared deployment
         cp ${cloudflaredManifest} $out/05-cloudflared-deployment.yaml
 
-        # Write gitea SSH LoadBalancer
-        cp ${giteaSSHLoadBalancer} $out/06-gitea-ssh-lb.yaml
+        # Write gitea SSH NodePort
+        cp ${giteaSSHNodePort} $out/06-gitea-ssh-nodeport.yaml
 
         # Create combined file
         cat $out/01-gitea.yaml > $out/bootstrap.yaml
@@ -258,7 +260,7 @@ let
         echo "---" >> $out/bootstrap.yaml
         cat $out/05-cloudflared-deployment.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/06-gitea-ssh-lb.yaml >> $out/bootstrap.yaml
+        cat $out/06-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
       '';
 
 in

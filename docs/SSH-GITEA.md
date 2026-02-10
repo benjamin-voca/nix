@@ -1,12 +1,15 @@
 # SSH Access to Gitea
 
-## Option 1: Direct SSH via LoadBalancer (Recommended)
+## Direct SSH Access via NodePort (Port 2222)
 
-The bootstrap creates a LoadBalancer service exposing SSH on port 2222.
+The bootstrap creates a NodePort service exposing SSH on **port 2222** on the node's IP.
 
-### Configure DNS
+### Router Configuration
 
-Ensure `gitea-ssh.quadtech.dev` points to your node's external IP. The LoadBalancer service has external-dns annotation.
+You need to configure your router to forward port 2222 to your node's IP:
+- **External Port**: 2222
+- **Internal IP**: 192.168.1.14 (or your node's IP)
+- **Internal Port**: 2222
 
 ### SSH Config
 
@@ -27,7 +30,15 @@ Host gitea-ssh.quadtech.dev
 ssh git@gitea-ssh.quadtech.dev
 ```
 
-## Option 2: Via Cloudflare Tunnel (Requires Access)
+### Apply
+
+```bash
+nix build .#bootstrap.x86_64-linux
+kubectl apply -f result/06-gitea-ssh-nodeport.yaml
+kubectl get svc -n gitea gitea-ssh-nodeport  # Verify nodePort: 2222
+```
+
+## Alternative: Via Cloudflare Tunnel (Requires Access)
 
 If you want SSH through Cloudflare Tunnel with Zero Trust security:
 
@@ -64,6 +75,8 @@ Host gitea-ssh.quadtech.dev
 
 ## Troubleshooting
 
-- **Connection refused**: Check LoadBalancer has external IP: `kubectl get svc -n gitea gitea-ssh-lb`
-- **DNS not resolving**: Wait for external-dns or manually create A record
+- **Connection refused**: Check router port forwarding is configured
+- **Connection timeout**: Verify firewall rules allow port 2222
 - **Authentication failed**: Verify SSH key is added to Gitea
+- **Check service**: `kubectl get svc -n gitea gitea-ssh-nodeport`
+- **Test locally**: `nc -zv 192.168.1.14 2222` (from backbone-01)
