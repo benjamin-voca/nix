@@ -72,7 +72,30 @@ let
           kubelib.buildHelmChart
         ];
 
-      # Cloudflared - using a Kubernetes deployment manifest since there's no official Helm chart in nixhelm
+      # Cloudflared config with TCP ingress for SSH
+      cloudflaredConfig = pkgs.writeText "config.yaml" (builtins.toJSON {
+        tunnel = "quadnix";
+        credentials-file = "/etc/cloudflared/credentials.json";
+        ingress = [
+          {
+            hostname = "gitea-ssh.quadtech.dev";
+            service = "tcp://gitea-ssh.gitea.svc.cluster.local:22";
+          }
+          {
+            hostname = "gitea.quadtech.dev";
+            service = "http://gitea-http.gitea.svc.cluster.local:3000";
+          }
+          {
+            hostname = "argocd.quadtech.dev";
+            service = "http://argocd-server.argocd.svc.cluster.local:80";
+          }
+          {
+            service = "http_status:404";
+          }
+        ];
+      });
+
+      # Cloudflared deployment with config file
       cloudflaredManifest = pkgs.writeText "cloudflared.yaml" (builtins.toJSON {
         apiVersion = "apps/v1";
         kind = "Deployment";
@@ -93,16 +116,21 @@ let
               containers = [{
                 name = "cloudflared";
                 image = "cloudflare/cloudflared:latest";
-                command = [ "cloudflared" "tunnel" "run" "--token" "$(TUNNEL_TOKEN)" ];
-                env = [{
-                  name = "TUNNEL_TOKEN";
-                  valueFrom = {
-                    secretKeyRef = {
-                      name = "cloudflared-credentials";
-                      key = "token";
-                    };
-                  };
-                }];
+                command = [ "cloudflared" "tunnel" "--config" "/etc/cloudflared/config.yaml" "run" ];
+                volumeMounts = [
+                  {
+                    name = "config";
+                    mountPath = "/etc/cloudflared/config.yaml";
+                    subPath = "config.yaml";
+                    readOnly = true;
+                  }
+                  {
+                    name = "credentials";
+                    mountPath = "/etc/cloudflared/credentials.json";
+                    subPath = "credentials.json";
+                    readOnly = true;
+                  }
+                ];
                 resources = {
                   requests = {
                     cpu = "100m";
@@ -114,8 +142,35 @@ let
                   };
                 };
               }];
+              volumes = [
+                {
+                  name = "config";
+                  configMap = {
+                    name = "cloudflared-config";
+                  };
+                }
+                {
+                  name = "credentials";
+                  secret = {
+                    secretName = "cloudflared-credentials";
+                  };
+                }
+              ];
             };
           };
+        };
+      });
+
+      # ConfigMap for cloudflared
+      cloudflaredConfigMap = pkgs.writeText "cloudflared-configmap.yaml" (builtins.toJSON {
+        apiVersion = "v1";
+        kind = "ConfigMap";
+        metadata = {
+          name = "cloudflared-config";
+          namespace = "cloudflared";
+        };
+        data = {
+          "config.yaml" = builtins.readFile cloudflaredConfig;
         };
       });
 
@@ -131,6 +186,26 @@ let
         };
       });
 
+      # Secret template for cloudflared credentials (user must populate this)
+      cloudflaredSecret = pkgs.writeText "cloudflared-secret.yaml" ''
+        # This is a template - you must create the actual secret with your credentials
+        # kubectl create secret generic cloudflared-credentials \
+        #   --from-file=credentials.json=/path/to/your/credentials.json \
+        #   -n cloudflared
+        #
+        # Or use sops-nix to manage the secret
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: cloudflared-credentials
+          namespace: cloudflared
+        type: Opaque
+        data:
+          # Base64-encoded credentials.json content
+          # Example: echo '{"AccountTag":"...","TunnelID":"...","TunnelSecret":"..."}' | base64
+          credentials.json: "REPLACE_WITH_BASE64_CREDENTIALS"
+      '');
+
     in
       # Combine all charts and manifests into a single bootstrap output
       pkgs.runCommand "bootstrap-manifests" {} ''
@@ -145,8 +220,14 @@ let
         # Write cloudflared namespace
         cp ${cloudflaredNamespace} $out/03-cloudflared-namespace.yaml
         
+        # Write cloudflared configmap
+        cp ${cloudflaredConfigMap} $out/04-cloudflared-configmap.yaml
+        
         # Write cloudflared deployment
-        cp ${cloudflaredManifest} $out/04-cloudflared-deployment.yaml
+        cp ${cloudflaredManifest} $out/05-cloudflared-deployment.yaml
+        
+        # Write cloudflared secret template
+        cp ${cloudflaredSecret} $out/06-cloudflared-secret-template.yaml
         
         # Create combined file
         cat $out/01-gitea.yaml > $out/bootstrap.yaml
@@ -155,7 +236,11 @@ let
         echo "---" >> $out/bootstrap.yaml
         cat $out/03-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        cat $out/04-cloudflared-configmap.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/05-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/06-cloudflared-secret-template.yaml >> $out/bootstrap.yaml
       '';
 
 in
