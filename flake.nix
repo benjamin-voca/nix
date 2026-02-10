@@ -21,6 +21,7 @@
     nix-kube-generators.url = "github:farcaller/nix-kube-generators";
   };
 
+
   outputs = inputs:
     let
       lib = inputs.nixpkgs.lib;
