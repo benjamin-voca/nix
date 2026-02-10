@@ -84,6 +84,10 @@ let
             service = "ssh://localhost:22";
           }
           {
+            hostname = "gitea-ssh.quadtech.dev";
+            service = "tcp://gitea-ssh.gitea.svc.cluster.local:22";
+          }
+          {
             hostname = "gitea.quadtech.dev";
             service = "http://gitea-http.gitea.svc.cluster.local:3000";
           }
