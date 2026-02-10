@@ -74,9 +74,15 @@ let
 
       # Cloudflared config with TCP ingress for SSH
       cloudflaredConfig = pkgs.writeText "config.yaml" (builtins.toJSON {
-        tunnel = "quadnix";
-        credentials-file = "/etc/cloudflared/credentials.json";
+        tunnel = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
+        credentials-file = "/etc/cloudflared/creds/credentials.json";
+        metrics = "0.0.0.0:2000";
+        no-autoupdate = true;
         ingress = [
+          {
+            hostname = "backbone-01.quadtech.dev";
+            service = "ssh://localhost:22";
+          }
           {
             hostname = "gitea-ssh.quadtech.dev";
             service = "tcp://gitea-ssh.gitea.svc.cluster.local:22";
@@ -88,6 +94,10 @@ let
           {
             hostname = "argocd.quadtech.dev";
             service = "http://argocd-server.argocd.svc.cluster.local:80";
+          }
+          {
+            hostname = "*.quadtech.dev";
+            service = "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80";
           }
           {
             service = "http_status:404";
@@ -120,14 +130,12 @@ let
                 volumeMounts = [
                   {
                     name = "config";
-                    mountPath = "/etc/cloudflared/config.yaml";
-                    subPath = "config.yaml";
+                    mountPath = "/etc/cloudflared/config";
                     readOnly = true;
                   }
                   {
-                    name = "credentials";
-                    mountPath = "/etc/cloudflared/credentials.json";
-                    subPath = "credentials.json";
+                    name = "creds";
+                    mountPath = "/etc/cloudflared/creds";
                     readOnly = true;
                   }
                 ];
@@ -147,13 +155,18 @@ let
                   name = "config";
                   configMap = {
                     name = "cloudflared-config";
+                    items = [
+                      {
+                        key = "config.yaml";
+                        path = "config.yaml";
+                      }
+                    ];
                   };
                 }
                 {
-                  name = "credentials";
-                  hostPath = {
-                    path = "/run/secrets/cloudflared-credentials.json";
-                    type = "File";
+                  name = "creds";
+                  secret = {
+                    secretName = "cloudflared-credentials";
                   };
                 }
               ];
@@ -187,8 +200,8 @@ let
         };
       });
 
-      # Note: cloudflared credentials are mounted via hostPath from sops-managed secret
-      # The file is decrypted by sops-nix and mounted at /run/secrets/cloudflared-credentials.json
+      # Note: cloudflared credentials are mounted via Kubernetes secret
+      # The secret 'cloudflared-credentials' should be created from sops-decrypted credentials
 
     in
       # Combine all charts and manifests into a single bootstrap output
