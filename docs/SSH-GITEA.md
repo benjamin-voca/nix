@@ -1,15 +1,15 @@
 # SSH Access to Gitea
 
-## Direct SSH Access via NodePort (Port 2222)
+## Direct SSH Access via NodePort (Port 32222)
 
-The bootstrap creates a NodePort service exposing SSH on **port 2222** on the node's IP.
+The bootstrap creates a NodePort service exposing SSH on **port 32222** on the node's IP (Kubernetes NodePort range is 30000-32767).
 
 ### Router Configuration
 
-You need to configure your router to forward port 2222 to your node's IP:
-- **External Port**: 2222
+You need to configure your router to forward port 32222 to your node's IP:
+- **External Port**: 32222
 - **Internal IP**: 192.168.1.14 (or your node's IP)
-- **Internal Port**: 2222
+- **Internal Port**: 32222
 
 ### SSH Config
 
@@ -19,7 +19,7 @@ Add to `~/.ssh/config`:
 Host gitea-ssh.quadtech.dev
   HostName gitea-ssh.quadtech.dev
   User git
-  Port 2222
+  Port 32222
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
 ```
@@ -35,7 +35,7 @@ ssh git@gitea-ssh.quadtech.dev
 ```bash
 nix build .#bootstrap.x86_64-linux
 kubectl apply -f result/06-gitea-ssh-nodeport.yaml
-kubectl get svc -n gitea gitea-ssh-nodeport  # Verify nodePort: 2222
+kubectl get svc -n gitea gitea-ssh-nodeport  # Verify nodePort: 32222
 ```
 
 ## Alternative: Via Cloudflare Tunnel (Requires Access)
@@ -67,7 +67,7 @@ In Cloudflare Dashboard:
 Host gitea-ssh.quadtech.dev
   HostName gitea-ssh.quadtech.dev
   User git
-  Port 2222
+  Port 32222
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
   ProxyCommand cloudflared access tcp --hostname %h --id CLIENT_ID --secret CLIENT_SECRET
@@ -76,7 +76,7 @@ Host gitea-ssh.quadtech.dev
 ## Troubleshooting
 
 - **Connection refused**: Check router port forwarding is configured
-- **Connection timeout**: Verify firewall rules allow port 2222
+- **Connection timeout**: Verify firewall rules allow port 32222
 - **Authentication failed**: Verify SSH key is added to Gitea
 - **Check service**: `kubectl get svc -n gitea gitea-ssh-nodeport`
-- **Test locally**: `nc -zv 192.168.1.14 2222` (from backbone-01)
+- **Test locally**: `nc -zv 192.168.1.14 32222` (from backbone-01)

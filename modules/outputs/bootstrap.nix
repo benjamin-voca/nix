@@ -216,7 +216,7 @@ let
           ports = [{
             port = 22;
             targetPort = 22;
-            nodePort = 2222;
+            nodePort = 32222;
             protocol = "TCP";
           }];
           selector = {
