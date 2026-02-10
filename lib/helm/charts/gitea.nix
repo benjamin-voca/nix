@@ -22,8 +22,14 @@
         pullPolicy = "IfNotPresent";
       };
 
-      # Replicas for high availability
+      # Replicas - must be 1 since LevelDB queue doesn't support multiple pods
       replicaCount = 1;
+
+      # Strategy: Recreate ensures only one pod accesses storage at a time
+      # (LevelDB queue doesn't support concurrent access)
+      strategy = {
+        type = "Recreate";
+      };
 
       # Service configuration
       service = {
@@ -36,6 +42,7 @@
           create = true;
           type = "ClusterIP";
           port = 22;
+          targetPort = 2223;
           clusterIP = "";
           annotations = {
             "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
@@ -107,10 +114,10 @@
             DOMAIN = "gitea.quadtech.dev";
             ROOT_URL = "https://gitea.quadtech.dev";
             SSH_DOMAIN = "gitea.quadtech.dev";
-            SSH_PORT = 2222;
+            SSH_PORT = 22;
             DISABLE_SSH = false;
             START_SSH_SERVER = true;
-            SSH_LISTEN_PORT = 22;
+            SSH_LISTEN_PORT = 2223;
           };
           ssh = {
             create = true;
@@ -123,6 +130,10 @@
             USER = "gitea";
             PASSWD = "REPLACE_ME";
             SSL_MODE = "disable";
+          };
+
+          security = {
+            INSTALL_LOCK = true;
           };
 
           cache = {
@@ -200,36 +211,45 @@
         timeoutSeconds = 3;
       };
 
-      # Security context
+      # Security context - run as root (Gitea drops privileges internally)
       podSecurityContext = {
         fsGroup = 1000;
       };
 
-      containerSecurityContext = {
-        runAsUser = 1000;
-        runAsGroup = 1000;
-        allowPrivilegeEscalation = false;
-      };
+      # Note: Run as root - Gitea container uses s6-overlay which requires root
+      # Gitea process drops to UID 1000 internally
 
-      # Init containers for setting up Gitea
-      initContainers = {
-        initDirectories = {
-          enabled = true;
-        };
-        initAppIni = {
-          enabled = true;
-        };
-        configureGitea = {
-          enabled = true;
-        };
-      };
-
-      # Run custom script before built-in init containers to fix SSH directory
-      initPreScript = ''
-        mkdir -p /data/ssh
-        chown -R 1000:1000 /data/ssh
-        chmod 700 /data/ssh
-      '';
+      # Init containers
+      initContainers = [
+        {
+          name = "fix-ssh-permissions";
+          image = "busybox:latest";
+          command = [ "sh" "-c" ];
+          args = [''
+            mkdir -p /data/ssh
+            chown -R 1000:1000 /data/ssh
+            chmod 700 /data/ssh
+            if [ -f /data/ssh/gitea.rsa ]; then
+              chmod 600 /data/ssh/gitea.rsa
+              chown 1000:1000 /data/ssh/gitea.rsa
+            fi
+            if [ -f /data/ssh/gitea.rsa.pub ]; then
+              chmod 644 /data/ssh/gitea.rsa.pub
+              chown 1000:1000 /data/ssh/gitea.rsa.pub
+            fi
+          ''];
+          volumeMounts = [
+            {
+              name = "data";
+              mountPath = "/data";
+            }
+          ];
+          securityContext = {
+            runAsUser = 0;
+            runAsGroup = 0;
+          };
+        }
+      ];
 
       # Node affinity for HA
       affinity = { };
