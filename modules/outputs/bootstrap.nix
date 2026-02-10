@@ -84,10 +84,6 @@ let
             service = "ssh://localhost:22";
           }
           {
-            hostname = "gitea-ssh.quadtech.dev";
-            service = "tcp://gitea-ssh.gitea.svc.cluster.local:22";
-          }
-          {
             hostname = "gitea.quadtech.dev";
             service = "http://gitea-http.gitea.svc.cluster.local:3000";
           }
@@ -203,6 +199,31 @@ let
       # Note: cloudflared credentials are mounted via Kubernetes secret
       # The secret 'cloudflared-credentials' should be created from sops-decrypted credentials
 
+      # LoadBalancer service for direct SSH access (bypass Cloudflare Tunnel)
+      giteaSSHLoadBalancer = pkgs.writeText "gitea-ssh-lb.yaml" (builtins.toJSON {
+        apiVersion = "v1";
+        kind = "Service";
+        metadata = {
+          name = "gitea-ssh-lb";
+          namespace = "gitea";
+          annotations = {
+            "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-direct.quadtech.dev";
+          };
+        };
+        spec = {
+          type = "LoadBalancer";
+          ports = [{
+            port = 2222;
+            targetPort = 22;
+            protocol = "TCP";
+          }];
+          selector = {
+            "app.kubernetes.io/name" = "gitea";
+            "app.kubernetes.io/instance" = "gitea";
+          };
+        };
+      });
+
     in
       # Combine all charts and manifests into a single bootstrap output
       pkgs.runCommand "bootstrap-manifests" {} ''
@@ -222,7 +243,10 @@ let
         
         # Write cloudflared deployment
         cp ${cloudflaredManifest} $out/05-cloudflared-deployment.yaml
-        
+
+        # Write gitea SSH LoadBalancer
+        cp ${giteaSSHLoadBalancer} $out/06-gitea-ssh-lb.yaml
+
         # Create combined file
         cat $out/01-gitea.yaml > $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -233,6 +257,8 @@ let
         cat $out/04-cloudflared-configmap.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/05-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/06-gitea-ssh-lb.yaml >> $out/bootstrap.yaml
       '';
 
 in
