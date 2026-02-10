@@ -30,11 +30,13 @@
         http = {
           type = "ClusterIP";
           port = 3000;
+          clusterIP = "";
         };
         ssh = {
           create = true;
           type = "ClusterIP";
           port = 22;
+          clusterIP = "";
           annotations = {
             "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
           };

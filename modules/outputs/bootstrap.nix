@@ -28,147 +28,9 @@ let
       helmLib = helmLibFor system;
       kubelib = inputs.nix-kube-generators.lib { inherit pkgs; };
       
-      # Gitea chart configuration
-      giteaChart = pkgs.lib.pipe
-        {
-          name = "gitea";
-          chart = helmLib.kubelib.downloadHelmChart {
-            repo = "https://dl.gitea.com/charts";
-            chart = "gitea";
-            version = "12.5.0";
-            chartHash = "sha256-6sG9xCpbbRMMDlsZtHzqrNWuqsT/NHalUVUv0Ltx/zA=";
-          };
-          namespace = "gitea";
-          values = {
-            image = {
-              repository = "gitea/gitea";
-              tag = "1.25.4";
-            };
-            replicaCount = 1;
-            service = {
-              http = {
-                type = "ClusterIP";
-                port = 3000;
-              };
-              ssh = {
-                create = true;
-                type = "ClusterIP";
-                port = 22;
-                annotations = {
-                  "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
-                };
-              };
-            };
-            ingress = {
-              enabled = true;
-              className = "nginx";
-              annotations = {
-                "nginx.ingress.kubernetes.io/proxy-body-size" = "512m";
-              };
-              hosts = [{
-                host = "gitea.quadtech.dev";
-                paths = [{
-                  path = "/";
-                  pathType = "Prefix";
-                }];
-              }];
-              tls = [];
-            };
-            persistence = {
-              enabled = true;
-              create = true;
-              mount = true;
-              size = "50Gi";
-              storageClass = "longhorn";
-              claimName = "gitea-shared-storage";
-            };
-            postgresql.enabled = false;
-            postgresql-ha.enabled = false;
-            redis-cluster.enabled = false;
-            valkey-cluster.enabled = false;
-            gitea = {
-              admin = {
-                existingSecret = "gitea-admin";
-                username = "gitea_admin";
-                password = "REPLACE_ME";
-                email = "admin@quadtech.dev";
-              };
-              config = {
-                log = {
-                  MODE = "console";
-                  ROOT_PATH = "/data/gitea/custom/log";
-                };
-                server = {
-                  DOMAIN = "gitea.quadtech.dev";
-                  ROOT_URL = "https://gitea.quadtech.dev";
-                  SSH_DOMAIN = "gitea.quadtech.dev";
-                  SSH_PORT = 2222;
-                  DISABLE_SSH = false;
-                  START_SSH_SERVER = true;
-                  SSH_LISTEN_PORT = 22;
-                };
-                ssh.create = true;
-                database = {
-                  DB_TYPE = "postgres";
-                  HOST = "gitea-db-rw.gitea.svc.cluster.local:5432";
-                  NAME = "gitea";
-                  USER = "gitea";
-                  PASSWD = "REPLACE_ME";
-                  SSL_MODE = "disable";
-                };
-                cache = {
-                  ENABLED = true;
-                  ADAPTER = "memory";
-                };
-                session.PROVIDER = "memory";
-                queue.TYPE = "level";
-                service = {
-                  DISABLE_REGISTRATION = true;
-                  REQUIRE_SIGNIN_VIEW = true;
-                  ENABLE_NOTIFY_MAIL = false;
-                };
-                actions.ENABLED = true;
-                repository = {
-                  DEFAULT_BRANCH = "main";
-                  ENABLE_PUSH_CREATE_USER = true;
-                  ENABLE_PUSH_CREATE_ORG = true;
-                };
-                webhook.ALLOWED_HOST_LIST = "*";
-              };
-              additionalConfigFromEnvs = [
-                {
-                  name = "GITEA__DATABASE__PASSWD";
-                  valueFrom = {
-                    secretKeyRef = {
-                      name = "gitea-db";
-                      key = "password";
-                    };
-                  };
-                }
-              ];
-            };
-            resources = {
-              requests = {
-                cpu = "200m";
-                memory = "512Mi";
-              };
-              limits = {
-                cpu = "2000m";
-                memory = "2Gi";
-              };
-            };
-            initContainers = {
-              initDirectories.enabled = false;
-              initAppIni.enabled = false;
-              configureGitea.enabled = false;
-            };
-            affinity = {};
-          };
-        }
-        [
-          kubelib.buildHelmChart
-        ];
-
+      # Import existing charts from lib/helm/charts
+      existingCharts = import ../../lib/helm/charts { inherit helmLib; };
+      
       # ArgoCD chart configuration  
       argocdChart = pkgs.lib.pipe
         {
@@ -274,8 +136,8 @@ let
       pkgs.runCommand "bootstrap-manifests" {} ''
         mkdir -p $out
         
-        # Copy gitea chart
-        cp ${giteaChart} $out/01-gitea.yaml
+        # Copy gitea chart from existing charts
+        cp ${existingCharts.gitea} $out/01-gitea.yaml
         
         # Copy argocd chart
         cp ${argocdChart} $out/02-argocd.yaml
