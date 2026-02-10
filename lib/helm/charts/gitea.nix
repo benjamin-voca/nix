@@ -205,18 +205,31 @@
         fsGroup = 1000;
       };
 
-      # Disable init containers that have broken templates
+      containerSecurityContext = {
+        runAsUser = 1000;
+        runAsGroup = 1000;
+        allowPrivilegeEscalation = false;
+      };
+
+      # Init containers for setting up Gitea
       initContainers = {
         initDirectories = {
-          enabled = false;
+          enabled = true;
         };
         initAppIni = {
-          enabled = false;
+          enabled = true;
         };
         configureGitea = {
-          enabled = false;
+          enabled = true;
         };
       };
+
+      # Run custom script before built-in init containers to fix SSH directory
+      initPreScript = ''
+        mkdir -p /data/ssh
+        chown -R 1000:1000 /data/ssh
+        chmod 700 /data/ssh
+      '';
 
       # Node affinity for HA
       affinity = { };

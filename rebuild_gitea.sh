@@ -15,8 +15,8 @@ nix build .#helmCharts.x86_64-linux.all.gitea
 echo "Deploying Gitea..."
 envsubst '${GITEA_DB_PASSWORD} ${GITEA_ADMIN_PASSWORD}' < ./result | kubectl apply -f -
 
-echo "Removing broken init containers..."
-kubectl patch deployment gitea -n gitea --type='json' -p='[{"op": "remove", "path": "/spec/template/spec/initContainers"}]' 2>/dev/null || true
+echo "Waiting for init containers to complete..."
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=gitea -n gitea --timeout=300s || true
 
 echo "Restarting Gitea..."
 kubectl rollout restart -n gitea deployment/gitea
