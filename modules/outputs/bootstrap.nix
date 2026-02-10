@@ -151,8 +151,9 @@ let
                 }
                 {
                   name = "credentials";
-                  secret = {
-                    secretName = "cloudflared-credentials";
+                  hostPath = {
+                    path = "/run/secrets/cloudflared-credentials.json";
+                    type = "File";
                   };
                 }
               ];
@@ -186,25 +187,8 @@ let
         };
       });
 
-      # Secret template for cloudflared credentials (user must populate this)
-      cloudflaredSecret = pkgs.writeText "cloudflared-secret.yaml" ''
-        # This is a template - you must create the actual secret with your credentials
-        # kubectl create secret generic cloudflared-credentials \
-        #   --from-file=credentials.json=/path/to/your/credentials.json \
-        #   -n cloudflared
-        #
-        # Or use sops-nix to manage the secret
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: cloudflared-credentials
-          namespace: cloudflared
-        type: Opaque
-        data:
-          # Base64-encoded credentials.json content
-          # Example: echo '{"AccountTag":"...","TunnelID":"...","TunnelSecret":"..."}' | base64
-          credentials.json: "REPLACE_WITH_BASE64_CREDENTIALS"
-      '');
+      # Note: cloudflared credentials are mounted via hostPath from sops-managed secret
+      # The file is decrypted by sops-nix and mounted at /run/secrets/cloudflared-credentials.json
 
     in
       # Combine all charts and manifests into a single bootstrap output
@@ -226,9 +210,6 @@ let
         # Write cloudflared deployment
         cp ${cloudflaredManifest} $out/05-cloudflared-deployment.yaml
         
-        # Write cloudflared secret template
-        cp ${cloudflaredSecret} $out/06-cloudflared-secret-template.yaml
-        
         # Create combined file
         cat $out/01-gitea.yaml > $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -239,8 +220,6 @@ let
         cat $out/04-cloudflared-configmap.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/05-cloudflared-deployment.yaml >> $out/bootstrap.yaml
-        echo "---" >> $out/bootstrap.yaml
-        cat $out/06-cloudflared-secret-template.yaml >> $out/bootstrap.yaml
       '';
 
 in
