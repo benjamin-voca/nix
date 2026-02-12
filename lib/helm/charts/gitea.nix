@@ -211,15 +211,12 @@
         timeoutSeconds = 3;
       };
 
-      # Security context - run as root for s6-overlay (Gitea drops to UID 1000 internally)
+      # Security context - let rootful image manage its own user (s6-overlay needs root for init)
       podSecurityContext = {
         fsGroup = 1000;
       };
 
-      containerSecurityContext = {
-        runAsUser = 0;
-        runAsGroup = 0;
-      };
+      containerSecurityContext = { };
 
       # Note: Run as root - Gitea container uses s6-overlay which requires root
       # Gitea process drops to UID 1000 internally
