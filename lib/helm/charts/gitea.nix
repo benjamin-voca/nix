@@ -228,16 +228,15 @@
           args = [''
             echo "Fixing SSH key permissions..."
             if [ -d /data/ssh ]; then
-              chown -R 1000:1000 /data/ssh
               chmod 700 /data/ssh
               if [ -f /data/ssh/gitea.rsa ]; then
                 chmod 600 /data/ssh/gitea.rsa
-                chown 1000:1000 /data/ssh/gitea.rsa
-                echo "Fixed gitea.rsa permissions"
+                chown root:root /data/ssh/gitea.rsa
+                echo "Fixed gitea.rsa permissions for root container"
               fi
               if [ -f /data/ssh/gitea.rsa.pub ]; then
                 chmod 644 /data/ssh/gitea.rsa.pub
-                chown 1000:1000 /data/ssh/gitea.rsa.pub
+                chown root:root /data/ssh/gitea.rsa.pub
                 echo "Fixed gitea.rsa.pub permissions"
               fi
               ls -la /data/ssh/
