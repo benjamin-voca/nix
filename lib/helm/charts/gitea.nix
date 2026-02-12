@@ -216,8 +216,10 @@
         fsGroup = 1000;
       };
 
-      # Custom init container to fix Longhorn volume permissions BEFORE Gitea starts
-      initContainers = [
+      containerSecurityContext = { };
+
+      # Use postExtraInitContainers which is supported by the Gitea chart
+      postExtraInitContainers = [
         {
           name = "fix-permissions";
           image = "gitea/gitea:1.25.4";
@@ -247,8 +249,6 @@
           };
         }
       ];
-
-      containerSecurityContext = { };
 
       # Note: Run as root - Gitea container uses s6-overlay which requires root
       # Gitea process drops to UID 1000 internally
