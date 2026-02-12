@@ -211,14 +211,14 @@
         timeoutSeconds = 3;
       };
 
-      # Security context - run as git user (UID 1000)
+      # Security context - run as root for s6-overlay (Gitea drops to UID 1000 internally)
       podSecurityContext = {
         fsGroup = 1000;
       };
 
       containerSecurityContext = {
-        runAsUser = 1000;
-        runAsGroup = 1000;
+        runAsUser = 0;
+        runAsGroup = 0;
       };
 
       # Note: Run as root - Gitea container uses s6-overlay which requires root
@@ -235,16 +235,20 @@
             if [ -d /data/ssh ]; then
               chown 1000:1000 /data/ssh
               chmod 700 /data/ssh
-              if [ -f /data/ssh/gitea.rsa ]; then
-                chmod 600 /data/ssh/gitea.rsa
-                chown 1000:1000 /data/ssh/gitea.rsa
-                echo "Fixed gitea.rsa permissions (owned by git user)"
-              fi
-              if [ -f /data/ssh/gitea.rsa.pub ]; then
-                chmod 644 /data/ssh/gitea.rsa.pub
-                chown 1000:1000 /data/ssh/gitea.rsa.pub
-                echo "Fixed gitea.rsa.pub permissions"
-              fi
+              for key in /data/ssh/gitea.rsa /data/ssh/ssh_host_*_key; do
+                if [ -f "$key" ]; then
+                  chmod 600 "$key"
+                  chown 1000:1000 "$key"
+                  echo "Fixed $key permissions (owned by git user)"
+                fi
+              done
+              for pubkey in /data/ssh/*.pub; do
+                if [ -f "$pubkey" ]; then
+                  chmod 644 "$pubkey"
+                  chown 1000:1000 "$pubkey"
+                  echo "Fixed $pubkey permissions"
+                fi
+              done
               ls -la /data/ssh/
             else
               echo "SSH directory not found"
