@@ -40,12 +40,13 @@
         };
          ssh = {
            create = true;
-           type = "ClusterIP";
+           type = "LoadBalancer";
            port = 22;
-           targetPort = 22;
+           targetPort = 2223;
            clusterIP = "";
            annotations = {
-             "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
+             "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh.quadtech.dev";
+             "metallb.universe.tf/address-pool" = "default";
            };
          };
       };
@@ -110,15 +111,15 @@
             MODE = "console";
             ROOT_PATH = "/data/gitea/custom/log";
           };
-           server = {
-             DOMAIN = "gitea.quadtech.dev";
-             ROOT_URL = "https://gitea.quadtech.dev";
-             SSH_DOMAIN = "gitea.quadtech.dev";
-             SSH_PORT = 22;
-             DISABLE_SSH = false;
-             START_SSH_SERVER = false;
-             SSH_LISTEN_PORT = 22;
-           };
+          server = {
+            DOMAIN = "gitea.quadtech.dev";
+            ROOT_URL = "https://gitea.quadtech.dev";
+            SSH_DOMAIN = "gitea-ssh.quadtech.dev";
+            SSH_PORT = 22;
+            DISABLE_SSH = false;
+            START_SSH_SERVER = true;
+            SSH_LISTEN_PORT = 2223;
+          };
           ssh = {
             create = true;
           };
@@ -230,26 +231,24 @@
           args = [''
             echo "Fixing SSH key permissions..."
             if [ -d /data/ssh ]; then
-              chown 1000:1000 /data/ssh
+              chown -R 1000:1000 /data/ssh
               chmod 700 /data/ssh
-              for key in /data/ssh/gitea.rsa /data/ssh/ssh_host_*_key; do
-                if [ -f "$key" ]; then
-                  chmod 600 "$key"
-                  chown 1000:1000 "$key"
-                  echo "Fixed $key permissions (owned by git user)"
-                fi
-              done
-              for pubkey in /data/ssh/*.pub; do
-                if [ -f "$pubkey" ]; then
-                  chmod 644 "$pubkey"
-                  chown 1000:1000 "$pubkey"
-                  echo "Fixed $pubkey permissions"
-                fi
-              done
-              ls -la /data/ssh/
+              chmod 600 /data/ssh/*
+              echo "Fixed /data/ssh permissions"
             else
               echo "SSH directory not found"
             fi
+            # Fix .ssh directory in git user's home
+            if [ -d /data/git/.ssh ]; then
+              chown -R 1000:1000 /data/git/.ssh
+              chmod 700 /data/git/.ssh
+              chmod 600 /data/git/.ssh/authorized_keys 2>/dev/null || true
+              echo "Fixed /data/git/.ssh permissions"
+            else
+              echo ".ssh directory not found in /data/git"
+            fi
+            ls -la /data/ssh/ 2>/dev/null || true
+            ls -la /data/git/.ssh/ 2>/dev/null || true
           ''];
           volumeMounts = [
             {

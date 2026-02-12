@@ -1,0 +1,17 @@
+tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
+credentials-file: /etc/cloudflared/creds/credentials.json
+protocol: http2
+metrics: 0.0.0.0:2000
+no-autoupdate: true
+ingress:
+  - hostname: mainssh.quadtech.dev
+    service: ssh://localhost:22
+  - hostname: gitea-ssh.quadtech.dev
+    service: tcp://192.168.1.240:32222
+  - hostname: gitea.quadtech.dev
+    service: http://192.168.1.240:80
+  - hostname: argocd.quadtech.dev
+    service: http://192.168.1.240:80
+  - hostname: "*.quadtech.dev"
+    service: http://192.168.1.240:80
+  - service: http_status:404

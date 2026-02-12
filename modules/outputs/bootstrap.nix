@@ -131,7 +131,7 @@ let
 
       # Cloudflared config content as string
       cloudflaredConfigContent = builtins.toJSON {
-        tunnel = "96380c18-327c-4cb9-9b2a-b01081d15d24";
+        tunnel = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
         credentials-file = "/etc/cloudflared/creds/credentials.json";
         metrics = "0.0.0.0:2000";
         no-autoupdate = true;
