@@ -22,6 +22,32 @@
         pullPolicy = "IfNotPresent";
       };
 
+      # Custom command to fix SSH permissions before starting Gitea
+      command = [
+        "/bin/sh"
+        "-c"
+        ''
+          echo "Fixing SSH permissions before starting Gitea..."
+          if [ -d /data/ssh ]; then
+            chown -R 1000:1000 /data/ssh
+            chmod 700 /data/ssh
+            chmod 600 /data/ssh/* 2>/dev/null || true
+            echo "Fixed /data/ssh permissions"
+          fi
+          if [ -d /data/git/.ssh ]; then
+            chown -R 1000:1000 /data/git/.ssh
+            chmod 700 /data/git/.ssh
+            chmod 600 /data/git/.ssh/* 2>/dev/null || true
+            echo "Fixed /data/git/.ssh permissions"
+          fi
+          # Kill any existing SSH processes that might be holding the port
+          pkill -f "sshd.*2223" 2>/dev/null || true
+          sleep 1
+          # Start Gitea
+          exec /usr/local/bin/gitea web
+        ''
+      ];
+
       # Replicas - must be 1 since LevelDB queue doesn't support multiple pods
       replicaCount = 1;
 
