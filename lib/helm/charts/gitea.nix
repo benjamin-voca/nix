@@ -211,14 +211,14 @@
         timeoutSeconds = 3;
       };
 
-      # Security context - run as root (Gitea drops privileges internally)
+      # Security context - run as git user (UID 1000)
       podSecurityContext = {
         fsGroup = 1000;
       };
 
       containerSecurityContext = {
-        runAsUser = 0;
-        runAsGroup = 0;
+        runAsUser = 1000;
+        runAsGroup = 1000;
       };
 
       # Note: Run as root - Gitea container uses s6-overlay which requires root
