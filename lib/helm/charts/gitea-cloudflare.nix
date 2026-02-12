@@ -1,5 +1,13 @@
 { helmLib }:
 
+let
+  chart = helmLib.kubelib.downloadHelmChart {
+    repo = "https://dl.gitea.com/charts";
+    chart = "gitea";
+    version = "12.5.0";
+    chartHash = "sha256-6sG9xCpbbRMMDlsZtHzqrNWuqsT/NHalUVUv0Ltx/zA=";
+  };
+in
 # Gitea configuration optimized for Cloudflare Tunnel
 # - No LoadBalancer (uses ClusterIP)
 # - No TLS configuration (Cloudflare handles it)
@@ -9,7 +17,7 @@
   # Gitea configuration
   gitea = helmLib.buildChart {
     name = "gitea";
-    chart = helmLib.charts.gitea-charts.gitea;
+    inherit chart;
     namespace = "gitea";
     values = {
       # Gitea image configuration

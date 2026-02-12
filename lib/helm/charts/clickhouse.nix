@@ -1,10 +1,24 @@
 { helmLib }:
 
+let
+  chart = helmLib.kubelib.downloadHelmChart {
+    repo = "https://charts.bitnami.com/bitnami";
+    chart = "clickhouse";
+    version = "9.4.4";
+    chartHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
+  clickhouseOperatorChart = helmLib.kubelib.downloadHelmChart {
+    repo = "https://charts.bitnami.com/bitnami";
+    chart = "clickhouse-operator";
+    version = "0.23.0";
+    chartHash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
+  };
+in
 {
   # ClickHouse configuration
   clickhouse = helmLib.buildChart {
     name = "clickhouse";
-    chart = helmLib.charts.clickhouse.clickhouse;
+    inherit chart;
     namespace = "clickhouse";
     values = {
       # ClickHouse cluster configuration
@@ -225,7 +239,7 @@
   # ClickHouse Operator for managing clusters
   clickhouse-operator = helmLib.buildChart {
     name = "clickhouse-operator";
-    chart = helmLib.charts.clickhouse.clickhouse-operator;
+    inherit clickhouseOperatorChart;
     namespace = "clickhouse-operator";
     values = {
       # Operator configuration

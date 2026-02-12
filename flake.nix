@@ -98,6 +98,12 @@
       flakeOutputs = {
         helmLib = forAllSystems (system: helmLibFor system);
         argocdChart = forAllSystems (system: argocdChartFor system);
+        packages = forAllSystems (system: {
+          inherit (inputs.nixhelm.packages.${system}) helmupdater;
+        });
+        apps = forAllSystems (system: {
+          inherit (inputs.nixhelm.apps.${system}) helmupdater;
+        });
       };
       eval = lib.evalModules {
         specialArgs = { inherit inputs; argocdChart = flakeOutputs.argocdChart; };

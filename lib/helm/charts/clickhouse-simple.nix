@@ -1,10 +1,24 @@
 { helmLib }:
 
+let
+  chart = helmLib.kubelib.downloadHelmChart {
+    repo = "https://charts.bitnami.com/bitnami";
+    chart = "clickhouse";
+    version = "9.4.4";
+    chartHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
+  clickhouseOperatorChart = helmLib.kubelib.downloadHelmChart {
+    repo = "https://charts.bitnami.com/bitnami";
+    chart = "clickhouse-operator";
+    version = "0.23.0";
+    chartHash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
+  };
+in
 {
   # ClickHouse - Single Instance Configuration for Cloudflare Tunnel
   clickhouse = helmLib.buildChart {
     name = "clickhouse";
-    chart = helmLib.charts.clickhouse.clickhouse;
+    inherit chart;
     namespace = "clickhouse";
     values = {
       # Single instance cluster (no sharding/replication)
@@ -173,7 +187,7 @@
   # ClickHouse Operator - Single Instance
   clickhouse-operator = helmLib.buildChart {
     name = "clickhouse-operator";
-    chart = helmLib.charts.clickhouse.clickhouse-operator;
+    inherit clickhouseOperatorChart;
     namespace = "clickhouse-operator";
     values = {
       # Operator configuration
