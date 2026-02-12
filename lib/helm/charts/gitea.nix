@@ -40,13 +40,12 @@
         };
          ssh = {
            create = true;
-           type = "LoadBalancer";
+           type = "NodePort";
            port = 22;
-           targetPort = 2223;
+           targetPort = 22;
            clusterIP = "";
            annotations = {
              "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh.quadtech.dev";
-             "metallb.universe.tf/address-pool" = "default";
            };
          };
       };
@@ -118,7 +117,7 @@
             SSH_PORT = 22;
             DISABLE_SSH = false;
             START_SSH_SERVER = true;
-            SSH_LISTEN_PORT = 2223;
+            SSH_LISTEN_PORT = 22;
           };
           ssh = {
             create = true;
