@@ -21,15 +21,6 @@
         rootless = false;
         pullPolicy = "IfNotPresent";
       };
-            echo "Fixed /data/git/.ssh permissions"
-          fi
-          # Kill any existing SSH processes that might be holding the port
-          pkill -f "sshd.*2223" 2>/dev/null || true
-          sleep 1
-          # Start Gitea
-          exec /usr/local/bin/gitea web
-        ''
-      ];
 
       # Replicas - must be 1 since LevelDB queue doesn't support multiple pods
       replicaCount = 1;
