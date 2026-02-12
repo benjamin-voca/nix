@@ -35,7 +35,7 @@ let
       metallbChart = pkgs.lib.pipe
         {
           name = "metallb";
-          chart = charts.metallb.metallb;
+          chart = chartsFor.x86_64-linux.kubernetes-sigs.ingress-nginx;
           namespace = "metallb";
           values = {
             # IP address pool for LoadBalancer services
@@ -58,7 +58,7 @@ let
       ingressNginxChart = pkgs.lib.pipe
         {
           name = "ingress-nginx";
-          chart = existingCharts.ingress-nginx;
+          chart = chartsFor.x86_64-linux.kubernetes-sigs.ingress-nginx;
           namespace = "ingress-nginx";
           values = {
             controller = {
