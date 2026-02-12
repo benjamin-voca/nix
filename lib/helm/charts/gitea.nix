@@ -21,23 +21,6 @@
         rootless = false;
         pullPolicy = "IfNotPresent";
       };
-
-      # Custom command to fix SSH permissions before starting Gitea
-      command = [
-        "/bin/sh"
-        "-c"
-        ''
-          echo "Fixing SSH permissions before starting Gitea..."
-          if [ -d /data/ssh ]; then
-            chown -R 1000:1000 /data/ssh
-            chmod 700 /data/ssh
-            chmod 600 /data/ssh/* 2>/dev/null || true
-            echo "Fixed /data/ssh permissions"
-          fi
-          if [ -d /data/git/.ssh ]; then
-            chown -R 1000:1000 /data/git/.ssh
-            chmod 700 /data/git/.ssh
-            chmod 600 /data/git/.ssh/* 2>/dev/null || true
             echo "Fixed /data/git/.ssh permissions"
           fi
           # Kill any existing SSH processes that might be holding the port
@@ -241,40 +224,36 @@
       # Security context - let rootful image manage its own user (s6-overlay needs root for init)
       podSecurityContext = {
         fsGroup = 1000;
+        runAsUser = 0;
+        runAsGroup = 0;
       };
 
       containerSecurityContext = { };
 
-      # Note: Run as root - Gitea container uses s6-overlay which requires root
-      # Gitea process drops to UID 1000 internally
-
-      # Init containers
-      postExtraInitContainers = [
+      # Init container to fix SSH permissions BEFORE main container starts
+      initContainers = [
         {
           name = "fix-ssh-permissions";
           image = "busybox:latest";
           command = [ "sh" "-c" ];
           args = [''
+            echo "Waiting for data volume to be mounted..."
+            sleep 5
             echo "Fixing SSH key permissions..."
             if [ -d /data/ssh ]; then
               chown -R 1000:1000 /data/ssh
               chmod 700 /data/ssh
-              chmod 600 /data/ssh/*
-              echo "Fixed /data/ssh permissions"
-            else
-              echo "SSH directory not found"
+              chmod 600 /data/ssh/* 2>/dev/null || true
+              ls -la /data/ssh/
             fi
-            # Fix .ssh directory in git user's home
-            if [ -d /data/git/.ssh ]; then
-              chown -R 1000:1000 /data/git/.ssh
-              chmod 700 /data/git/.ssh
-              chmod 600 /data/git/.ssh/authorized_keys 2>/dev/null || true
-              echo "Fixed /data/git/.ssh permissions"
-            else
-              echo ".ssh directory not found in /data/git"
+            if [ -d /data/git ]; then
+              chown -R 1000:1000 /data/git
+              if [ -d /data/git/.ssh ]; then
+                chmod 700 /data/git/.ssh
+                chmod 600 /data/git/.ssh/* 2>/dev/null || true
+              fi
             fi
-            ls -la /data/ssh/ 2>/dev/null || true
-            ls -la /data/git/.ssh/ 2>/dev/null || true
+            echo "Permissions fixed"
           ''];
           volumeMounts = [
             {
@@ -288,6 +267,9 @@
           };
         }
       ];
+
+      # Note: Run as root - Gitea container uses s6-overlay which requires root
+      # Gitea process drops to UID 1000 internally
 
       # Node affinity for HA
       affinity = { };
