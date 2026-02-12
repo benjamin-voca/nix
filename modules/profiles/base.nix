@@ -28,7 +28,7 @@
     enable = true;
     settings.PasswordAuthentication = false;
   };
-  services.cloudflared.enable = true;
+  # services.cloudflared.enable = true;  # Disabled - using custom systemd service in backbone.nix
 
   environment.systemPackages = with pkgs; [
     vim

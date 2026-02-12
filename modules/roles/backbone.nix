@@ -92,6 +92,49 @@
     labels = [ "ubuntu-latest" "linux" "x86_64" "self-hosted" ];
   };
 
+  # Cloudflared tunnel service (runs on host for SSH access via Cloudflare Tunnel)
+  systemd.services.cloudflared = {
+    description = "Cloudflare Tunnel";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.cloudflared}/bin/cloudflared tunnel --protocol http2 --config /etc/cloudflared/config.yaml run";
+      Restart = "always";
+      RestartSec = "10s";
+      User = "root";
+    };
+  };
+
+  # Create cloudflared config directory and files
+  systemd.services.cloudflared.preStart = ''
+    mkdir -p /etc/cloudflared/config /etc/cloudflared/creds
+    
+    # Write cloudflared config
+    cat > /etc/cloudflared/config/config.yaml << 'EOF'
+tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
+credentials-file: /etc/cloudflared/creds/credentials.json
+protocol: http2
+metrics: 0.0.0.0:2000
+no-autoupdate: true
+ingress:
+  - hostname: backbone-01.quadtech.dev
+    service: ssh://localhost:22
+  - hostname: gitea-ssh.quadtech.dev
+    service: tcp://192.168.1.240:32222
+  - hostname: gitea.quadtech.dev
+    service: http://192.168.1.240:80
+  - hostname: argocd.quadtech.dev
+    service: http://192.168.1.240:80
+  - hostname: "*.quadtech.dev"
+    service: http://192.168.1.240:80
+  - service: http_status:404
+EOF
+    
+    # Copy credentials from SOPS secret
+    cp /run/secrets/cloudflared-credentials.json /etc/cloudflared/creds/credentials.json
+    chmod 600 /etc/cloudflared/creds/credentials.json
+  '';
+
   # Enable 2 additional runners via systemd service instances
   systemd.services.gitea-runner-2 = {
     description = "Gitea actions runner 2";
