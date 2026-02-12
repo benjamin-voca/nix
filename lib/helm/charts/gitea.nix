@@ -215,49 +215,9 @@
       # Security context - let rootful image manage its own user (s6-overlay needs root for init)
       podSecurityContext = {
         fsGroup = 1000;
-        runAsUser = 0;
-        runAsGroup = 0;
       };
 
       containerSecurityContext = { };
-
-      # Init container to fix SSH permissions BEFORE main container starts
-      initContainers = [
-        {
-          name = "fix-ssh-permissions";
-          image = "busybox:latest";
-          command = [ "sh" "-c" ];
-          args = [''
-            echo "Waiting for data volume to be mounted..."
-            sleep 5
-            echo "Fixing SSH key permissions..."
-            if [ -d /data/ssh ]; then
-              chown -R 1000:1000 /data/ssh
-              chmod 700 /data/ssh
-              chmod 600 /data/ssh/* 2>/dev/null || true
-              ls -la /data/ssh/
-            fi
-            if [ -d /data/git ]; then
-              chown -R 1000:1000 /data/git
-              if [ -d /data/git/.ssh ]; then
-                chmod 700 /data/git/.ssh
-                chmod 600 /data/git/.ssh/* 2>/dev/null || true
-              fi
-            fi
-            echo "Permissions fixed"
-          ''];
-          volumeMounts = [
-            {
-              name = "data";
-              mountPath = "/data";
-            }
-          ];
-          securityContext = {
-            runAsUser = 0;
-            runAsGroup = 0;
-          };
-        }
-      ];
 
       # Note: Run as root - Gitea container uses s6-overlay which requires root
       # Gitea process drops to UID 1000 internally
