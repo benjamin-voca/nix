@@ -32,21 +32,37 @@ let
       existingCharts = import ../../lib/helm/charts { inherit helmLib; };
 
       # MetalLB chart - use nixhelm's chart derivation directly
+      # Note: MetalLB 0.15+ uses CRDs for configuration instead of configInline
       metallbChart = pkgs.lib.pipe
         {
           name = "metallb";
           chart = charts.metallb.metallb;
           namespace = "metallb";
           values = {
-            # IP address pool for LoadBalancer services
-            configInline = {
-              address-pools = [
-                {
-                  name = "default";
-                  protocol = "layer2";
-                  addresses = [ "192.168.1.240-192.168.1.250" ];
-                }
-              ];
+            # Use the CRD-based configuration (L2Advertisement and IPAddressPool)
+            controller = {
+              resources = {
+                requests = {
+                  cpu = "100m";
+                  memory = "128Mi";
+                };
+                limits = {
+                  cpu = "500m";
+                  memory = "256Mi";
+                };
+              };
+            };
+            speaker = {
+              resources = {
+                requests = {
+                  cpu = "50m";
+                  memory = "64Mi";
+                };
+                limits = {
+                  cpu = "200m";
+                  memory = "128Mi";
+                };
+              };
             };
           };
         }
@@ -258,6 +274,28 @@ let
         };
       });
 
+      # MetalLB CRDs for IP address pool configuration (MetalLB 0.15+ uses CRDs)
+      metallbIPAddressPool = ''
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default
+  namespace: metallb
+spec:
+  addresses:
+  - 192.168.1.240-192.168.1.250
+  autoAssign: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default
+  namespace: metallb
+spec:
+  ipAddressPools:
+  - default
+'';
+
     in
       # Combine all charts and manifests into a single bootstrap output
       # Use runCommand with explicit system to avoid cross-compilation issues
@@ -324,6 +362,11 @@ spec:
         # Copy metallb chart first (needed for LoadBalancer)
         cp ${metallbChart} $out/00-metallb.yaml
         
+        # Write MetalLB CRDs for IP pool
+        cat > $out/00-metallb-crds.yaml << 'METALLB_CRDS_EOF'
+${metallbIPAddressPool}
+METALLB_CRDS_EOF
+        
         # Copy ingress-nginx chart (will get IP from MetalLB)
         cp ${ingressNginxChart} $out/01-ingress-nginx.yaml
         
@@ -383,6 +426,8 @@ EOF
 
         # Create combined file
         cat $out/00-metallb.yaml > $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/00-metallb-crds.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/01-ingress-nginx.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
