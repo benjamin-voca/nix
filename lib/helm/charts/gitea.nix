@@ -216,6 +216,34 @@
         fsGroup = 1000;
       };
 
+      # Custom init container to fix Longhorn volume permissions BEFORE Gitea starts
+      initContainers = [
+        {
+          name = "fix-permissions";
+          image = "gitea/gitea:1.25.4";
+          command = [ "sh" "-c" ];
+          args = [''
+            echo "Fixing volume permissions..."
+            chown -R 1000:1000 /data
+            chmod -R 755 /data
+            chmod -R 700 /data/ssh /data/git/.ssh 2>/dev/null || true
+            chmod 600 /data/ssh/* /data/git/.ssh/* 2>/dev/null || true
+            ls -la /data/
+            echo "Done"
+          ''];
+          volumeMounts = [
+            {
+              name = "data";
+              mountPath = "/data";
+            }
+          ];
+          securityContext = {
+            runAsUser = 0;
+            runAsGroup = 0;
+          };
+        }
+      ];
+
       containerSecurityContext = { };
 
       # Note: Run as root - Gitea container uses s6-overlay which requires root
