@@ -126,7 +126,7 @@ let
               containers = [{
                 name = "cloudflared";
                 image = "cloudflare/cloudflared:latest";
-                command = [ "cloudflared" "tunnel" "--config" "/etc/cloudflared/config.yaml" "run" ];
+                command = [ "cloudflared" "tunnel" "--config" "/etc/cloudflared/config/config.yaml" "run" ];
                 volumeMounts = [
                   {
                     name = "config";
