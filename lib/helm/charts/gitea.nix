@@ -237,6 +237,10 @@
               mountPath = "/data";
             }
           ];
+          resources = {
+            requests = { cpu = "10m"; memory = "16Mi"; };
+            limits = { cpu = "100m"; memory = "64Mi"; };
+          };
           securityContext = {
             runAsUser = 0;
             runAsGroup = 0;
