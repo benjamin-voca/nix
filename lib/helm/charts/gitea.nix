@@ -220,22 +220,29 @@
       # Gitea process drops to UID 1000 internally
 
       # Init containers
-      initContainers = [
+      postExtraInitContainers = [
         {
           name = "fix-ssh-permissions";
           image = "busybox:latest";
           command = [ "sh" "-c" ];
           args = [''
-            mkdir -p /data/ssh
-            chown -R 1000:1000 /data/ssh
-            chmod 700 /data/ssh
-            if [ -f /data/ssh/gitea.rsa ]; then
-              chmod 600 /data/ssh/gitea.rsa
-              chown 1000:1000 /data/ssh/gitea.rsa
-            fi
-            if [ -f /data/ssh/gitea.rsa.pub ]; then
-              chmod 644 /data/ssh/gitea.rsa.pub
-              chown 1000:1000 /data/ssh/gitea.rsa.pub
+            echo "Fixing SSH key permissions..."
+            if [ -d /data/ssh ]; then
+              chown -R 1000:1000 /data/ssh
+              chmod 700 /data/ssh
+              if [ -f /data/ssh/gitea.rsa ]; then
+                chmod 600 /data/ssh/gitea.rsa
+                chown 1000:1000 /data/ssh/gitea.rsa
+                echo "Fixed gitea.rsa permissions"
+              fi
+              if [ -f /data/ssh/gitea.rsa.pub ]; then
+                chmod 644 /data/ssh/gitea.rsa.pub
+                chown 1000:1000 /data/ssh/gitea.rsa.pub
+                echo "Fixed gitea.rsa.pub permissions"
+              fi
+              ls -la /data/ssh/
+            else
+              echo "SSH directory not found"
             fi
           ''];
           volumeMounts = [
