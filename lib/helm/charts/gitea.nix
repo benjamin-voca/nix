@@ -228,9 +228,19 @@
             echo "Fixing volume permissions..."
             chown -R 1000:1000 /data
             chmod -R 755 /data
-            chmod -R 700 /data/ssh /data/git/.ssh 2>/dev/null || true
-            chmod 600 /data/ssh/* /data/git/.ssh/* 2>/dev/null || true
-            ls -la /data/
+            # Fix SSH keys specifically - they must be readable by git user
+            chown -R 1000:1000 /data/ssh
+            chmod 600 /data/ssh/*
+            chmod 644 /data/ssh/*.pub 2>/dev/null || true
+            # Fix git user ssh directory
+            if [ -d /data/git ]; then
+              chown -R 1000:1000 /data/git
+              if [ -d /data/git/.ssh ]; then
+                chmod 700 /data/git/.ssh
+                chmod 600 /data/git/.ssh/*
+              fi
+            fi
+            ls -la /data/ssh/
             echo "Done"
           ''];
           volumeMounts = [
