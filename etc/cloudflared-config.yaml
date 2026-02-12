@@ -7,7 +7,7 @@ ingress:
   - hostname: mainssh.quadtech.dev
     service: ssh://localhost:22
   - hostname: gitea-ssh.quadtech.dev
-    service: tcp://192.168.1.240:32222
+    service: tcp://192.168.1.14:32222
   - hostname: gitea.quadtech.dev
     service: http://192.168.1.240:80
   - hostname: argocd.quadtech.dev
