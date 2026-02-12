@@ -38,16 +38,16 @@
           port = 3000;
           clusterIP = "";
         };
-        ssh = {
-          create = true;
-          type = "ClusterIP";
-          port = 22;
-          targetPort = 2223;
-          clusterIP = "";
-          annotations = {
-            "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
-          };
-        };
+         ssh = {
+           create = true;
+           type = "ClusterIP";
+           port = 22;
+           targetPort = 22;
+           clusterIP = "";
+           annotations = {
+             "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh-internal.quadtech.dev";
+           };
+         };
       };
 
       # Ingress configuration
@@ -110,15 +110,15 @@
             MODE = "console";
             ROOT_PATH = "/data/gitea/custom/log";
           };
-            server = {
-            DOMAIN = "gitea.quadtech.dev";
-            ROOT_URL = "https://gitea.quadtech.dev";
-            SSH_DOMAIN = "gitea.quadtech.dev";
-            SSH_PORT = 22;
-            DISABLE_SSH = false;
-            START_SSH_SERVER = true;
-            SSH_LISTEN_PORT = 2223;
-          };
+           server = {
+             DOMAIN = "gitea.quadtech.dev";
+             ROOT_URL = "https://gitea.quadtech.dev";
+             SSH_DOMAIN = "gitea.quadtech.dev";
+             SSH_PORT = 22;
+             DISABLE_SSH = false;
+             START_SSH_SERVER = false;
+             SSH_LISTEN_PORT = 22;
+           };
           ssh = {
             create = true;
           };
