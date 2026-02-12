@@ -30,7 +30,48 @@ let
       
       # Import existing charts from lib/helm/charts
       existingCharts = import ../../lib/helm/charts { inherit helmLib; };
-      
+
+      # MetalLB chart - use nixhelm's chart derivation directly
+      metallbChart = pkgs.lib.pipe
+        {
+          name = "metallb";
+          chart = charts.metallb.metallb;
+          namespace = "metallb";
+          values = {
+            # IP address pool for LoadBalancer services
+            configInline = {
+              address-pools = [
+                {
+                  name = "default";
+                  protocol = "layer2";
+                  addresses = [ "192.168.1.240-192.168.1.250" ];
+                }
+              ];
+            };
+          };
+        }
+        [
+          kubelib.buildHelmChart
+        ];
+
+      # Ingress-nginx chart with LoadBalancer (gets IP from MetalLB)
+      ingressNginxChart = pkgs.lib.pipe
+        {
+          name = "ingress-nginx";
+          chart = existingCharts.ingress-nginx;
+          namespace = "ingress-nginx";
+          values = {
+            controller = {
+              service = {
+                type = "LoadBalancer";
+              };
+            };
+          };
+        }
+        [
+          kubelib.buildHelmChart
+        ];
+
       # ArgoCD chart configuration  
       argocdChart = pkgs.lib.pipe
         {
@@ -72,8 +113,8 @@ let
           kubelib.buildHelmChart
         ];
 
-      # Cloudflared config with TCP ingress for SSH
-      cloudflaredConfig = pkgs.writeText "config.yaml" (builtins.toJSON {
+      # Cloudflared config content as string
+      cloudflaredConfigContent = builtins.toJSON {
         tunnel = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
         credentials-file = "/etc/cloudflared/creds/credentials.json";
         metrics = "0.0.0.0:2000";
@@ -85,25 +126,25 @@ let
           }
           {
             hostname = "gitea-ssh.quadtech.dev";
-            service = "tcp://gitea-ssh.gitea.svc.cluster.local:22";
+            service = "tcp://192.168.1.240:32222";
           }
           {
             hostname = "gitea.quadtech.dev";
-            service = "http://gitea-http.gitea.svc.cluster.local:3000";
+            service = "http://192.168.1.240:80";
           }
           {
             hostname = "argocd.quadtech.dev";
-            service = "http://argocd-server.argocd.svc.cluster.local:80";
+            service = "http://192.168.1.240:80";
           }
           {
             hostname = "*.quadtech.dev";
-            service = "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80";
+            service = "http://192.168.1.240:80";
           }
           {
             service = "http_status:404";
           }
         ];
-      });
+      };
 
       # Cloudflared deployment with config file
       cloudflaredManifest = pkgs.writeText "cloudflared.yaml" (builtins.toJSON {
@@ -175,19 +216,6 @@ let
         };
       });
 
-      # ConfigMap for cloudflared
-      cloudflaredConfigMap = pkgs.writeText "cloudflared-configmap.yaml" (builtins.toJSON {
-        apiVersion = "v1";
-        kind = "ConfigMap";
-        metadata = {
-          name = "cloudflared-config";
-          namespace = "cloudflared";
-        };
-        data = {
-          "config.yaml" = builtins.readFile cloudflaredConfig;
-        };
-      });
-
       # Create namespace for cloudflared
       cloudflaredNamespace = pkgs.writeText "cloudflared-namespace.yaml" (builtins.toJSON {
         apiVersion = "v1";
@@ -232,39 +260,143 @@ let
 
     in
       # Combine all charts and manifests into a single bootstrap output
-      pkgs.runCommand "bootstrap-manifests" {} ''
+      # Use runCommand with explicit system to avoid cross-compilation issues
+      let
+        cloudflaredDeployment = ''
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: cloudflared
+  labels:
+    app: cloudflared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      hostNetwork: true
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:latest
+        command: ["cloudflared", "tunnel", "--config", "/etc/cloudflared/config/config.yaml", "run"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/cloudflared/config
+          readOnly: true
+        - name: creds
+          mountPath: /etc/cloudflared/creds
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      volumes:
+      - name: config
+        configMap:
+          name: cloudflared-config
+          items:
+          - key: config.yaml
+            path: config.yaml
+      - name: creds
+        secret:
+          secretName: cloudflared-credentials
+'';
+      in
+      pkgs.runCommand "bootstrap-manifests"
+        {
+          inherit system;
+          preferLocalBuild = true;
+        }
+        ''
+        set -euo pipefail
+        
         mkdir -p $out
         
+        # Copy metallb chart first (needed for LoadBalancer)
+        cp ${metallbChart} $out/00-metallb.yaml
+        
+        # Copy ingress-nginx chart (will get IP from MetalLB)
+        cp ${ingressNginxChart} $out/01-ingress-nginx.yaml
+        
         # Copy gitea chart from existing charts
-        cp ${existingCharts.gitea} $out/01-gitea.yaml
+        cp ${existingCharts.gitea} $out/02-gitea.yaml
         
         # Copy argocd chart
-        cp ${argocdChart} $out/02-argocd.yaml
+        cp ${argocdChart} $out/03-argocd.yaml
         
-        # Write cloudflared namespace
-        cp ${cloudflaredNamespace} $out/03-cloudflared-namespace.yaml
+        # Create cloudflared namespace inline
+        cat > $out/04-cloudflared-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloudflared
+  labels:
+    app.kubernetes.io/name: cloudflared
+EOF
         
-        # Write cloudflared configmap
-        cp ${cloudflaredConfigMap} $out/04-cloudflared-configmap.yaml
+        # Create cloudflared configmap inline
+        cat > $out/05-cloudflared-configmap.yaml << 'CONFIGMAP_EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: cloudflared
+data:
+  config.yaml: |
+CONFIGMAP_EOF
+        echo '${cloudflaredConfigContent}' | sed 's/^/    /' >> $out/05-cloudflared-configmap.yaml
         
-        # Write cloudflared deployment
-        cp ${cloudflaredManifest} $out/05-cloudflared-deployment.yaml
+        # Write cloudflared deployment inline
+        cat > $out/06-cloudflared-deployment.yaml << 'DEPLOYMENT_EOF'
+${cloudflaredDeployment}
+DEPLOYMENT_EOF
 
-        # Write gitea SSH NodePort
-        cp ${giteaSSHNodePort} $out/06-gitea-ssh-nodeport.yaml
+        # Create gitea SSH NodePort inline
+        cat > $out/07-gitea-ssh-nodeport.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-ssh-nodeport
+  namespace: gitea
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: gitea-ssh.quadtech.dev
+spec:
+  type: NodePort
+  ports:
+  - port: 22
+    targetPort: 22
+    nodePort: 32222
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: gitea
+    app.kubernetes.io/instance: gitea
+EOF
 
         # Create combined file
-        cat $out/01-gitea.yaml > $out/bootstrap.yaml
+        cat $out/00-metallb.yaml > $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/02-argocd.yaml >> $out/bootstrap.yaml
+        cat $out/01-ingress-nginx.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/03-cloudflared-namespace.yaml >> $out/bootstrap.yaml
+        cat $out/02-gitea.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-cloudflared-configmap.yaml >> $out/bootstrap.yaml
+        cat $out/03-argocd.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/05-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        cat $out/04-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/06-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
+        cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/06-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/07-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
       '';
 
 in

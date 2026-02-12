@@ -43,6 +43,11 @@
       charts = [ "ingress-nginx" ];
     }
     {
+      name = "metallb";
+      url = "https://metallb.github.io/metallb";
+      charts = [ "metallb" ];
+    }
+    {
       name = "gitea-charts";
       url = "https://dl.gitea.com/charts";
       charts = [ "gitea" ];

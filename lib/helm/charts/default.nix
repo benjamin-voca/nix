@@ -11,6 +11,7 @@ let
   verdaccio = import ./verdaccio.nix { inherit helmLib; };
   infisical = import ./infisical.nix { inherit helmLib; };
   longhorn = import ./longhorn.nix { inherit helmLib; };
+  metallb = import ./metallb.nix { inherit helmLib; };
 in
 {
   # Re-export all charts
@@ -24,6 +25,7 @@ in
   inherit (verdaccio) verdaccio;
   inherit (infisical) infisical;
   inherit (longhorn) longhorn;
+  inherit (metallb) metallb;
 
   # Convenience function to get all charts
   all = {
@@ -37,5 +39,6 @@ in
     inherit (verdaccio) verdaccio;
     inherit (infisical) infisical;
     inherit (longhorn) longhorn;
+    inherit (metallb) metallb;
   };
 }

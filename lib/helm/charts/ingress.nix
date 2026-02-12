@@ -17,11 +17,7 @@
 
         # Service configuration
         service = {
-          type = "NodePort";
-          ports = {
-            http = 30080;
-            https = 30443;
-          };
+          type = "LoadBalancer";
         };
 
         metrics = {
