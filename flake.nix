@@ -341,6 +341,8 @@
                 parameters:
                 - name: expose.ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
                   value: "false"
+                - name: expose.ingress.annotations ingress\.kubernetes\.io/ssl-redirect
+                  value: "false"
                 - name: expose.ingress.annotations nginx\.ingress\.kubernetes\.io/proxy-body-size
                   value: "0"
                 - name: externalURL
