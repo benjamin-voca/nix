@@ -416,7 +416,7 @@ spec:
   type: NodePort
   ports:
   - port: 22
-    targetPort: 22
+    targetPort: 2223
     nodePort: 32222
     protocol: TCP
   selector:

@@ -42,7 +42,7 @@
            create = true;
            type = "NodePort";
            port = 22;
-           targetPort = 22;
+           targetPort = 2223;
            clusterIP = "";
            annotations = {
              "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh.quadtech.dev";
