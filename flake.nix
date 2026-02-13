@@ -345,6 +345,8 @@
                   value: "false"
                 - name: expose.ingress.annotations nginx\.ingress\.kubernetes\.io/proxy-body-size
                   value: "0"
+                - name: expose.ingress.annotations ingress\.kubernetes\.io/proxy-body-size
+                  value: "0"
                 - name: externalURL
                   value: https://harbor.quadtech.dev
                 - name: expose.ingress.hosts.core
