@@ -337,6 +337,16 @@
               chart: harbor
               repoURL: https://helm.goharbor.io
               targetRevision: 1.18.1
+              helm:
+                parameters:
+                - name: expose.ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
+                  value: "false"
+                - name: expose.ingress.annotations nginx\.ingress\.kubernetes\.io/proxy-body-size
+                  value: "0"
+                - name: externalURL
+                  value: https://harbor.quadtech.dev
+                - name: expose.ingress.hosts.core
+                  value: harbor.quadtech.dev
             destination:
               server: https://kubernetes.default.svc
               namespace: harbor
@@ -358,6 +368,14 @@
               chart: verdaccio
               repoURL: https://charts.verdaccio.org
               targetRevision: 4.29.0
+              helm:
+                parameters:
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
+                  value: "false"
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
+                  value: HTTP
+                - name: ingress.tls
+                  value: "true"
             destination:
               server: https://kubernetes.default.svc
               namespace: verdaccio

@@ -22,8 +22,11 @@ in
         className = "nginx";
         paths = [ "/" ];
         hosts = [ "verdaccio.quadtech.dev" ];
-        annotations = { };
-        tls = [ ];
+        annotations = {
+          "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
+          "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP";
+        };
+        tls = [ { hosts = [ "verdaccio.quadtech.dev" ]; secretName = "verdaccio-tls"; } ];
       };
       persistence = {
         enabled = true;
