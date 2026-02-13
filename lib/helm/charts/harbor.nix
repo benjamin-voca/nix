@@ -27,6 +27,7 @@ in
           className = "nginx";
           annotations = {
             "nginx.ingress.kubernetes.io/proxy-body-size" = "0";
+            "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
           };
         };
       };

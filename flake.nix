@@ -53,6 +53,9 @@
                   "server.insecure" = true;
                   url = "https://argocd.quadtech.dev";
                 };
+                cmData = {
+                  "server.insecure" = "true";
+                };
                 params = {
                   "server.insecure" = true;
                 };
@@ -93,6 +96,17 @@
               };
 
               global.image.tag = "v2.9.3";
+
+              server.ingress = {
+                enabled = true;
+                annotations = {
+                  "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
+                  "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP";
+                };
+                ingressClassName = "nginx";
+                hosts = ["argocd.quadtech.dev"];
+                tls = true;
+              };
             };
           };
       flakeOutputs = {
