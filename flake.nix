@@ -222,6 +222,18 @@
                   value: "true"
                 - name: server.service.type
                   value: ClusterIP
+                - name: server.ingress.enabled
+                  value: "true"
+                - name: server.ingress.ingressClassName
+                  value: nginx
+                - name: server.ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
+                  value: "false"
+                - name: server.ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
+                  value: HTTP
+                - name: server.ingress.hosts[0]
+                  value: argocd.quadtech.dev
+                - name: server.ingress.tls
+                  value: "true"
             destination:
               server: https://kubernetes.default.svc
               namespace: argocd
@@ -238,6 +250,11 @@
             name: metallb
             namespace: argocd
           spec:
+            ignoreDifferences:
+            - group: apiextensions.k8s.io
+              kind: CustomResourceDefinition
+              jsonPointers:
+              - /spec
             project: default
             source:
               chart: metallb

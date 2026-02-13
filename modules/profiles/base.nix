@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 
 {
   imports = [
@@ -36,11 +36,12 @@
     helix
     ripgrep
     k9s
-    envsubst
     sops
     htop
     curl
     cloudflared
+    jq
+    yq
   ];
 
   users.users.root.openssh.authorizedKeys.keys = [
