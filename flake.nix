@@ -243,6 +243,12 @@
               chart: metallb
               repoURL: https://metallb.github.io/metallb
               targetRevision: 0.14.8
+              helm:
+                parameters:
+                - name: controller.config.addressPools.default.addresses
+                  value: "[192.168.1.240-192.168.1.250]"
+                - name: controller.config.addressPools.default.autoAssign
+                  value: "true"
             destination:
               server: https://kubernetes.default.svc
               namespace: metallb
@@ -264,6 +270,14 @@
               chart: ingress-nginx
               repoURL: https://kubernetes.github.io/ingress-nginx
               targetRevision: 4.14.1
+              helm:
+                parameters:
+                - name: controller.service.type
+                  value: LoadBalancer
+                - name: controller.service.annotations.external-dns\.alpha\.kubernetes.io/hostname
+                  value: "*.quadtech.dev"
+                - name: controller.publishService.enabled
+                  value: "true"
             destination:
               server: https://kubernetes.default.svc
               namespace: ingress-nginx
