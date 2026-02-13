@@ -219,7 +219,36 @@
       containerSecurityContext = { };
 
       # Use postExtraInitContainers which is supported by the Gitea chart
+      # Wait for app.ini to be created and copy to /etc/gitea for SSH hooks
       postExtraInitContainers = [
+        {
+          name = "fix-app-ini-permissions";
+          image = "gitea/gitea:1.25.4";
+          command = [ "sh" "-c" ];
+          args = [''
+            echo "Waiting for Gitea to generate app.ini..."
+            while [ ! -f /data/gitea/conf/app.ini ]; do sleep 2; done
+            sleep 2
+            mkdir -p /etc/gitea
+            cp /data/gitea/conf/app.ini /etc/gitea/app.ini
+            chown -R 1000:1000 /etc/gitea
+            echo "Copied app.ini to /etc/gitea"
+          ''];
+          volumeMounts = [
+            {
+              name = "data";
+              mountPath = "/data";
+            }
+          ];
+          resources = {
+            requests = { cpu = "10m"; memory = "16Mi"; };
+            limits = { cpu = "100m"; memory = "64Mi"; };
+          };
+          securityContext = {
+            runAsUser = 0;
+            runAsGroup = 0;
+          };
+        }
         {
           name = "fix-permissions";
           image = "gitea/gitea:1.25.4";
