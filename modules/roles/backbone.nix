@@ -131,7 +131,7 @@ ingress:
     service: http://192.168.1.240:80
   - hostname: argocd.quadtech.dev
     service: http://192.168.1.240:80
-  - hostname: "*.quadtech.dev"
+  - hostname: harbor.quadtech.dev
     service: http://192.168.1.240:80
   - service: http_status:404
 EOF
