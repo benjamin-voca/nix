@@ -187,6 +187,35 @@
               requests:
                 storage: 10Gi
 
+          # ArgoCD Application - ArgoCD itself
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: argocd
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: argo-cd
+              repoURL: https://argoproj.github.io/argo-helm
+              targetRevision: 9.3.5
+              helm:
+                parameters:
+                - name: global.domain
+                  value: argocd.quadtech.dev
+                - name: server.insecure
+                  value: "true"
+                - name: server.service.type
+                  value: ClusterIP
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: argocd
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
           # ArgoCD Application - MetalLB
           ---
           apiVersion: argoproj.io/v1alpha1
