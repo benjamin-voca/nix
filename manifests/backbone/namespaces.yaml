@@ -118,3 +118,13 @@ metadata:
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor
+  labels:
+    app.kubernetes.io/name: harbor
+    app.kubernetes.io/component: registry
+    environment: production
+    app.kubernetes.io/managed-by: quadnix

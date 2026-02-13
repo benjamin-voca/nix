@@ -8,7 +8,6 @@
     ../profiles/sops.nix
     ../profiles/kubernetes/control-plane.nix
     ../profiles/kubernetes/allow-master-workloads.nix
-    ../profiles/kubernetes/helm.nix
     ../services/argocd-deploy.nix
     ../services/helm-charts.nix
     ../services/verdaccio-deploy.nix

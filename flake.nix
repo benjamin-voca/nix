@@ -105,6 +105,195 @@
           inherit (inputs.nixhelm.apps.${system}) helmupdater;
         });
       };
+
+      # Bootstrap that creates ArgoCD Applications (declarative GitOps)
+      argocdBootstrap = forAllSystems (system:
+        let
+          pkgs = inputs.nixpkgs.legacyPackages.${system};
+        in
+        pkgs.runCommand "argocd-bootstrap"
+          {
+            inherit system;
+            preferLocalBuild = true;
+          }
+          ''
+          mkdir -p $out
+          cat > $out/bootstrap.yaml << 'BOOTSTRAP_EOF'
+          # ArgoCD Bootstrap - Namespaces
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: argocd
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: metallb
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: ingress-nginx
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: longhorn-system
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: harbor
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: verdaccio
+
+          # MetalLB CRDs
+          ---
+          apiVersion: metallb.io/v1beta1
+          kind: IPAddressPool
+          metadata:
+            name: default
+            namespace: metallb
+          spec:
+            addresses:
+            - 192.168.1.240-192.168.1.250
+            autoAssign: true
+          ---
+          apiVersion: metallb.io/v1beta1
+          kind: L2Advertisement
+          metadata:
+            name: default
+            namespace: metallb
+          spec:
+            ipAddressPools:
+            - default
+
+          # Verdaccio PVC
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: verdaccio-data
+            namespace: verdaccio
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            storageClassName: longhorn
+            resources:
+              requests:
+                storage: 10Gi
+
+          # ArgoCD Application - MetalLB
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: metallb
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: metallb
+              repoURL: https://metallb.github.io/metallb
+              targetRevision: 0.14.8
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: metallb
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+          # ArgoCD Application - Ingress-Nginx
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: ingress-nginx
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: ingress-nginx
+              repoURL: https://kubernetes.github.io/ingress-nginx
+              targetRevision: 4.14.1
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: ingress-nginx
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+          # ArgoCD Application - Longhorn
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: longhorn
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: longhorn
+              repoURL: https://charts.longhorn.io
+              targetRevision: 1.11.0
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: longhorn-system
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+          # ArgoCD Application - Harbor
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: harbor
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: harbor
+              repoURL: https://helm.goharbor.io
+              targetRevision: 1.18.1
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: harbor
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+          # ArgoCD Application - Verdaccio
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: verdaccio
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: verdaccio
+              repoURL: https://charts.verdaccio.org
+              targetRevision: 4.29.0
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: verdaccio
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+          BOOTSTRAP_EOF
+          ''
+      );
       eval = lib.evalModules {
         specialArgs = { inherit inputs; argocdChart = flakeOutputs.argocdChart; };
         modules = [
@@ -112,5 +301,5 @@
         ];
       };
     in
-      eval.config.flake // flakeOutputs;
+      eval.config.flake // flakeOutputs // { inherit argocdBootstrap; };
 }

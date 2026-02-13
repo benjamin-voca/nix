@@ -88,6 +88,28 @@ let
           kubelib.buildHelmChart
         ];
 
+      # Longhorn chart for persistent storage
+      longhornChart = pkgs.lib.pipe
+        {
+          name = "longhorn";
+          chart = charts.longhorn.longhorn;
+          namespace = "longhorn-system";
+          values = {
+            persistence = {
+              defaultClass = true;
+              defaultClassReplicaCount = 1;
+            };
+            service = {
+              ui = {
+                type = "ClusterIP";
+              };
+            };
+          };
+        }
+        [
+          kubelib.buildHelmChart
+        ];
+
       # ArgoCD chart configuration  
       argocdChart = pkgs.lib.pipe
         {
@@ -378,14 +400,17 @@ METALLB_CRDS_EOF
         # Copy ingress-nginx chart (will get IP from MetalLB)
         cp ${ingressNginxChart} $out/01-ingress-nginx.yaml
         
+        # Copy Longhorn chart (for persistent storage)
+        cp ${longhornChart} $out/02-longhorn.yaml
+        
         # Copy gitea chart from existing charts
-        cp ${existingCharts.gitea} $out/02-gitea.yaml
+        cp ${existingCharts.gitea} $out/03-gitea.yaml
         
         # Copy argocd chart
-        cp ${argocdChart} $out/03-argocd.yaml
+        cp ${argocdChart} $out/04-argocd.yaml
         
         # Create cloudflared namespace inline
-        cat > $out/04-cloudflared-namespace.yaml << 'EOF'
+        cat > $out/05-cloudflared-namespace.yaml << 'EOF'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -433,7 +458,7 @@ spec:
 EOF
 
         # Create harbor namespace inline
-        cat > $out/08-harbor-namespace.yaml << 'EOF'
+        cat > $out/09-harbor-namespace.yaml << 'EOF'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -443,7 +468,7 @@ metadata:
 EOF
 
         # Create verdaccio namespace inline
-        cat > $out/09-verdaccio-namespace.yaml << 'EOF'
+        cat > $out/10-verdaccio-namespace.yaml << 'EOF'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -453,7 +478,7 @@ metadata:
 EOF
 
         # Create Verdaccio PVC
-        cat > $out/09a-verdaccio-pvc.yaml << 'EOF'
+        cat > $out/10a-verdaccio-pvc.yaml << 'EOF'
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -468,8 +493,32 @@ spec:
       storage: 10Gi
 EOF
 
+        # Create ArgoCD Application for Longhorn (storage)
+        cat > $out/10-longhorn-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: longhorn
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: longhorn
+    repoURL: https://charts.longhorn.io
+    targetRevision: 1.11.0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: longhorn-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
         # Create ArgoCD Application for Harbor
-        cat > $out/10-harbor-argocd-app.yaml << 'EOF'
+        cat > $out/11-harbor-argocd-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -534,7 +583,7 @@ spec:
 EOF
 
         # Create ArgoCD Application for Verdaccio
-        cat > $out/11-verdaccio-argocd-app.yaml << 'EOF'
+        cat > $out/13-verdaccio-argocd-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -577,27 +626,31 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/01-ingress-nginx.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/02-gitea.yaml >> $out/bootstrap.yaml
+        cat $out/02-longhorn.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/03-argocd.yaml >> $out/bootstrap.yaml
+        cat $out/03-gitea.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-cloudflared-namespace.yaml >> $out/bootstrap.yaml
+        cat $out/04-argocd.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
+        cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/06-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        cat $out/06-cloudflared-configmap.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/07-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
+        cat $out/07-cloudflared-deployment.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/08-harbor-namespace.yaml >> $out/bootstrap.yaml
+        cat $out/08-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/09-verdaccio-namespace.yaml >> $out/bootstrap.yaml
+        cat $out/09-harbor-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/09a-verdaccio-pvc.yaml >> $out/bootstrap.yaml
+        cat $out/10-verdaccio-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/10-harbor-argocd-app.yaml >> $out/bootstrap.yaml
+        cat $out/10a-verdaccio-pvc.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/11-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
+        cat $out/10-longhorn-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/11-harbor-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
       '';
 
 in
