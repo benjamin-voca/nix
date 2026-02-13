@@ -13,6 +13,7 @@
     ../services/helm-charts.nix
     ../services/verdaccio-deploy.nix
     ../services/infiscal-deploy.nix
+    ../services/argocd-apps.nix
     ../gitea/runner.nix
   ];
 
@@ -77,6 +78,12 @@
    services.quadnix.verdaccio-deploy = {
      enable = true;
    };
+
+  services.quadnix.argocdApps = {
+    enable = true;
+    harbor = true;
+    verdaccio = true;
+  };
 
   # Additional packages
   environment.systemPackages = with pkgs; [

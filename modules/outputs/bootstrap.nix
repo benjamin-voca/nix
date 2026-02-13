@@ -153,6 +153,14 @@ let
             service = "http://192.168.1.240:80";
           }
           {
+            hostname = "harbor.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
+            hostname = "verdaccio.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
             hostname = "*.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
@@ -424,6 +432,144 @@ spec:
     app.kubernetes.io/instance: gitea
 EOF
 
+        # Create harbor namespace inline
+        cat > $out/08-harbor-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor
+  labels:
+    app.kubernetes.io/name: harbor
+EOF
+
+        # Create verdaccio namespace inline
+        cat > $out/09-verdaccio-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: verdaccio
+  labels:
+    app.kubernetes.io/name: verdaccio
+EOF
+
+        # Create Verdaccio PVC
+        cat > $out/09a-verdaccio-pvc.yaml << 'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: verdaccio-data
+  namespace: verdaccio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+EOF
+
+        # Create ArgoCD Application for Harbor
+        cat > $out/10-harbor-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harbor
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: harbor
+    repoURL: https://helm.goharbor.io
+    targetRevision: 1.18.1
+    parameterValues:
+    - name: expose.ingress.hosts.core
+      value: harbor.quadtech.dev
+    - name: expose.tls.enabled
+      value: "true"
+    - name: expose.tls.certSource
+      value: auto
+    - name: externalURL
+      value: https://harbor.quadtech.dev
+    - name: persistence.enabled
+      value: "true"
+    - name: persistence.resourcePolicy
+      value: keep
+    - name: persistence.persistentVolumeClaim.registry.storageClass
+      value: longhorn
+    - name: persistence.persistentVolumeClaim.registry.size
+      value: 100Gi
+    - name: persistence.persistentVolumeClaim.database.size
+      value: 10Gi
+    - name: persistence.persistentVolumeClaim.redis.size
+      value: 5Gi
+    - name: persistence.persistentVolumeClaim.trivy.size
+      value: 10Gi
+    - name: database.type
+      value: internal
+    - name: redis.type
+      value: internal
+    - name: portal.replicas
+      value: "1"
+    - name: core.replicas
+      value: "1"
+    - name: jobservice.replicas
+      value: "1"
+    - name: registry.replicas
+      value: "1"
+    - name: trivy.enabled
+      value: "true"
+    - name: notary.enabled
+      value: "false"
+    - name: chartmuseum.enabled
+      value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harbor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
+        # Create ArgoCD Application for Verdaccio
+        cat > $out/11-verdaccio-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: verdaccio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: verdaccio
+    repoURL: https://charts.verdaccio.org
+    targetRevision: 4.29.0
+    parameterValues:
+    - name: service.type
+      value: ClusterIP
+    - name: ingress.enabled
+      value: "true"
+    - name: ingress.className
+      value: nginx
+    - name: ingress.hosts[0]
+      value: verdaccio.quadtech.dev
+    - name: persistence.enabled
+      value: "true"
+    - name: persistence.existingClaim
+      value: verdaccio-data
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: verdaccio
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
         # Create combined file
         cat $out/00-metallb.yaml > $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -442,6 +588,16 @@ EOF
         cat $out/06-cloudflared-deployment.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/07-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/08-harbor-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/09-verdaccio-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/09a-verdaccio-pvc.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/10-harbor-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/11-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
       '';
 
 in

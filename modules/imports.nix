@@ -17,3 +17,4 @@ in
   ++ filesIn ./outputs
   ++ filesIn ./hosts
   ++ filesIn ./lib
+  ++ filesIn ./services
