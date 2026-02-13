@@ -332,6 +332,11 @@
             name: harbor
             namespace: argocd
           spec:
+            ignoreDifferences:
+            - group: networking.k8s.io
+              kind: Ingress
+              jsonPointers:
+              - /metadata/annotations
             project: default
             source:
               chart: harbor
@@ -367,6 +372,11 @@
             name: verdaccio
             namespace: argocd
           spec:
+            ignoreDifferences:
+            - group: networking.k8s.io
+              kind: Ingress
+              jsonPointers:
+              - /metadata/annotations
             project: default
             source:
               chart: verdaccio
