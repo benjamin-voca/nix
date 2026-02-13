@@ -240,6 +240,10 @@
                 chmod 600 /data/git/.ssh/*
               fi
             fi
+            # Create symlink for Gitea hooks that expect /etc/gitea
+            mkdir -p /etc/gitea
+            cp /data/gitea/conf/app.ini /etc/gitea/app.ini
+            chown -R 1000:1000 /etc/gitea
             ls -la /data/ssh/
             echo "Done"
           ''];
