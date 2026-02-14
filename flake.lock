@@ -7,11 +7,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1766051518,
-        "narHash": "sha256-znKOwPXQnt3o7lDb3hdf19oDo0BLP4MfBOYiWkEHoik=",
+        "lastModified": 1770019181,
+        "narHash": "sha256-hwsYgDnby50JNVpTRYlF3UR/Rrpt01OrxVuryF40CFY=",
         "owner": "serokell",
         "repo": "deploy-rs",
-        "rev": "d5eff7f948535b9c723d60cd8239f8f11ddc90fa",
+        "rev": "77c906c0ba56aabdbc72041bf9111b565cdd6171",
         "type": "github"
       },
       "original": {
@@ -56,7 +56,30 @@
     },
     "haumea": {
       "inputs": {
-        "nixpkgs": ["nixhelm", "nixpkgs"]
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1708375098,
+        "narHash": "sha256-DaFJp3wDHgOqx98U0SF57bXaH2Orp106c+jSdPCVu1E=",
+        "owner": "nix-community",
+        "repo": "haumea",
+        "rev": "ec6350fd9353e7f27ce0e85d31f82e3ed73e4d70",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "haumea",
+        "type": "github"
+      }
+    },
+    "haumea_2": {
+      "inputs": {
+        "nixpkgs": [
+          "nixhelm",
+          "nixpkgs"
+        ]
       },
       "locked": {
         "lastModified": 1685133229,
@@ -106,7 +129,7 @@
     "nixhelm": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "haumea": "haumea",
+        "haumea": "haumea_2",
         "nix-kube-generators": "nix-kube-generators_2",
         "nixpkgs": "nixpkgs_2",
         "pyproject-build-systems": "pyproject-build-systems",
@@ -114,11 +137,11 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1769306215,
-        "narHash": "sha256-dEWIkzBaOGc28U/0jH3QFh3nwa1eQqM4Qfi0nieuYcU=",
+        "lastModified": 1771207792,
+        "narHash": "sha256-ZfNmBwCk/DeCO+Qap5quwqH5vJJpQQI0EyPsR+lN++0=",
         "owner": "farcaller",
         "repo": "nixhelm",
-        "rev": "da3b72dd6172befee9a4968931c0dbdcd0430ccd",
+        "rev": "e81b8146da18d06e792aef442881bc7ca347605f",
         "type": "github"
       },
       "original": {
@@ -161,11 +184,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1769170682,
-        "narHash": "sha256-oMmN1lVQU0F0W2k6OI3bgdzp2YOHWYUAw79qzDSjenU=",
+        "lastModified": 1771008912,
+        "narHash": "sha256-gf2AmWVTs8lEq7z/3ZAsgnZDhWIckkb+ZnAo5RzSxJg=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "c5296fdd05cfa2c187990dd909864da9658df755",
+        "rev": "a82ccc39b39b621151d6732718e3e250109076fa",
         "type": "github"
       },
       "original": {
@@ -177,9 +200,18 @@
     },
     "pyproject-build-systems": {
       "inputs": {
-        "nixpkgs": ["nixhelm", "nixpkgs"],
-        "pyproject-nix": ["nixhelm", "pyproject-nix"],
-        "uv2nix": ["nixhelm", "uv2nix"]
+        "nixpkgs": [
+          "nixhelm",
+          "nixpkgs"
+        ],
+        "pyproject-nix": [
+          "nixhelm",
+          "pyproject-nix"
+        ],
+        "uv2nix": [
+          "nixhelm",
+          "uv2nix"
+        ]
       },
       "locked": {
         "lastModified": 1763662255,
@@ -197,7 +229,10 @@
     },
     "pyproject-nix": {
       "inputs": {
-        "nixpkgs": ["nixhelm", "nixpkgs"]
+        "nixpkgs": [
+          "nixhelm",
+          "nixpkgs"
+        ]
       },
       "locked": {
         "lastModified": 1764134915,
@@ -216,6 +251,7 @@
     "root": {
       "inputs": {
         "deploy-rs": "deploy-rs",
+        "haumea": "haumea",
         "nix-kube-generators": "nix-kube-generators",
         "nixhelm": "nixhelm",
         "nixpkgs": "nixpkgs_3",
@@ -224,14 +260,16 @@
     },
     "sops-nix": {
       "inputs": {
-        "nixpkgs": ["nixpkgs"]
+        "nixpkgs": [
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "lastModified": 1769314333,
-        "narHash": "sha256-+Uvq9h2eGsbhacXpuS7irYO7fFlz514nrhPCSTkASlw=",
+        "lastModified": 1771166946,
+        "narHash": "sha256-UFc4lfGBr+wJmwgDGJDn1cVD6DTr0/8TdronNUiyXlU=",
         "owner": "Mic92",
         "repo": "sops-nix",
-        "rev": "2eb9eed7ef48908e0f02985919f7eb9d33fa758f",
+        "rev": "2d0cf89b4404529778bc82de7e42b5754e0fe4fa",
         "type": "github"
       },
       "original": {
@@ -290,8 +328,14 @@
     },
     "uv2nix": {
       "inputs": {
-        "nixpkgs": ["nixhelm", "nixpkgs"],
-        "pyproject-nix": ["nixhelm", "pyproject-nix"]
+        "nixpkgs": [
+          "nixhelm",
+          "nixpkgs"
+        ],
+        "pyproject-nix": [
+          "nixhelm",
+          "pyproject-nix"
+        ]
       },
       "locked": {
         "lastModified": 1767701098,

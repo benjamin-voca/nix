@@ -28,6 +28,7 @@ in
           annotations = {
             "nginx.ingress.kubernetes.io/proxy-body-size" = "0";
             "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
+            "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP";
           };
         };
       };
@@ -75,6 +76,16 @@ in
 
       core = {
         replicas = 1;
+        env = [
+          {
+            name = "EXT_PUBLIC_URL";
+            value = "https://harbor.quadtech.dev";
+          }
+          {
+            name = "PROXY_PUBLIC_URL";
+            value = "https://harbor.quadtech.dev";
+          }
+        ];
       };
 
       jobservice = {

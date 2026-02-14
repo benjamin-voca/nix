@@ -19,6 +19,8 @@
     deploy-rs.url = "github:serokell/deploy-rs";
     nixhelm.url = "github:farcaller/nixhelm";
     nix-kube-generators.url = "github:farcaller/nix-kube-generators";
+    haumea.url = "github:nix-community/haumea";
+    haumea.inputs.nixpkgs.follows = "nixpkgs";
   };
 
 
@@ -30,11 +32,26 @@
       helmLibFor = system:
         let
           pkgs = inputs.nixpkgs.legacyPackages.${system};
-        in
-          import ./lib/helm {
+          kubelib = inputs.nix-kube-generators.lib { inherit pkgs; };
+          localCharts = inputs.haumea.lib.load {
+            src = ./charts;
+            transformer = inputs.haumea.lib.transformers.liftDefault;
+          };
+          localChartsDerivations = builtins.mapAttrs (repo: charts:
+            builtins.mapAttrs (name: chart:
+              kubelib.downloadHelmChart {
+                repo = chart.repo;
+                chart = chart.chart;
+                version = chart.version;
+              }
+            ) charts
+          ) localCharts;
+          helmLib = import ./lib/helm {
             inherit (inputs) nixhelm nix-kube-generators;
             inherit pkgs system;
           };
+        in
+        helmLib // { chartsDerivations = localChartsDerivations; };
       argocdChartFor = system:
         let
           helmLib = helmLibFor system;
@@ -118,6 +135,11 @@
         apps = forAllSystems (system: {
           inherit (inputs.nixhelm.apps.${system}) helmupdater;
         });
+        chartsMetadata = inputs.haumea.lib.load {
+          src = ./charts;
+          transformer = inputs.haumea.lib.transformers.liftDefault;
+        };
+        chartsDerivations = forAllSystems (system: helmLibFor system).chartsDerivations;
       };
 
       # Bootstrap that creates ArgoCD Applications (declarative GitOps)
@@ -164,6 +186,11 @@
           kind: Namespace
           metadata:
             name: verdaccio
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: erpnext
 
           # MetalLB CRDs
           ---
@@ -393,6 +420,69 @@
             destination:
               server: https://kubernetes.default.svc
               namespace: verdaccio
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+          # ERPNext PVC
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: erpnext-databases
+            namespace: erpnext
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            storageClassName: longhorn
+            resources:
+              requests:
+                storage: 20Gi
+
+          # ArgoCD Application - ERPNext
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: erpnext
+            namespace: argocd
+          spec:
+            ignoreDifferences:
+            - group: networking.k8s.io
+              kind: Ingress
+              jsonPointers:
+              - /metadata/annotations
+            project: default
+            source:
+              chart: erpnext
+              repoURL: https://helm.erpnext.com
+              targetRevision: 8.0.22
+              helm:
+                parameters:
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
+                  value: "false"
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
+                  value: HTTP
+                - name: ingress.enabled
+                  value: "true"
+                - name: ingress.className
+                  value: nginx
+                - name: ingress.hosts[0]
+                  value: helpdesk.quadtech.dev
+                - name: ingress.tls[0].hosts[0]
+                  value: helpdesk.quadtech.dev
+                - name: ingress.tls[0].secretName
+                  value: helpdesk-quadtech-dev-tls
+                - name: persistence.enabled
+                  value: "true"
+                - name: persistence.storageClass
+                  value: longhorn
+                - name: persistence.size
+                  value: 20Gi
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: erpnext
             syncPolicy:
               automated:
                 prune: true
