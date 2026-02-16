@@ -175,6 +175,10 @@ let
             service = "http://192.168.1.240:80";
           }
           {
+            hostname = "helpdesk.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
             hostname = "harbor.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
