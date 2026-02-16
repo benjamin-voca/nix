@@ -460,20 +460,20 @@
               targetRevision: 8.0.22
               helm:
                 parameters:
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
-                  value: "false"
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
-                  value: HTTP
                 - name: ingress.enabled
                   value: "true"
                 - name: ingress.className
                   value: nginx
-                - name: ingress.hosts[0]
-                  value: helpdesk.quadtech.dev
-                - name: ingress.tls[0].hosts[0]
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
+                  value: "false"
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
+                  value: HTTP
+                - name: ingress.hosts[0].host
                   value: helpdesk.quadtech.dev
                 - name: ingress.tls[0].secretName
                   value: helpdesk-quadtech-dev-tls
+                - name: ingress.tls[0].hosts[0]
+                  value: helpdesk.quadtech.dev
                 - name: persistence.enabled
                   value: "true"
                 - name: persistence.worker.storageClass
