@@ -476,9 +476,9 @@
                   value: helpdesk-quadtech-dev-tls
                 - name: persistence.enabled
                   value: "true"
-                - name: persistence.storageClass
+                - name: persistence.worker.storageClass
                   value: longhorn
-                - name: persistence.size
+                - name: persistence.worker.size
                   value: 20Gi
             destination:
               server: https://kubernetes.default.svc
