@@ -476,10 +476,6 @@
                   value: /
                 - name: ingress.hosts[0].paths[0].pathType
                   value: Prefix
-                - name: ingress.tls[0].secretName
-                  value: helpdesk-quadtech-dev-tls
-                - name: ingress.tls[0].hosts[0]
-                  value: helpdesk.quadtech.dev
                 - name: persistence.enabled
                   value: "true"
                 - name: persistence.worker.storageClass
