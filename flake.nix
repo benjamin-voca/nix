@@ -318,8 +318,6 @@
                 parameters:
                 - name: controller.service.type
                   value: LoadBalancer
-                - name: controller.service.annotations.external-dns\.alpha\.kubernetes.io/hostname
-                  value: "*.quadtech.dev"
                 - name: controller.publishService.enabled
                   value: "true"
             destination:
@@ -466,8 +464,12 @@
                   value: nginx
                 - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
                   value: "false"
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/force-ssl-redirect
+                  value: "false"
                 - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
                   value: HTTP
+                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/proxy-ssl-redirect
+                  value: "false"
                 - name: ingress.hosts[0].host
                   value: helpdesk.quadtech.dev
                 - name: ingress.hosts[0].paths[0].path
