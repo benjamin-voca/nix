@@ -470,7 +470,7 @@
                   value: HTTP
                 - name: ingress.hosts[0].host
                   value: helpdesk.quadtech.dev
-                - name: ingress.hosts[0].paths[0]
+                - name: ingress.hosts[0].paths[0].path
                   value: /
                 - name: ingress.hosts[0].paths[0].pathType
                   value: Prefix

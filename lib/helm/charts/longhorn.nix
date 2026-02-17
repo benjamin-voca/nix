@@ -26,6 +26,75 @@ in
           type = "ClusterIP";
         };
       };
+
+      csiPlugin = {
+        attacherImage = "";
+        provisionerImage = "";
+        pluginImage = "longhornio/longhorn-manager:v1.11.0";
+        provisioner = {
+          resources = {
+            limits = {
+              cpu = "100m";
+              memory = "128Mi";
+            };
+            requests = {
+              cpu = "10m";
+              memory = "64Mi";
+            };
+          };
+        };
+       attacher = {
+          resources = {
+            limits = {
+              cpu = "100m";
+              memory = "128Mi";
+            };
+            requests = {
+              cpu = "10m";
+              memory = "64Mi";
+            };
+          };
+        };
+      };
+
+      longhornManager = {
+        resources = {
+          limits = {
+            cpu = "100m";
+            memory = "256Mi";
+          };
+          requests = {
+            cpu = "10m";
+            memory = "64Mi";
+          };
+        };
+      };
+
+      longhornDriver = {
+        resources = {
+          limits = {
+            cpu = "100m";
+            memory = "256Mi";
+          };
+          requests = {
+            cpu = "10m";
+            memory = "64Mi";
+          };
+        };
+      };
+
+      longhornUI = {
+        resources = {
+          limits = {
+            cpu = "100m";
+            memory = "128Mi";
+          };
+          requests = {
+            cpu = "10m";
+            memory = "64Mi";
+          };
+        };
+      };
     };
   };
 }
