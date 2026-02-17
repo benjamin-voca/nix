@@ -462,6 +462,8 @@
                   value: "true"
                 - name: ingress.className
                   value: nginx
+                - name: global.domain
+                  value: helpdesk.quadtech.dev
                 - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
                   value: "false"
                 - name: ingress.annotations nginx\.ingress\.kubernetes\.io/force-ssl-redirect
@@ -481,6 +483,15 @@
                 - name: persistence.worker.storageClass
                   value: longhorn
                 - name: persistence.worker.size
+                  value: 20Gi
+                - name: persistence.site.storageClass
+                  value: longhorn
+                - name: persistence.site.size
+                  value: 10Gi
+                - name: scheduler.useTLS
+                  value: "false"
+                - name: ingress.tls
+                  value: "false"
                   value: 20Gi
             destination:
               server: https://kubernetes.default.svc
