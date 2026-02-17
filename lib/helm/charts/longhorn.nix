@@ -21,6 +21,8 @@ in
         defaultClassReplicaCount = 1;
       };
 
+      v2DataEngine = true;
+
       service = {
         ui = {
           type = "ClusterIP";

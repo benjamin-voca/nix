@@ -5,11 +5,30 @@
     ../../shared/quad-common.nix
   ];
 
+  boot.kernelModules = [
+    "nfs"
+    "nfsv4"
+    "nfsv4_1"
+    "nfsv4_2"
+    "vfio_pci"
+    "uio_pci_generic"
+    "nvme-tcp"
+  ];
+
+  boot.extraModulePackages = with config.boot.kernelPackages; [
+  ];
+
+  boot.kernelParams = [
+    "hugepagesz=2M"
+    "hugepages=1024"
+  ];
+
   environment.systemPackages = with pkgs; [
     kubernetes
     kubectl
     cri-tools
     containerd
+    flannel
   ];
 
   services.kubernetes = {
@@ -56,9 +75,13 @@
     after = [ "kube-apiserver.service" "network-online.target" ];
     wants = [ "kube-apiserver.service" "network-online.target" ];
     requires = [ "kube-apiserver.service" ];
-    serviceConfig.ExecStartPre = lib.mkBefore [
-      "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 90); do ${pkgs.curl}/bin/curl -fsSk https://127.0.0.1:6443/healthz >/dev/null && exit 0; sleep 1; done; exit 1'"
-    ];
+    serviceConfig = {
+      ExecStartPre = lib.mkBefore [
+        "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 90); do ${pkgs.curl}/bin/curl -fsSk https://127.0.0.1:6443/healthz >/dev/null && exit 0; sleep 1; done; exit 1'"
+      ];
+      ExecStart = lib.mkForce "${pkgs.flannel}/bin/flannel -etcd-endpoints=https://127.0.0.1:2379 -etcd-cafile=/var/lib/kubernetes/secrets/ca.pem -etcd-certfile=/var/lib/kubernetes/secrets/kubernetes.pem -etcd-keyfile=/var/lib/kubernetes/secrets/kubernetes-key.pem -iface=eth0";
+      Restart = lib.mkForce "on-failure";
+    };
   };
 
   systemd.services.kube-addon-manager = {

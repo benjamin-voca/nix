@@ -1,0 +1,10 @@
+#!/bin/bash
+# NixOS-compatible nsmounter - use mount.nfs from /host/usr/local
+
+# If this is an NFS mount, use mount.nfs directly
+if [[ "$*" == *"-t nfs"* ]] || [[ "$*" == *"nfs"* ]]; then
+    exec /host/usr/local/bin/mount.nfs "$@"
+fi
+
+# Otherwise use regular mount
+exec /run/current-system/sw/bin/mount "$@"

@@ -492,7 +492,6 @@
                   value: "false"
                 - name: ingress.tls
                   value: "false"
-                  value: 20Gi
             destination:
               server: https://kubernetes.default.svc
               namespace: erpnext

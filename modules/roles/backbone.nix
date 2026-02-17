@@ -214,11 +214,15 @@
   systemd.services.cloudflared = {
     description = "Cloudflare Tunnel";
     wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
+    wants = [ "network.target" ];
+    after = [ "network.target" "sops-secrets-cloudflared-credentials.service" ];
+    requires = [ "sops-secrets-cloudflared-credentials.service" ];
+    enable = true;
     serviceConfig = {
       ExecStart = "${pkgs.cloudflared}/bin/cloudflared tunnel --protocol http2 --config /etc/cloudflared/config/config.yaml run";
       Restart = "always";
-      RestartSec = "10s";
+      RestartSec = "5s";
+      StartLimitIntervalSec = "0";
       User = "root";
     };
   };
