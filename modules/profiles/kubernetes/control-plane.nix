@@ -72,9 +72,9 @@
   };
 
   systemd.services.flannel = {
-    after = [ "kube-apiserver.service" "network-online.target" ];
+    after = [ "kube-apiserver.service" "etcd.service" "network-online.target" ];
     wants = [ "kube-apiserver.service" "network-online.target" ];
-    requires = [ "kube-apiserver.service" ];
+    requires = [ "kube-apiserver.service" "etcd.service" ];
     serviceConfig = {
       ExecStartPre = lib.mkBefore [
         "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 90); do ${pkgs.curl}/bin/curl -fsSk https://127.0.0.1:6443/healthz >/dev/null && exit 0; sleep 1; done; exit 1'"

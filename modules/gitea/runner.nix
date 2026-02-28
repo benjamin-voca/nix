@@ -46,14 +46,26 @@ in {
       description = "Gitea actions runner";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
+      requires = [ "network.target" ];
       serviceConfig = {
         ExecStart = "${runnerPkg}/bin/act_runner daemon --config /etc/gitea/runner/config.yaml";
         Restart = "always";
+        RestartSec = "10s";
         StateDirectory = "gitea-runner";
         WorkingDirectory = "/var/lib/gitea-runner";
       };
       preStart = ''
         mkdir -p /etc/gitea/runner /var/lib/gitea-runner
+        
+        echo "Waiting for Gitea to be accessible..."
+        for i in $(seq 1 60); do
+          if curl -fsSk "${cfg.registrationUrl}" >/dev/null 2>&1; then
+            break
+          fi
+          echo "Waiting for Gitea..."
+          sleep 5
+        done
+        
         cat > /etc/gitea/runner/config.yaml << EOF
 runner:
   name: ${cfg.instanceName}

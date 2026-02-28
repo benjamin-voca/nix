@@ -87,6 +87,12 @@ in
             sleep 5
           done
 
+          echo "Waiting for ingress-nginx controller to be ready..."
+          until $kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; do
+            echo "Waiting for ingress-nginx controller..."
+            sleep 5
+          done
+
           echo "Cleaning up any existing ArgoCD installation..."
           ${pkgs.kubernetes-helm}/bin/helm uninstall argocd -n argocd --ignore-not-found 2>/dev/null || true
           $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true

@@ -262,9 +262,11 @@ EOF
     description = "Gitea actions runner 2";
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ];
+    requires = [ "network.target" ];
     serviceConfig = {
       ExecStart = "${pkgs.gitea-actions-runner}/bin/act_runner daemon --config /etc/gitea/runner/config-2.yaml";
       Restart = "always";
+      RestartSec = "10s";
       StateDirectory = "gitea-runner-2";
       WorkingDirectory = "/var/lib/gitea-runner-2";
     };
@@ -274,9 +276,11 @@ EOF
     description = "Gitea actions runner 3";
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ];
+    requires = [ "network.target" ];
     serviceConfig = {
       ExecStart = "${pkgs.gitea-actions-runner}/bin/act_runner daemon --config /etc/gitea/runner/config-3.yaml";
       Restart = "always";
+      RestartSec = "10s";
       StateDirectory = "gitea-runner-3";
       WorkingDirectory = "/var/lib/gitea-runner-3";
     };
@@ -285,6 +289,16 @@ EOF
   # Create config files for additional runners (token read from file at runtime via systemd service)
   systemd.services.gitea-runner-2.preStart = ''
     mkdir -p /etc/gitea/runner /var/lib/gitea-runner-2
+    
+    echo "Waiting for Gitea to be accessible..."
+    for i in $(seq 1 60); do
+      if curl -fsSk https://gitea.quadtech.dev >/dev/null 2>&1; then
+        break
+      fi
+      echo "Waiting for Gitea..."
+      sleep 5
+    done
+    
     cat > /etc/gitea/runner/config-2.yaml << EOF
 runner:
   name: backbone-runner-2
@@ -323,6 +337,16 @@ EOF
   };
   systemd.services.gitea-runner-3.preStart = ''
     mkdir -p /etc/gitea/runner /var/lib/gitea-runner-3
+    
+    echo "Waiting for Gitea to be accessible..."
+    for i in $(seq 1 60); do
+      if curl -fsSk https://gitea.quadtech.dev >/dev/null 2>&1; then
+        break
+      fi
+      echo "Waiting for Gitea..."
+      sleep 5
+    done
+    
     cat > /etc/gitea/runner/config-3.yaml << EOF
 runner:
   name: backbone-runner-3
@@ -339,9 +363,9 @@ EOF
     if [ ! -f /var/lib/gitea-runner-3/.runner ]; then
       cd /var/lib/gitea-runner-3
       TOKEN=$(cat /run/secrets/gitea-runner-token)
-      ${pkgs.gitea-actions-runner}/bin/act_runner register --instance https://gitea.quadtech.dev --token "$TOKEN" --name backbone-runner-3 --no-interactive || true
+      ${pkgs.gitea-actions-runner}/bin/act_runner register --instance https://gitea.quadtech.dev --token "$TOKEN" --name backbone-runner-3 --no-interactive || true  '';
+
     fi
-  '';
 }
 
 
