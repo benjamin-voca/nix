@@ -8,6 +8,7 @@
     secrets = {
       # Add secrets here following the pattern:
       # "path/to/secret" = {};
+      useSystemdActivation = true;
     };
   };
 }
