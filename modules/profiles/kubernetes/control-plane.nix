@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 let
-  flannelInterface = config.networking.interfaces.${config.networking.defaultGatewayDevice}.name;
+  flannelInterface = "enp0s31f6";
 in
 {
   imports = [
