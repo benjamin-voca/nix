@@ -215,8 +215,7 @@
     description = "Cloudflare Tunnel";
     wantedBy = [ "multi-user.target" ];
     wants = [ "network.target" ];
-    after = [ "network.target" "sops-secrets-cloudflared-credentials.service" ];
-    requires = [ "sops-secrets-cloudflared-credentials.service" ];
+    after = [ "network.target" ];
     enable = true;
     serviceConfig = {
       ExecStart = "${pkgs.cloudflared}/bin/cloudflared tunnel --protocol http2 --config /etc/cloudflared/config/config.yaml run";
@@ -230,6 +229,15 @@
   # Create cloudflared config directory and files
   systemd.services.cloudflared.preStart = ''
     mkdir -p /etc/cloudflared/config /etc/cloudflared/creds
+    
+    # Wait for the secret to be available
+    for i in $(seq 1 30); do
+      if [ -f /run/secrets/cloudflared-credentials.json ]; then
+        break
+      fi
+      echo "Waiting for cloudflared credentials..."
+      sleep 2
+    done
     
     # Write cloudflared config
     cat > /etc/cloudflared/config/config.yaml << 'EOF'
