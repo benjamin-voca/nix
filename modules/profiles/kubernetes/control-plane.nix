@@ -87,7 +87,6 @@ in
       Restart = lib.mkForce "on-failure";
     };
   };
-}
 
   systemd.services.kube-addon-manager = {
     after = [ "kube-apiserver.service" "network-online.target" ];
