@@ -363,9 +363,9 @@ EOF
     if [ ! -f /var/lib/gitea-runner-3/.runner ]; then
       cd /var/lib/gitea-runner-3
       TOKEN=$(cat /run/secrets/gitea-runner-token)
-      ${pkgs.gitea-actions-runner}/bin/act_runner register --instance https://gitea.quadtech.dev --token "$TOKEN" --name backbone-runner-3 --no-interactive || true  '';
-
+      ${pkgs.gitea-actions-runner}/bin/act_runner register --instance https://gitea.quadtech.dev --token "$TOKEN" --name backbone-runner-3 --no-interactive || true
     fi
+  '';
 }
 
 
