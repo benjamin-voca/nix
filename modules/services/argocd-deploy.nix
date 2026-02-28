@@ -135,8 +135,18 @@ in
              --set server.ingress.enabled=false \
               --wait --timeout 5m || true
 
+          echo "Waiting for ingress-nginx admission webhook to be ready..."
+          for i in $(seq 1 30); do
+            if $kubectl get validatingwebhookconfigurations.admissionregistration.k8s.io ingress-nginx-admission -o jsonpath='{.webhooks[0].clientConfig.url}' 2>/dev/null | grep -q "admission"; then
+              echo "Ingress-nginx webhook is ready"
+              break
+            fi
+            echo "Waiting for ingress-nginx webhook... ($i/30)"
+            sleep 2
+          done
+
           echo "Creating ArgoCD ingress..."
-          $kubectl apply -f - <<EOF
+          if ! $kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -158,6 +168,9 @@ spec:
             port:
               number: 80
 EOF
+          then
+            echo "Warning: Failed to create ingress, skipping..."
+          fi
 
           echo "ArgoCD deployed successfully!"
           echo "URL: https://argocd.quadtech.dev"
