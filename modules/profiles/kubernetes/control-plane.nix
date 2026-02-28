@@ -1,5 +1,8 @@
 { config, lib, pkgs, ... }:
 
+let
+  flannelInterface = config.networking.interfaces.${config.networking.defaultGatewayDevice}.name;
+in
 {
   imports = [
     ../../shared/quad-common.nix
@@ -78,11 +81,13 @@
     serviceConfig = {
       ExecStartPre = lib.mkBefore [
         "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 120); do ${pkgs.curl}/bin/curl -fsSk https://127.0.0.1:6443/healthz >/dev/null && exit 0; sleep 1; done; exit 1'"
+        "${pkgs.bash}/bin/sh -c 'export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig; ${pkgs.kubectl}/bin/kubectl create clusterrolebinding flannel-crb --clusterrole=system:flannel --serviceaccount=kube-system:flannel --dry-run=client -o yaml | ${pkgs.kubectl}/bin/kubectl apply -f - 2>/dev/null || true'"
       ];
-      ExecStart = lib.mkForce "${pkgs.flannel}/bin/flannel -etcd-endpoints=https://127.0.0.1:2379 -etcd-cafile=/var/lib/kubernetes/secrets/ca.pem -etcd-certfile=/var/lib/kubernetes/secrets/kubernetes.pem -etcd-keyfile=/var/lib/kubernetes/secrets/kubernetes-key.pem -iface=eth0 -v=10";
+      ExecStart = lib.mkForce "${pkgs.flannel}/bin/flannel -etcd-endpoints=https://127.0.0.1:2379 -etcd-cafile=/var/lib/kubernetes/secrets/ca.pem -etcd-certfile=/var/lib/kubernetes/secrets/kubernetes.pem -etcd-keyfile=/var/lib/kubernetes/secrets/kubernetes-key.pem -kubeconfig-file=/etc/kubernetes/cluster-admin.kubeconfig -iface=${flannelInterface} -v=10";
       Restart = lib.mkForce "on-failure";
     };
   };
+}
 
   systemd.services.kube-addon-manager = {
     after = [ "kube-apiserver.service" "network-online.target" ];
