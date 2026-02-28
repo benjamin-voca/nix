@@ -81,7 +81,6 @@
       ];
       ExecStart = lib.mkForce "${pkgs.flannel}/bin/flannel -etcd-endpoints=https://127.0.0.1:2379 -etcd-cafile=/var/lib/kubernetes/secrets/ca.pem -etcd-certfile=/var/lib/kubernetes/secrets/kubernetes.pem -etcd-keyfile=/var/lib/kubernetes/secrets/kubernetes-key.pem -iface=eth0 -v=10";
       Restart = lib.mkForce "on-failure";
-      RestartSec = 10;
     };
   };
 
