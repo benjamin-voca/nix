@@ -717,11 +717,11 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/06-cloudflared-configmap.yaml >> $out/bootstrap.yaml
+        cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/07-cloudflared-deployment.yaml >> $out/bootstrap.yaml
+        cat $out/06-cloudflared-deployment.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/08-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
+        cat $out/07-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/09-harbor-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
