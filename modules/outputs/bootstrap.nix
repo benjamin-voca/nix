@@ -187,6 +187,10 @@ let
             service = "http://192.168.1.240:80";
           }
           {
+            hostname = "minecraft.quadtech.dev";
+            service = "tcp://192.168.1.240:25565";
+          }
+          {
             hostname = "*.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
@@ -481,6 +485,16 @@ metadata:
     app.kubernetes.io/name: verdaccio
 EOF
 
+        # Create minecraft namespace inline
+        cat > $out/11-minecraft-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minecraft
+  labels:
+    app.kubernetes.io/name: minecraft
+EOF
+
         # Create Verdaccio PVC
         cat > $out/10a-verdaccio-pvc.yaml << 'EOF'
 apiVersion: v1
@@ -623,6 +637,71 @@ spec:
       selfHeal: true
 EOF
 
+        # Create ArgoCD Application for Minecraft
+        cat > $out/14-minecraft-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minecraft
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: minecraft
+    repoURL: https://itzg.github.io/minecraft-server-charts
+    targetRevision: 5.1.1
+    helm:
+      valueFiles:
+      - values.yaml
+      values: |
+        minecraftServer:
+          eula: "TRUE"
+          version: "1.21.4"
+          gamemode: survival
+          difficulty: normal
+          allow-flight: true
+          enable-rcon: true
+          rcon.password: "minecraft-rcon-password"
+          rcon.port: 25575
+          query.enabled: true
+          query.port: 25565
+        persistence:
+          enabled: true
+          storageClass: longhorn
+          size: 20Gi
+        service:
+          type: LoadBalancer
+          loadBalancerIP: 192.168.1.245
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/ssl-redirect: "false"
+            nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+          hosts:
+            - minecraft.quadtech.dev
+          tls:
+            - secretName: minecraft-tls
+              hosts:
+                - minecraft.quadtech.dev
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 4000m
+            memory: 6Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minecraft
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
         # Create combined file
         cat $out/00-metallb.yaml > $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -655,6 +734,10 @@ EOF
         cat $out/11-harbor-argocd-app.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/14-minecraft-argocd-app.yaml >> $out/bootstrap.yaml
       '';
 
 in
