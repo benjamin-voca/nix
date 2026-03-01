@@ -416,8 +416,7 @@ METALLB_CRDS_EOF
         # Copy gitea chart from existing charts
         cp ${existingCharts.gitea} $out/03-gitea.yaml
         
-        # Copy argocd chart
-        cp ${argocdChart} $out/04-argocd.yaml
+        # Note: ArgoCD is deployed separately via argocdBootstrap
         
         # Create cloudflared namespace inline
         cat > $out/05-cloudflared-namespace.yaml << 'EOF'
@@ -717,8 +716,7 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/03-gitea.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-argocd.yaml >> $out/bootstrap.yaml
-        echo "---" >> $out/bootstrap.yaml
+        # ArgoCD is deployed separately - skip 04-argocd.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
