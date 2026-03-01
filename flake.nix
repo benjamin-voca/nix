@@ -247,6 +247,8 @@
                   value: argocd.quadtech.dev
                 - name: server.insecure
                   value: "true"
+                - name: server.forceHttp
+                  value: "true"
                 - name: server.service.type
                   value: ClusterIP
                 - name: server.ingress.enabled
