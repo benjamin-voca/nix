@@ -123,10 +123,12 @@ let
             configs = {
               cm = {
                 "server.insecure" = true;
+                "server.forceHttp" = true;
                 url = "http://argocd.quadtech.dev";
               };
               params = {
                 "server.insecure" = true;
+                "server.forceHttp" = true;
               };
               secret = {
                 argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
@@ -550,47 +552,48 @@ spec:
     chart: harbor
     repoURL: https://helm.goharbor.io
     targetRevision: 1.18.1
-    parameterValues:
-    - name: expose.ingress.hosts.core
-      value: harbor.quadtech.dev
-    - name: expose.tls.enabled
-      value: "true"
-    - name: expose.tls.certSource
-      value: auto
-    - name: externalURL
-      value: https://harbor.quadtech.dev
-    - name: persistence.enabled
-      value: "true"
-    - name: persistence.resourcePolicy
-      value: keep
-    - name: persistence.persistentVolumeClaim.registry.storageClass
-      value: longhorn
-    - name: persistence.persistentVolumeClaim.registry.size
-      value: 100Gi
-    - name: persistence.persistentVolumeClaim.database.size
-      value: 10Gi
-    - name: persistence.persistentVolumeClaim.redis.size
-      value: 5Gi
-    - name: persistence.persistentVolumeClaim.trivy.size
-      value: 10Gi
-    - name: database.type
-      value: internal
-    - name: redis.type
-      value: internal
-    - name: portal.replicas
-      value: "1"
-    - name: core.replicas
-      value: "1"
-    - name: jobservice.replicas
-      value: "1"
-    - name: registry.replicas
-      value: "1"
-    - name: trivy.enabled
-      value: "true"
-    - name: notary.enabled
-      value: "false"
-    - name: chartmuseum.enabled
-      value: "false"
+    helm:
+      parameters:
+      - name: expose.ingress.hosts.core
+        value: harbor.quadtech.dev
+      - name: expose.tls.enabled
+        value: "true"
+      - name: expose.tls.certSource
+        value: auto
+      - name: externalURL
+        value: https://harbor.quadtech.dev
+      - name: persistence.enabled
+        value: "true"
+      - name: persistence.resourcePolicy
+        value: keep
+      - name: persistence.persistentVolumeClaim.registry.storageClass
+        value: longhorn
+      - name: persistence.persistentVolumeClaim.registry.size
+        value: 100Gi
+      - name: persistence.persistentVolumeClaim.database.size
+        value: 10Gi
+      - name: persistence.persistentVolumeClaim.redis.size
+        value: 5Gi
+      - name: persistence.persistentVolumeClaim.trivy.size
+        value: 10Gi
+      - name: database.type
+        value: internal
+      - name: redis.type
+        value: internal
+      - name: portal.replicas
+        value: "1"
+      - name: core.replicas
+        value: "1"
+      - name: jobservice.replicas
+        value: "1"
+      - name: registry.replicas
+        value: "1"
+      - name: trivy.enabled
+        value: "true"
+      - name: notary.enabled
+        value: "false"
+      - name: chartmuseum.enabled
+        value: "false"
   destination:
     server: https://kubernetes.default.svc
     namespace: harbor
@@ -615,19 +618,20 @@ spec:
     chart: verdaccio
     repoURL: https://charts.verdaccio.org
     targetRevision: 4.29.0
-    parameterValues:
-    - name: service.type
-      value: ClusterIP
-    - name: ingress.enabled
-      value: "true"
-    - name: ingress.className
-      value: nginx
-    - name: ingress.hosts[0]
-      value: verdaccio.quadtech.dev
-    - name: persistence.enabled
-      value: "true"
-    - name: persistence.existingClaim
-      value: verdaccio-data
+    helm:
+      parameters:
+      - name: service.type
+        value: ClusterIP
+      - name: ingress.enabled
+        value: "true"
+      - name: ingress.className
+        value: nginx
+      - name: ingress.hosts[0]
+        value: verdaccio.quadtech.dev
+      - name: persistence.enabled
+        value: "true"
+      - name: persistence.existingClaim
+        value: verdaccio-data
   destination:
     server: https://kubernetes.default.svc
     namespace: verdaccio
