@@ -123,7 +123,7 @@ let
             configs = {
               cm = {
                 "server.insecure" = true;
-                url = "https://argocd.quadtech.dev";
+                url = "http://argocd.quadtech.dev";
               };
               params = {
                 "server.insecure" = true;
