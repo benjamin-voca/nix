@@ -416,6 +416,22 @@ METALLB_CRDS_EOF
         # Copy gitea chart from existing charts
         cp ${existingCharts.gitea} $out/03-gitea.yaml
         
+        # Copy gitea-actions chart (runners on K8s)
+        cp ${existingCharts.gitea-actions} $out/04-gitea-actions.yaml
+        
+        # Create gitea runner token secret (base64 encoded - will be replaced with actual secret via SOPS or external secret operator)
+        # Note: This is a placeholder. In production, use an external secret operator or SOPS-mounted secrets
+        cat > $out/04-gitea-runner-secret.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea-runner-token
+  namespace: gitea
+type: Opaque
+stringData:
+  token: RUNNER_TOKEN_PLACEHOLDER
+EOF
+        
         # Note: ArgoCD is deployed separately via argocdBootstrap
         
         # Create cloudflared namespace inline
@@ -715,6 +731,10 @@ EOF
         cat $out/02-longhorn.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/03-gitea.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/04-gitea-runner-secret.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/04-gitea-actions.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         # ArgoCD is deployed separately - skip 04-argocd.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml

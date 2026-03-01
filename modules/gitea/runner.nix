@@ -35,6 +35,12 @@ in {
       default = "quadnix-runner";
     };
 
+    checkUrl = mkOption {
+      type = types.str;
+      default = cfg.registrationUrl;
+      description = "URL to check for Gitea availability before starting.";
+    };
+
     stateDir = mkOption {
       type = types.str;
       default = "/var/lib/gitea-runner";
@@ -59,7 +65,7 @@ in {
         
         echo "Waiting for Gitea to be accessible..."
         for i in $(seq 1 60); do
-          if curl -fsSk "${cfg.registrationUrl}" >/dev/null 2>&1; then
+          if curl -fsSk "${cfg.checkUrl}" >/dev/null 2>&1; then
             break
           fi
           echo "Waiting for Gitea..."

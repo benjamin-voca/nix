@@ -202,13 +202,14 @@
     verdaccio = true;
   };
 
-  # Gitea Actions Runners
-  services.gitea.runner = {
-    enable = true;
-    instanceName = "backbone-runner-1";
-    tokenFile = "/run/secrets/gitea-runner-token";
-    labels = [ "ubuntu-latest" "linux" "x86_64" "self-hosted" ];
-  };
+  # Gitea Actions Runners are now running on Kubernetes
+  # Commenting out host-based runners - they are replaced by gitea-actions helm chart
+  # services.gitea.runner = {
+  #   enable = true;
+  #   instanceName = "backbone-runner-1";
+  #   tokenFile = "/run/secrets/gitea-runner-token";
+  #   labels = [ "ubuntu-latest" "linux" "x86_64" "self-hosted" ];
+  # };
 
   # Cloudflared tunnel service (runs on host for SSH access via Cloudflare Tunnel)
   # Uses host IP 192.168.1.15 with NodePorts for K8s services
@@ -266,67 +267,7 @@ EOF
     chmod 600 /etc/cloudflared/creds/credentials.json
   '';
 
-  # Enable 2 additional runners via systemd service instances
-  systemd.services.gitea-runner-2 = {
-    description = "Gitea actions runner 2";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
-    requires = [ "network.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.gitea-actions-runner}/bin/act_runner daemon --config /etc/gitea/runner/config-2.yaml";
-      Restart = "always";
-      RestartSec = "10s";
-      StateDirectory = "gitea-runner-2";
-      WorkingDirectory = "/var/lib/gitea-runner-2";
-    };
-  };
-
-  systemd.services.gitea-runner-3 = {
-    description = "Gitea actions runner 3";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
-    requires = [ "network.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.gitea-actions-runner}/bin/act_runner daemon --config /etc/gitea/runner/config-3.yaml";
-      Restart = "always";
-      RestartSec = "10s";
-      StateDirectory = "gitea-runner-3";
-      WorkingDirectory = "/var/lib/gitea-runner-3";
-    };
-  };
-
-  # Create config files for additional runners (token read from file at runtime via systemd service)
-  systemd.services.gitea-runner-2.preStart = ''
-    mkdir -p /etc/gitea/runner /var/lib/gitea-runner-2
-    
-    echo "Waiting for Gitea to be accessible..."
-    for i in $(seq 1 60); do
-      if curl -fsSk https://gitea.quadtech.dev >/dev/null 2>&1; then
-        break
-      fi
-      echo "Waiting for Gitea..."
-      sleep 5
-    done
-    
-    cat > /etc/gitea/runner/config-2.yaml << EOF
-runner:
-  name: backbone-runner-2
-  labels:
-    - ubuntu-latest
-    - linux
-    - x86_64
-    - self-hosted
-  token: $(cat /run/secrets/gitea-runner-token)
-  url: https://gitea.quadtech.dev
-  state_dir: /var/lib/gitea-runner-2
-EOF
-    # Register runner if not already registered
-    if [ ! -f /var/lib/gitea-runner-2/.runner ]; then
-      cd /var/lib/gitea-runner-2
-      TOKEN=$(cat /run/secrets/gitea-runner-token)
-      ${pkgs.gitea-actions-runner}/bin/act_runner register --instance https://gitea.quadtech.dev --token "$TOKEN" --name backbone-runner-2 --no-interactive || true
-    fi
-  '';
+  # Host-based runners removed - runners now run on Kubernetes via gitea-actions helm chart
 
   systemd.timers.git-pull = {
     description = "Pull git repo hourly";
