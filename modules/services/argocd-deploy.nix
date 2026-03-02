@@ -172,10 +172,15 @@ EOF
             echo "Warning: Failed to create ingress, skipping..."
           fi
 
-          echo "ArgoCD deployed successfully!"
-          echo "URL: https://argocd.quadtech.dev"
-          echo "Admin username: admin"
-          echo "Admin password: admin"
+          echo "Waiting for ArgoCD CRDs to be ready..."
+          for i in $(seq 1 30); do
+            if $kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
+              echo "ArgoCD CRDs are ready"
+              break
+            fi
+            echo "Waiting for ArgoCD CRDs... ($i/30)"
+            sleep 2
+          done
 
           echo "Creating ArgoCD Gitea credentials secret..."
           if [ -f /run/secrets/argocd-gitea-username ] && [ -f /run/secrets/argocd-gitea-token ]; then
@@ -185,29 +190,15 @@ EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: argocd-gitea-creds
+  name: gitea-quadtech-repo-creds
   namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repo-creds
 type: Opaque
 stringData:
+  url: https://gitea.quadtech.dev/QuadCoreTech
   username: "$GITEA_USERNAME"
   password: "$GITEA_TOKEN"
-EOF
-            echo "Creating ArgoCD Repository CR for Gitea..."
-            $kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Repository
-metadata:
-  name: gitea-quadtech
-  namespace: argocd
-spec:
-  type: git
-  url: https://gitea.quadtech.dev/QuadCoreTech
-  usernameSecret:
-    name: argocd-gitea-creds
-    key: username
-  passwordSecret:
-    name: argocd-gitea-creds
-    key: password
 EOF
           else
             echo "Warning: Gitea credentials not found in /run/secrets/, skipping..."
