@@ -517,48 +517,6 @@ CONFIGEOF
 EOF
         
         # Create cloudflared namespace inline
-            - name: CONFIG_FILE
-              value: /runner/config.yaml
-            - name: GITEA_RUNNER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: gitea-runner-token
-                  key: token
-          volumeMounts:
-            - name: runner-config
-              mountPath: /runner
-              readOnly: true
-            - name: runner-data
-              mountPath: /data
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-        - name: dind
-          image: docker:28.3.3-dind
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: runner-data
-              mountPath: /var/lib/docker
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 2000m
-              memory: 2Gi
-      volumes:
-        - name: runner-config
-          emptyDir: {}
-        - name: runner-data
-          emptyDir: {}
-EOF
-        
-        # Create cloudflared namespace inline
         cat > $out/05-cloudflared-namespace.yaml << 'EOF'
 apiVersion: v1
 kind: Namespace
