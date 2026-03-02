@@ -436,21 +436,6 @@ metadata:
   name: gitea-actions
   namespace: gitea
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gitea-actions-config
-  namespace: gitea
-data:
-  config.yaml: |
-    runner:
-      url: https://gitea.quadtech.dev
-      extra:
-        - ubuntu-latest
-        - linux
-        - x86_64
-        - self-hosted
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -471,7 +456,67 @@ spec:
       containers:
         - name: act-runner
           image: docker.gitea.com/act_runner:0.2.13
+          command:
+            - sh
+            - -c
+            - |
+              cat > /runner/config.yaml << CONFIGEOF
+runner:
+  url: https://gitea.quadtech.dev
+  token: $(cat /run/secrets/token)
+  extra:
+    - ubuntu-latest
+    - linux
+    - x86_64
+    - self-hosted
+CONFIGEOF
+              exec /bin/act_runner daemon --config /runner/config.yaml
           env:
+            - name: GITEA_RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-token
+                  key: token
+          volumeMounts:
+            - name: runner-config
+              mountPath: /runner
+            - name: runner-data
+              mountPath: /data
+            - name: runner-token
+              mountPath: /run/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+        - name: dind
+          image: docker:28.3.3-dind
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: runner-data
+              mountPath: /var/lib/docker
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+      volumes:
+        - name: runner-config
+          emptyDir: {}
+        - name: runner-data
+          emptyDir: {}
+        - name: runner-token
+          secret:
+            secretName: gitea-runner-token
+EOF
+        
+        # Create cloudflared namespace inline
             - name: CONFIG_FILE
               value: /runner/config.yaml
             - name: GITEA_RUNNER_TOKEN
@@ -508,8 +553,7 @@ spec:
               memory: 2Gi
       volumes:
         - name: runner-config
-          configMap:
-            name: gitea-actions-config
+          emptyDir: {}
         - name: runner-data
           emptyDir: {}
 EOF
