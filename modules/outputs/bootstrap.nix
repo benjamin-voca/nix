@@ -476,7 +476,7 @@ spec:
             - -c
             - |
               echo "Waiting for Gitea to be ready..."
-              until curl -sf http://gitea.gitea.svc.cluster.local:3000 > /dev/null 2>&1; do
+              until curl -sf http://gitea-http.gitea.svc.cluster.local:3000 > /dev/null 2>&1; do
                 echo "Waiting..."
                 sleep 5
               done
@@ -487,6 +487,11 @@ spec:
           env:
             - name: CONFIG_FILE
               value: /runner/config.yaml
+            - name: GITEA_RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-token
+                  key: token
           volumeMounts:
             - name: runner-config
               mountPath: /runner
