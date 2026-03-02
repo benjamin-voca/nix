@@ -20,6 +20,23 @@ let
   # Get charts from nixhelm
   chartsFor = system: inputs.nixhelm.chartsDerivations.${system};
 
+  # Import composable library - for modular k8s manifest building
+  # This library provides reusable functions for:
+  # - Namespace creation (mkNamespace)
+  # - ArgoCD Application building (mkArgoHelmApp)
+  # - Cloudflared configuration (mkCloudflared*)
+  # - Gitea runner resources (mkGiteaRunner*)
+  # - MetalLB CRDs (mkMetallbCRDs)
+  # - Common resource presets
+  composableFor = system:
+    let
+      pkgs = pkgsFor system;
+    in
+      import ../../lib/helm/composable.nix {
+        inherit pkgs;
+      };
+
+
   # Bootstrap output that merges gitea, argocd, and cloudflare
   bootstrapFor = system:
     let
@@ -27,6 +44,9 @@ let
       charts = chartsFor system;
       helmLib = helmLibFor system;
       kubelib = inputs.nix-kube-generators.lib { inherit pkgs; };
+      
+      # Use the composable library for manifest building
+      composable = composableFor system;
       
       # Import existing charts from lib/helm/charts
       existingCharts = import ../../lib/helm/charts { inherit helmLib; };
