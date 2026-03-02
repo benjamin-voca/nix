@@ -468,19 +468,6 @@ spec:
         app.kubernetes.io/name: gitea-actions
     spec:
       serviceAccountName: gitea-actions
-      initContainers:
-        - name: init
-          image: busybox:1.37
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for Gitea to be ready..."
-              until curl -sf http://gitea-http.gitea.svc.cluster.local:3000 > /dev/null 2>&1; do
-                echo "Waiting..."
-                sleep 5
-              done
-              echo "Gitea is ready"
       containers:
         - name: act-runner
           image: docker.gitea.com/act_runner:0.2.13
