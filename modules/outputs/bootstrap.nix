@@ -416,11 +416,7 @@ METALLB_CRDS_EOF
         # Copy gitea chart from existing charts
         cp ${existingCharts.gitea} $out/03-gitea.yaml
         
-        # Copy gitea-actions chart (runners on K8s)
-        cp ${existingCharts.gitea-actions} $out/04-gitea-actions.yaml
-        
         # Create gitea runner token secret (base64 encoded - will be replaced with actual secret via SOPS or external secret operator)
-        # Note: This is a placeholder. In production, use an external secret operator or SOPS-mounted secrets
         cat > $out/04-gitea-runner-secret.yaml << 'EOF'
 apiVersion: v1
 kind: Secret
@@ -432,7 +428,172 @@ stringData:
   token: RUNNER_TOKEN_PLACEHOLDER
 EOF
         
-        # Note: ArgoCD is deployed separately via argocdBootstrap
+        # Create gitea-actions runner deployment inline
+        cat > $out/04-gitea-actions.yaml << 'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitea-actions
+  namespace: gitea
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitea-actions-config
+  namespace: gitea
+data:
+  config.yaml: |
+    runner:
+      url: https://gitea.quadtech.dev
+      extra:
+        - ubuntu-latest
+        - linux
+        - x86_64
+        - self-hosted
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitea-actions
+  namespace: gitea
+spec:
+  serviceName: gitea-actions
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-actions
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-actions
+    spec:
+      serviceAccountName: gitea-actions
+      initContainers:
+        - name: init
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Gitea to be ready..."
+              until curl -sf http://gitea.gitea.svc.cluster.local:3000 > /dev/null 2>&1; do
+                echo "Waiting..."
+                sleep 5
+              done
+              echo "Gitea is ready"
+      containers:
+        - name: act-runner
+          image: docker.gitea.com/act_runner:0.2.13
+          env:
+            - name: CONFIG_FILE
+              value: /runner/config.yaml
+          volumeMounts:
+            - name: runner-config
+              mountPath: /runner
+              readOnly: true
+            - name: runner-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+        - name: dind
+          image: docker:28.3.3-dind
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: runner-data
+              mountPath: /var/lib/docker
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+      volumes:
+        - name: runner-config
+          configMap:
+            name: gitea-actions-config
+        - name: runner-data
+          emptyDir: {}
+EOF
+        - x86_64
+        - self-hosted
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitea-actions
+  namespace: gitea
+spec:
+  serviceName: gitea-actions
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-actions
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-actions
+    spec:
+      serviceAccountName: gitea-actions
+      initContainers:
+        - name: init
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Gitea to be ready..."
+              until curl -sf http://gitea.gitea.svc.cluster.local:3000 > /dev/null 2>&1; do
+                echo "Waiting..."
+                sleep 5
+              done
+              echo "Gitea is ready"
+      containers:
+        - name: act-runner
+          image: docker.gitea.com/act_runner:0.2.13
+          env:
+            - name: CONFIG_FILE
+              value: /runner/config.yaml
+          volumeMounts:
+            - name: runner-config
+              mountPath: /runner
+              readOnly: true
+            - name: runner-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+        - name: dind
+          image: docker:28.3.3-dind
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: runner-data
+              mountPath: /var/lib/docker
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+      volumes:
+        - name: runner-config
+          configMap:
+            name: gitea-actions-config
+        - name: runner-data
+          emptyDir: {}
+EOF
         
         # Create cloudflared namespace inline
         cat > $out/05-cloudflared-namespace.yaml << 'EOF'

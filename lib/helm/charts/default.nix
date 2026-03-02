@@ -5,7 +5,6 @@ let
   prometheus = import ./prometheus.nix { inherit helmLib; };
   ingress = import ./ingress.nix { inherit helmLib; };
   gitea = import ./gitea.nix { inherit helmLib; };
-  gitea-actions = import ./gitea-actions.nix { inherit helmLib; };
   clickhouse = import ./clickhouse.nix { inherit helmLib; };
   grafana = import ./grafana.nix { inherit helmLib; };
   cloudnative-pg = import ./cloudnative-pg.nix { inherit helmLib; };
@@ -21,7 +20,6 @@ in
   inherit (prometheus) prometheus;
   inherit (ingress) ingress-nginx cert-manager;
   inherit (gitea) gitea;
-  inherit (gitea-actions) gitea-actions;
   inherit (clickhouse) clickhouse clickhouse-operator;
   inherit (grafana) grafana loki tempo;
   inherit (cloudnative-pg) cloudnative-pg;
@@ -37,7 +35,6 @@ in
     inherit (prometheus) prometheus;
     inherit (ingress) ingress-nginx cert-manager;
     inherit (gitea) gitea;
-    inherit (gitea-actions) gitea-actions;
     inherit (clickhouse) clickhouse clickhouse-operator;
     inherit (grafana) grafana loki tempo;
     inherit (cloudnative-pg) cloudnative-pg;

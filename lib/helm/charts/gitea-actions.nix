@@ -7,7 +7,7 @@
       repo = "https://dl.gitea.com/charts";
       chart = "actions";
       version = "0.0.3";
-      chartHash = "sha256-7b9a041a8bbf9dac7098a12331802b6c71d1f158deeb0a5e2f5aa1e969c97ed0";
+      chartHash = "sha256-e5oEGou/naxwmKEjMYArbHHR8Vje6wpeL1qh6WnJftA=";
     };
     namespace = "gitea";
     values = {
