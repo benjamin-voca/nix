@@ -176,6 +176,43 @@ EOF
           echo "URL: https://argocd.quadtech.dev"
           echo "Admin username: admin"
           echo "Admin password: admin"
+
+          echo "Creating ArgoCD Gitea credentials secret..."
+          if [ -f /run/secrets/argocd-gitea-username ] && [ -f /run/secrets/argocd-gitea-token ]; then
+            GITEA_USERNAME=$(cat /run/secrets/argocd-gitea-username)
+            GITEA_TOKEN=$(cat /run/secrets/argocd-gitea-token)
+            $kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-gitea-creds
+  namespace: argocd
+type: Opaque
+stringData:
+  username: "$GITEA_USERNAME"
+  password: "$GITEA_TOKEN"
+EOF
+            echo "Creating ArgoCD Repository CR for Gitea..."
+            $kubectl apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Repository
+metadata:
+  name: gitea-quadtech
+  namespace: argocd
+spec:
+  type: git
+  url: https://gitea.quadtech.dev/QuadCoreTech
+  usernameSecret:
+    name: argocd-gitea-creds
+    key: username
+  passwordSecret:
+    name: argocd-gitea-creds
+    key: password
+EOF
+          else
+            echo "Warning: Gitea credentials not found in /run/secrets/, skipping..."
+            echo "Add argocd-gitea-username and argocd-gitea-token to secrets/backbone-01.yaml"
+          fi
         '';
       })
       (pkgs.writeShellApplication {

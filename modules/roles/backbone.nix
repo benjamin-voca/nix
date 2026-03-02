@@ -182,6 +182,20 @@
         group = "root";
         mode = "0400";
       };
+      argocd-gitea-username = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/argocd-gitea-username";
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      argocd-gitea-token = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/argocd-gitea-token";
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
     };
 
   services.quadnix.argocd-deploy = {

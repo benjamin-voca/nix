@@ -213,6 +213,18 @@ let
             service = "tcp://192.168.1.240:25565";
           }
           {
+            hostname = "edukurs.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
+            hostname = "batllavatourist.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
+            hostname = "quadpacienti.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
             hostname = "*.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
@@ -433,6 +445,184 @@ METALLB_CRDS_EOF
         # Copy Longhorn chart (for persistent storage)
         cp ${longhornChart} $out/02-longhorn.yaml
         
+        # Copy CNPG operator chart
+        cp ${existingCharts.cloudnative-pg} $out/02a-cnpg-operator.yaml
+        
+        # Create CNPG cluster manifest for shared postgres
+        cat > $out/02b-cnpg-cluster.yaml << 'EOF'
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: shared-pg
+  namespace: cnpg-system
+spec:
+  instances: 1
+  imageName: docker.io/cloudnative-pg/container:1.22.1
+  storage:
+    storageClass: longhorn
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  bootstrap:
+    initdb:
+      database: edukurs
+      owner: edukurs
+      secret:
+        name: shared-pg-app
+  postgresql:
+    pg_hba:
+      - host all all 0.0.0.0/0 md5
+      - host all all ::0/0 md5
+  monitoring:
+    enabled: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shared-pg-app
+  namespace: cnpg-system
+type: Opaque
+stringData:
+  username: edukurs
+  password: edukurs-password
+  dbname: edukurs
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: batllavatourist
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: shared-pg
+  owner: app
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: quadpacienti
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: shared-pg
+  owner: app
+EOF
+
+        # Create cnpg-system namespace for the CNPG operator
+        cat > $out/02c-cnpg-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+EOF
+
+        # Create app namespaces
+        cat > $out/15-edukurs-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: edukurs
+  labels:
+    app.kubernetes.io/name: edukurs
+EOF
+
+        cat > $out/15-batllavatourist-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: batllavatourist
+  labels:
+    app.kubernetes.io/name: batllavatourist
+EOF
+
+        cat > $out/15-quadpacienti-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quadpacienti
+  labels:
+    app.kubernetes.io/name: quadpacienti
+EOF
+
+        # Create ArgoCD Application for EduKurs (placeholder - needs Docker image built)
+        cat > $out/16-edukurs-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: edukurs
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://gitea.quadtech.dev/QuadCoreTech/edukurs.git
+    path: k8s
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: edukurs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
+        # Create ArgoCD Application for BatllavaTourist (placeholder - needs Docker image built)
+        cat > $out/16-batllavatourist-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: batllavatourist
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://gitea.quadtech.dev/QuadCoreTech/batllavatourist.git
+    path: k8s
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: batllavatourist
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
+        # Create ArgoCD Application for QuadPacienti (placeholder - needs Docker image built)
+        cat > $out/16-quadpacienti-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quadpacienti
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://gitea.quadtech.dev/QuadCoreTech/quadpacienti.git
+    path: k8s
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quadpacienti
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+        
         # Copy gitea chart from existing charts
         cp ${existingCharts.gitea} $out/03-gitea.yaml
         
@@ -534,6 +724,29 @@ CONFIGEOF
         - name: runner-token
           secret:
             secretName: gitea-runner-token
+EOF
+
+        # Create Gitea repository credentials for ArgoCD
+        # NOTE: These are now applied via argocd-deploy service after deployment
+        # The service reads from /run/secrets/argocd-gitea-username and /run/secrets/argocd-gitea-token
+        # which are managed via SOPS in secrets/backbone-01.yaml
+
+        # Create ArgoCD Repository CR for Gitea
+        cat > $out/04-argocd-gitea-repo.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Repository
+metadata:
+  name: gitea-quadtech
+  namespace: argocd
+spec:
+  type: git
+  url: https://gitea.quadtech.dev/QuadCoreTech
+  usernameSecret:
+    name: argocd-gitea-creds
+    key: username
+  passwordSecret:
+    name: argocd-gitea-creds
+    key: password
 EOF
         
         # Create cloudflared namespace inline
@@ -832,12 +1045,19 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/02-longhorn.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
+        cat $out/02a-cnpg-operator.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/02b-cnpg-cluster.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/02c-cnpg-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
         cat $out/03-gitea.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/04-gitea-runner-secret.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/04-gitea-actions.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
+        # ArgoCD Gitea credentials now applied via argocd-deploy service (not in bootstrap)
         # ArgoCD is deployed separately - skip 04-argocd.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -862,6 +1082,18 @@ EOF
         cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/14-minecraft-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/15-edukurs-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/15-batllavatourist-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/15-quadpacienti-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/16-edukurs-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/16-batllavatourist-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/16-quadpacienti-argocd-app.yaml >> $out/bootstrap.yaml
       '';
 
 in
