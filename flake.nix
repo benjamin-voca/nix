@@ -636,6 +636,120 @@
                     repository: frappe/erpnext
                     tag: v16.5.0
 
+                  nginx:
+                    config: |
+                      upstream backend-server {
+                        server erpnext-gunicorn:8000 fail_timeout=0;
+                      }
+
+                      upstream socketio-server {
+                        server erpnext-socketio:9000 fail_timeout=0;
+                      }
+
+                      server {
+                        listen 8080;
+                        server_name $host;
+                        root /home/frappe/frappe-bench/sites;
+
+                        proxy_buffer_size 128k;
+                        proxy_buffers 4 256k;
+                        proxy_busy_buffers_size 256k;
+
+                        add_header X-Frame-Options "SAMEORIGIN";
+                        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+                        add_header X-Content-Type-Options nosniff;
+                        add_header X-XSS-Protection "1; mode=block";
+                        add_header Referrer-Policy "same-origin, strict-origin-when-cross-origin";
+
+                        set_real_ip_from 127.0.0.1;
+                        real_ip_header X-Forwarded-For;
+                        real_ip_recursive off;
+
+                        location /assets/helpdesk/ {
+                          alias /home/frappe/frappe-bench/sites/apps/helpdesk/helpdesk/public/;
+                        }
+
+                        location /assets/telephony/ {
+                          alias /home/frappe/frappe-bench/sites/apps/telephony/telephony/public/;
+                        }
+
+                        location /assets {
+                          try_files $uri =404;
+                        }
+
+                        location ~ ^/protected/(.*) {
+                          internal;
+                          try_files /$host/$1 =404;
+                        }
+
+                        location /socket.io {
+                          proxy_http_version 1.1;
+                          proxy_set_header Upgrade $http_upgrade;
+                          proxy_set_header Connection "upgrade";
+                          proxy_set_header X-Frappe-Site-Name $host;
+                          proxy_set_header Origin $scheme://$http_host;
+                          proxy_set_header Host $host;
+
+                          proxy_pass http://socketio-server;
+                        }
+
+                        location / {
+                          rewrite ^(.+)/$ $1 permanent;
+                          rewrite ^(.+)/index\.html$ $1 permanent;
+                          rewrite ^(.+)\.html$ $1 permanent;
+
+                          location ~ ^/files/.*.(htm|html|svg|xml) {
+                            add_header Content-disposition "attachment";
+                            try_files /$host/public/$uri @webserver;
+                          }
+
+                          try_files /$host/public/$uri @webserver;
+                        }
+
+                        location @webserver {
+                          proxy_http_version 1.1;
+                          proxy_set_header X-Forwarded-For $remote_addr;
+                          proxy_set_header X-Forwarded-Proto $scheme;
+                          proxy_set_header X-Frappe-Site-Name $host;
+                          proxy_set_header Host $host;
+                          proxy_set_header X-Use-X-Accel-Redirect True;
+                          proxy_read_timeout 120;
+                          proxy_redirect off;
+
+                          proxy_pass  http://backend-server;
+                        }
+
+                        sendfile on;
+                        keepalive_timeout 15;
+                        client_max_body_size 50m;
+                        client_body_buffer_size 16K;
+                        client_header_buffer_size 1k;
+
+                        gzip on;
+                        gzip_http_version 1.1;
+                        gzip_comp_level 5;
+                        gzip_min_length 256;
+                        gzip_proxied any;
+                        gzip_vary on;
+                        gzip_types
+                          application/atom+xml
+                          application/javascript
+                          application/json
+                          application/rss+xml
+                          application/vnd.ms-fontobject
+                          application/x-font-ttf
+                          application/font-woff
+                          application/x-web-app-manifest+json
+                          application/xhtml+xml
+                          application/xml
+                          font/opentype
+                          image/svg+xml
+                          image/x-icon
+                          text/css
+                          text/plain
+                          text/x-component;
+                      }
+
                   persistence:
                     worker:
                       enabled: true
