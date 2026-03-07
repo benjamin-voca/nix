@@ -502,6 +502,14 @@
                   value: "true"
                 - name: mariadb.persistence.size
                   value: 20Gi
+                - name: jobs.createSite.enabled
+                  value: "true"
+                - name: jobs.createSite.siteName
+                  value: helpdesk.quadtech.dev
+                - name: jobs.createSite.adminPassword
+                  value: admin123
+                - name: jobs.createSite.installApps[0]
+                  value: helpdesk
             destination:
               server: https://kubernetes.default.svc
               namespace: erpnext
