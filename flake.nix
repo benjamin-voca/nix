@@ -498,6 +498,10 @@
                   value: ReadWriteOnce
                 - name: persistence.site.accessMode
                   value: ReadWriteOnce
+                - name: mariadb.enabled
+                  value: "true"
+                - name: mariadb.persistence.size
+                  value: 20Gi
             destination:
               server: https://kubernetes.default.svc
               namespace: erpnext
