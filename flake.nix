@@ -494,6 +494,10 @@
                   value: "false"
                 - name: ingress.tls
                   value: "false"
+                - name: persistence.worker.accessMode
+                  value: ReadWriteOnce
+                - name: persistence.site.accessMode
+                  value: ReadWriteOnce
             destination:
               server: https://kubernetes.default.svc
               namespace: erpnext
