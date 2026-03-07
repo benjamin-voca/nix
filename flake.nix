@@ -191,6 +191,11 @@
           kind: Namespace
           metadata:
             name: erpnext
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: nfs-rwx
 
           # MetalLB CRDs
           ---
@@ -440,6 +445,158 @@
               requests:
                 storage: 20Gi
 
+          # ERPNext shared sites PVC on RWX storage
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: erpnext-sites-rwx-v2
+            namespace: erpnext
+          spec:
+            accessModes:
+              - ReadWriteMany
+            storageClassName: nfs-rwx-v2
+            resources:
+              requests:
+                storage: 20Gi
+
+          # Longhorn single-replica storage class for single-node shared services
+          ---
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: longhorn-single
+          provisioner: driver.longhorn.io
+          allowVolumeExpansion: true
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          parameters:
+            numberOfReplicas: "1"
+            staleReplicaTimeout: "30"
+            fromBackup: ""
+            fsType: ext4
+            dataLocality: disabled
+            unmapMarkSnapChainRemoved: ignored
+            disableRevisionCounter: "true"
+            dataEngine: v1
+            backupTargetName: default
+
+          # Host-backed PV for in-cluster NFS storage
+          ---
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: nfs-rwx-data
+          spec:
+            capacity:
+              storage: 50Gi
+            accessModes:
+              - ReadWriteOnce
+            persistentVolumeReclaimPolicy: Retain
+            storageClassName: ""
+            hostPath:
+              path: /var/lib/quadnix/nfs-rwx
+              type: DirectoryOrCreate
+
+          ---
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: nfs-rwx-data
+            namespace: nfs-rwx
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            storageClassName: ""
+            volumeName: nfs-rwx-data
+            resources:
+              requests:
+                storage: 50Gi
+
+          # ERPNext sites migration job
+          ---
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: erpnext-sites-migrate-v4
+            namespace: erpnext
+          spec:
+            backoffLimit: 3
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                - name: migrate-sites
+                  image: frappe/erpnext:v16.5.0
+                  command:
+                  - /bin/bash
+                  - -lc
+                  args:
+                  - |
+                    set -euo pipefail
+                    if [ -f /new/.migrated-from-longhorn ]; then
+                      echo "ERPNext sites already migrated"
+                      exit 0
+                    fi
+
+                    mkdir -p /new
+                    if [ -d /old/helpdesk.quadtech.dev ] || [ -f /old/common_site_config.json ]; then
+                      cp -a /old/. /new/
+                    fi
+
+                    mkdir -p /new/apps
+                    touch /new/.migrated-from-longhorn
+                  volumeMounts:
+                  - name: old-sites
+                    mountPath: /old
+                  - name: new-sites
+                    mountPath: /new
+                volumes:
+                - name: old-sites
+                  persistentVolumeClaim:
+                    claimName: erpnext
+                - name: new-sites
+                  persistentVolumeClaim:
+                    claimName: erpnext-sites-rwx-v2
+
+          # ArgoCD Application - In-cluster NFS provisioner
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: nfs-rwx
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              chart: nfs-server-provisioner
+              repoURL: https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner
+              targetRevision: 1.8.0
+              helm:
+                releaseName: nfs-rwx-hostpath
+                values: |
+                  persistence:
+                    enabled: true
+                    existingClaim: nfs-rwx-data
+
+                  storageClass:
+                    create: true
+                    defaultClass: false
+                    name: nfs-rwx-v2
+                    provisionerName: quadtech.dev/nfs-rwx-v2
+                    mountOptions:
+                      - vers=4.1
+
+                  service:
+                    type: ClusterIP
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: nfs-rwx
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
           # ArgoCD Application - ERPNext
           ---
           apiVersion: argoproj.io/v1alpha1
@@ -459,57 +616,274 @@
               repoURL: https://helm.erpnext.com
               targetRevision: 8.0.22
               helm:
-                parameters:
-                - name: ingress.enabled
-                  value: "true"
-                - name: ingress.className
-                  value: nginx
-                - name: global.domain
-                  value: helpdesk.quadtech.dev
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
-                  value: "false"
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/force-ssl-redirect
-                  value: "false"
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
-                  value: HTTP
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/proxy-ssl-redirect
-                  value: "false"
-                - name: ingress.hosts[0].host
-                  value: helpdesk.quadtech.dev
-                - name: ingress.hosts[0].paths[0].path
-                  value: /
-                - name: ingress.hosts[0].paths[0].pathType
-                  value: Prefix
-                - name: persistence.enabled
-                  value: "true"
-                - name: persistence.worker.storageClass
-                  value: longhorn
-                - name: persistence.worker.size
-                  value: 20Gi
-                - name: persistence.site.storageClass
-                  value: longhorn
-                - name: persistence.site.size
-                  value: 10Gi
-                - name: scheduler.useTLS
-                  value: "false"
-                - name: ingress.tls
-                  value: "false"
-                - name: persistence.worker.accessMode
-                  value: ReadWriteOnce
-                - name: persistence.site.accessMode
-                  value: ReadWriteOnce
-                - name: mariadb.enabled
-                  value: "true"
-                - name: mariadb.persistence.size
-                  value: 20Gi
-                - name: jobs.createSite.enabled
-                  value: "true"
-                - name: jobs.createSite.siteName
-                  value: helpdesk.quadtech.dev
-                - name: jobs.createSite.adminPassword
-                  value: admin123
-                - name: jobs.createSite.installApps[0]
-                  value: helpdesk
+                values: |
+                  ingress:
+                    enabled: true
+                    className: nginx
+                    annotations:
+                      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+                      nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+                      nginx.ingress.kubernetes.io/backend-protocol: HTTP
+                      nginx.ingress.kubernetes.io/proxy-ssl-redirect: "false"
+                    hosts:
+                      - host: helpdesk.quadtech.dev
+                        paths:
+                          - path: /
+                            pathType: Prefix
+                    tls: []
+
+                  image:
+                    repository: frappe/erpnext
+                    tag: v16.5.0
+
+                  persistence:
+                    worker:
+                      enabled: true
+                      existingClaim: erpnext-sites-rwx-v2
+
+                  mariadb:
+                    enabled: true
+
+                  mariadb-subchart:
+                    auth:
+                      database: frappe_bootstrap
+                      username: frappe_admin
+                    initdbScripts:
+                      00-create-frappe-admin.sql: |
+                        GRANT ALL PRIVILEGES ON *.* TO 'frappe_admin'@'%' WITH GRANT OPTION;
+                        FLUSH PRIVILEGES;
+                    primary:
+                      livenessProbe:
+                        enabled: false
+                      readinessProbe:
+                        enabled: false
+                      customReadinessProbe:
+                        initialDelaySeconds: 30
+                        periodSeconds: 10
+                        timeoutSeconds: 5
+                        failureThreshold: 6
+                        successThreshold: 1
+                        exec:
+                          command:
+                            - /bin/bash
+                            - -ec
+                            - >
+                              : > /dev/tcp/127.0.0.1/3306
+                      customLivenessProbe:
+                        initialDelaySeconds: 120
+                        periodSeconds: 10
+                        timeoutSeconds: 5
+                        failureThreshold: 6
+                        successThreshold: 1
+                        exec:
+                          command:
+                            - /bin/bash
+                            - -ec
+                            - >
+                              : > /dev/tcp/127.0.0.1/3306
+
+                  jobs:
+                    configure:
+                      args:
+                        - >
+                          mkdir -p sites/apps;
+                          ls -1 sites/apps > sites/apps.txt;
+                          [[ -f sites/common_site_config.json ]] || echo "{}" > sites/common_site_config.json;
+                          bench set-config -gp db_port $DB_PORT;
+                          bench set-config -g db_host $DB_HOST;
+                          bench set-config -g redis_cache $REDIS_CACHE;
+                          bench set-config -g redis_queue $REDIS_QUEUE;
+                          bench set-config -g redis_socketio $REDIS_QUEUE;
+                          bench set-config -gp socketio_port $SOCKETIO_PORT;
+                    createSite:
+                      enabled: false
+                    custom:
+                      enabled: true
+                      jobName: erpnext-bootstrap-helpdesk-v10
+                      restartPolicy: OnFailure
+                      containers:
+                        - name: bootstrap-helpdesk
+                          image: frappe/erpnext:v16.5.0
+                          imagePullPolicy: IfNotPresent
+                          command:
+                            - /bin/bash
+                            - -lc
+                          args:
+                            - |
+                              set -euo pipefail
+
+                              export SITE_NAME="helpdesk.quadtech.dev"
+                              export PYTHONPATH="/home/frappe/frappe-bench/sites/vendor:/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk''${PYTHONPATH:+:$PYTHONPATH}"
+                              site_config="/home/frappe/frappe-bench/sites/$SITE_NAME/site_config.json"
+
+                              until [ -f /home/frappe/frappe-bench/sites/common_site_config.json ]; do
+                                echo "Waiting for common_site_config.json"
+                                sleep 5
+                              done
+
+                              until (echo > /dev/tcp/"$DB_HOST"/"$DB_PORT") >/dev/null 2>&1; do
+                                echo "Waiting for MariaDB"
+                                sleep 5
+                              done
+
+                              sync_repo() {
+                                name="$1"
+                                url="$2"
+                                branch="$3"
+                                target="/home/frappe/frappe-bench/sites/apps/$name"
+
+                                if [ -d "$target/.git" ]; then
+                                  if git -C "$target" fetch --depth 1 origin "$branch"; then
+                                    git -C "$target" checkout -B "$branch" "origin/$branch"
+                                    git -C "$target" reset --hard "origin/$branch"
+                                  else
+                                    echo "Using existing $name checkout"
+                                  fi
+                                else
+                                  rm -rf "$target"
+                                  git clone --depth 1 --branch "$branch" "$url" "$target"
+                                fi
+                              }
+
+                              mkdir -p /home/frappe/frappe-bench/sites/apps
+                              mkdir -p /home/frappe/frappe-bench/sites/vendor
+                              sync_repo telephony https://github.com/frappe/telephony.git develop
+                              sync_repo helpdesk https://github.com/frappe/helpdesk.git main
+                              python -m pip install --no-cache-dir --upgrade --target /home/frappe/frappe-bench/sites/vendor twilio==8.5.0 textblob==0.18.0.post0
+                              printf '%s\n' frappe erpnext telephony helpdesk > /home/frappe/frappe-bench/sites/apps.txt
+
+                              wait_for_db_admin() {
+                                until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" --silent >/dev/null 2>&1; do
+                                  echo "Waiting for MariaDB admin access"
+                                  sleep 5
+                                done
+                              }
+
+                              wait_for_db_admin
+
+                              if [ ! -f "$site_config" ]; then
+                                bench new-site "$SITE_NAME" \
+                                  --no-mariadb-socket \
+                                  --db-type=mariadb \
+                                  --db-host="$DB_HOST" \
+                                  --db-port="$DB_PORT" \
+                                  --admin-password="admin123" \
+                                  --mariadb-root-username="$DB_ADMIN_USER" \
+                                  --mariadb-root-password="$DB_ADMIN_PASSWORD" \
+                                  --mariadb-user-host-login-scope=%
+                              fi
+
+                              eval "$(python - <<'PY'
+                              import json, shlex
+                              cfg = json.load(open('/home/frappe/frappe-bench/sites/helpdesk.quadtech.dev/site_config.json'))
+                              for key in ('db_name', 'db_password', 'db_user'):
+                                  print(f'{key.upper()}={shlex.quote(cfg[key])}')
+                              PY
+                              )"
+
+                              mysql -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" <<SQL
+                              CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                              CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
+                              ALTER USER '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
+                              GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%';
+                              FLUSH PRIVILEGES;
+                              SQL
+
+                              until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" --silent >/dev/null 2>&1; do
+                                echo "Waiting for site database credentials"
+                                sleep 5
+                              done
+
+                              if ! mysql -h "$DB_HOST" -P "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -D "$DB_NAME" -Nse "SHOW TABLES LIKE 'tabDefaultValue'" | grep -q tabDefaultValue; then
+                                bench new-site "$SITE_NAME" \
+                                  --force \
+                                  --db-name="$DB_NAME" \
+                                  --db-user="$DB_USER" \
+                                  --db-password="$DB_PASSWORD" \
+                                  --no-mariadb-socket \
+                                  --db-type=mariadb \
+                                  --db-host="$DB_HOST" \
+                                  --db-port="$DB_PORT" \
+                                  --admin-password="admin123" \
+                                  --mariadb-root-username="$DB_ADMIN_USER" \
+                                  --mariadb-root-password="$DB_ADMIN_PASSWORD" \
+                                  --mariadb-user-host-login-scope=%
+                              fi
+
+                              installed_apps="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
+                              case " $installed_apps " in
+                                *" telephony "*) ;;
+                                *) bench --site "$SITE_NAME" install-app --force telephony ;;
+                              esac
+                              installed_apps="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
+                              case " $installed_apps " in
+                                *" helpdesk "*) ;;
+                                *) bench --site "$SITE_NAME" install-app --force helpdesk ;;
+                              esac
+
+                              bench --site "$SITE_NAME" migrate
+                          env:
+                            - name: DB_HOST
+                              value: erpnext-mariadb-subchart
+                            - name: DB_PORT
+                              value: "3306"
+                            - name: DB_ADMIN_USER
+                              value: frappe_admin
+                            - name: DB_ADMIN_PASSWORD
+                              valueFrom:
+                                secretKeyRef:
+                                  name: erpnext-mariadb-subchart
+                                  key: mariadb-password
+                          volumeMounts:
+                            - name: sites-dir
+                              mountPath: /home/frappe/frappe-bench/sites
+                            - name: logs
+                              mountPath: /home/frappe/frappe-bench/logs
+                      volumes:
+                        - name: sites-dir
+                          persistentVolumeClaim:
+                            claimName: erpnext-sites-rwx-v2
+                        - name: logs
+                          emptyDir: {}
+
+                  worker:
+                    gunicorn:
+                      envVars: &helpdeskEnv
+                        - name: PYTHONPATH
+                          value: &helpdeskPythonPath /home/frappe/frappe-bench/sites/vendor:/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk
+                      initContainers: &waitForHelpdeskApps
+                        - name: wait-for-helpdesk-apps
+                          image: frappe/erpnext:v16.5.0
+                          imagePullPolicy: IfNotPresent
+                          command:
+                            - /bin/bash
+                            - -lc
+                          args:
+                            - |
+                              set -euo pipefail
+                              until [ -f /home/frappe/frappe-bench/sites/apps/helpdesk/helpdesk/__init__.py ] && [ -f /home/frappe/frappe-bench/sites/apps/telephony/telephony/__init__.py ]; do
+                                echo "Waiting for persisted Helpdesk apps"
+                                sleep 5
+                              done
+                          volumeMounts:
+                            - name: sites-dir
+                              mountPath: /home/frappe/frappe-bench/sites
+                    scheduler:
+                      envVars: *helpdeskEnv
+                      initContainers: *waitForHelpdeskApps
+                    default:
+                      envVars: *helpdeskEnv
+                      initContainers: *waitForHelpdeskApps
+                    short:
+                      envVars: *helpdeskEnv
+                      initContainers: *waitForHelpdeskApps
+                    long:
+                      envVars: *helpdeskEnv
+                      initContainers: *waitForHelpdeskApps
+
+                  socketio:
+                    envVars: *helpdeskEnv
+                    initContainers: *waitForHelpdeskApps
             destination:
               server: https://kubernetes.default.svc
               namespace: erpnext
