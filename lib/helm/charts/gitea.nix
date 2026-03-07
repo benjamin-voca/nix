@@ -118,6 +118,7 @@
             DISABLE_SSH = false;
             START_SSH_SERVER = true;
             SSH_LISTEN_PORT = 22;
+            SSH_SERVER_HOST_KEYS = "ssh/gitea.rsa,ssh/gitea.ed25519";
           };
           ssh = {
             create = true;
@@ -218,6 +219,52 @@
 
       containerSecurityContext = { };
 
+      # Generate SSH host keys on first startup and persist them
+      preExtraInitContainers = [
+        {
+          name = "ssh-host-keys";
+          image = "gitea/gitea:1.25.4";
+          command = [ "sh" "-c" ];
+          args = [''
+            echo "Checking for SSH host keys in /data/gitea/ssh..."
+            mkdir -p /data/gitea/ssh
+            mkdir -p /etc/ssh
+            if [ ! -f /data/gitea/ssh/gitea.rsa ]; then
+              echo "Generating new SSH host keys..."
+              ssh-keygen -t rsa -b 4096 -f /data/gitea/ssh/gitea.rsa -N "" -C "gitea@quadtech.dev"
+              ssh-keygen -t ed25519 -f /data/gitea/ssh/gitea.ed25519 -N "" -C "gitea@quadtech.dev"
+              echo "SSH host keys generated"
+            else
+              echo "Using existing SSH host keys from persistent storage"
+            fi
+            echo "Copying SSH host keys to /etc/ssh..."
+            cp /data/gitea/ssh/gitea.rsa /etc/ssh/ssh_host_rsa_key
+            cp /data/gitea/ssh/gitea.rsa.pub /etc/ssh/ssh_host_rsa_key.pub
+            cp /data/gitea/ssh/gitea.ed25519 /etc/ssh/ssh_host_ed25519_key
+            cp /data/gitea/ssh/gitea.ed25519.pub /etc/ssh/ssh_host_ed25519_key.pub
+            chmod 600 /etc/ssh/ssh_host_*
+            chmod 644 /etc/ssh/ssh_host_*.pub
+            ls -la /etc/ssh/
+            ls -la /data/gitea/ssh/
+            echo "Done"
+          ''];
+          volumeMounts = [
+            {
+              name = "data";
+              mountPath = "/data";
+            }
+          ];
+          resources = {
+            requests = { cpu = "10m"; memory = "16Mi"; };
+            limits = { cpu = "100m"; memory = "64Mi"; };
+          };
+          securityContext = {
+            runAsUser = 0;
+            runAsGroup = 0;
+          };
+        }
+      ];
+
       # Use postExtraInitContainers which is supported by the Gitea chart
       # Wait for app.ini to be created and copy to /etc/gitea for SSH hooks
       postExtraInitContainers = [
@@ -258,9 +305,11 @@
             chown -R 1000:1000 /data
             chmod -R 755 /data
             # Fix SSH keys specifically - they must be readable by git user
-            chown -R 1000:1000 /data/ssh
-            chmod 600 /data/ssh/*
-            chmod 644 /data/ssh/*.pub 2>/dev/null || true
+            if [ -d /data/gitea/ssh ]; then
+              chown -R 1000:1000 /data/gitea/ssh
+              chmod 600 /data/gitea/ssh/*
+              chmod 644 /data/gitea/ssh/*.pub 2>/dev/null || true
+            fi
             # Fix git user ssh directory
             if [ -d /data/git ]; then
               chown -R 1000:1000 /data/git
@@ -273,7 +322,7 @@
             mkdir -p /etc/gitea
             cp /data/gitea/conf/app.ini /etc/gitea/app.ini
             chown -R 1000:1000 /etc/gitea
-            ls -la /data/ssh/
+            ls -la /data/gitea/ssh/ 2>/dev/null || true
             echo "Done"
           ''];
           volumeMounts = [

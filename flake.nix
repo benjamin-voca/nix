@@ -559,6 +559,108 @@
                   persistentVolumeClaim:
                     claimName: erpnext-sites-rwx-v2
 
+          # ERPNext bootstrap helpdesk job
+          ---
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: erpnext-bootstrap-helpdesk
+            namespace: erpnext
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                - name: bootstrap-helpdesk
+                  image: frappe/erpnext:v16.5.0
+                  command:
+                  - /bin/bash
+                  - -lc
+                  args:
+                  - |
+                    set -euo pipefail
+
+                    export SITE_NAME="helpdesk.quadtech.dev"
+                    export PYTHONPATH="/home/frappe/frappe-bench/sites/vendor:/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk''${PYTHONPATH:+:$PYTHONPATH}"
+
+                    mkdir -p /home/frappe/frappe-bench/sites/apps
+                    mkdir -p /home/frappe/frappe-bench/sites/vendor
+
+                    sync_repo() {
+                      name="$1"
+                      url="$2"
+                      branch="$3"
+                      target="/home/frappe/frappe-bench/sites/apps/$name"
+
+                      if [ -d "$target/.git" ]; then
+                        if git -C "$target" fetch --depth 1 origin "$branch"; then
+                          git -C "$target" checkout -B "$branch" "origin/$branch"
+                          git -C "$target" reset --hard "origin/$branch"
+                        fi
+                      else
+                        rm -rf "$target"
+                        git clone --depth 1 --branch "$branch" "$url" "$target"
+                      fi
+                    }
+
+                    sync_repo telephony https://github.com/frappe/telephony.git develop
+                    sync_repo helpdesk https://github.com/frappe/helpdesk.git main
+                    /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir twilio textblob
+                    printf '%s\n' frappe erpnext telephony helpdesk > /home/frappe/frappe-bench/sites/apps.txt
+
+                    export DB_HOST="erpnext-mariadb-subchart"
+                    export DB_PORT="3306"
+                    export DB_ADMIN_USER="frappe_admin"
+                    export DB_ADMIN_PASSWORD="9mZw4cl1SC"
+
+                    wait_for_db_admin() {
+                      until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" --silent >/dev/null 2>&1; do
+                        echo "Waiting for MariaDB admin access"
+                        sleep 5
+                      done
+                    }
+
+                    wait_for_db_admin
+
+                    bench new-site "$SITE_NAME" \
+                      --no-mariadb-socket \
+                      --db-type=mariadb \
+                      --db-host="$DB_HOST" \
+                      --db-port="$DB_PORT" \
+                      --admin-password="admin123" \
+                      --mariadb-root-username="$DB_ADMIN_USER" \
+                      --mariadb-root-password="$DB_ADMIN_PASSWORD" \
+                      --mariadb-user-host-login-scope=% \
+                      --force || true
+
+                    export PYTHONPATH="/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk:$PYTHONPATH"
+
+                    bench --site "$SITE_NAME" install-app --force telephony || true
+                    bench --site "$SITE_NAME" install-app --force helpdesk || true
+
+                    bench --site "$SITE_NAME" migrate || true
+                  env:
+                  - name: DB_HOST
+                    value: erpnext-mariadb-subchart
+                  - name: DB_PORT
+                    value: "3306"
+                  - name: DB_ADMIN_USER
+                    value: frappe_admin
+                  - name: DB_ADMIN_PASSWORD
+                    value: "9mZw4cl1SC"
+                  volumeMounts:
+                  - name: sites-dir
+                    mountPath: /home/frappe/frappe-bench/sites
+                  - name: logs
+                    mountPath: /home/frappe/frappe-bench/logs
+                volumes:
+                - name: sites-dir
+                  persistentVolumeClaim:
+                    claimName: erpnext-sites-rwx-v2
+                - name: logs
+                  emptyDir: {}
+
           # ArgoCD Application - In-cluster NFS provisioner
           ---
           apiVersion: argoproj.io/v1alpha1
@@ -751,7 +853,11 @@
                       }
 
                   persistence:
+                    enabled: true
                     worker:
+                      enabled: true
+                      existingClaim: erpnext-sites-rwx-v2
+                    sites:
                       enabled: true
                       existingClaim: erpnext-sites-rwx-v2
 
@@ -863,7 +969,7 @@
                               mkdir -p /home/frappe/frappe-bench/sites/vendor
                               sync_repo telephony https://github.com/frappe/telephony.git develop
                               sync_repo helpdesk https://github.com/frappe/helpdesk.git main
-                              python -m pip install --no-cache-dir --upgrade --target /home/frappe/frappe-bench/sites/vendor twilio==8.5.0 textblob==0.18.0.post0
+                              /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir twilio textblob
                               printf '%s\n' frappe erpnext telephony helpdesk > /home/frappe/frappe-bench/sites/apps.txt
 
                               wait_for_db_admin() {
@@ -875,65 +981,21 @@
 
                               wait_for_db_admin
 
-                              if [ ! -f "$site_config" ]; then
-                                bench new-site "$SITE_NAME" \
-                                  --no-mariadb-socket \
-                                  --db-type=mariadb \
-                                  --db-host="$DB_HOST" \
-                                  --db-port="$DB_PORT" \
-                                  --admin-password="admin123" \
-                                  --mariadb-root-username="$DB_ADMIN_USER" \
-                                  --mariadb-root-password="$DB_ADMIN_PASSWORD" \
-                                  --mariadb-user-host-login-scope=%
-                              fi
+                              bench new-site "$SITE_NAME" \
+                                --no-mariadb-socket \
+                                --db-type=mariadb \
+                                --db-host="$DB_HOST" \
+                                --db-port="$DB_PORT" \
+                                --admin-password="admin123" \
+                                --mariadb-root-username="$DB_ADMIN_USER" \
+                                --mariadb-root-password="$DB_ADMIN_PASSWORD" \
+                                --mariadb-user-host-login-scope=% \
+                                --force
 
-                              eval "$(python - <<'PY'
-                              import json, shlex
-                              cfg = json.load(open('/home/frappe/frappe-bench/sites/helpdesk.quadtech.dev/site_config.json'))
-                              for key in ('db_name', 'db_password', 'db_user'):
-                                  print(f'{key.upper()}={shlex.quote(cfg[key])}')
-                              PY
-                              )"
+                              export PYTHONPATH="/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk:$PYTHONPATH"
 
-                              mysql -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" <<SQL
-                              CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-                              CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
-                              ALTER USER '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
-                              GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%';
-                              FLUSH PRIVILEGES;
-                              SQL
-
-                              until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" --silent >/dev/null 2>&1; do
-                                echo "Waiting for site database credentials"
-                                sleep 5
-                              done
-
-                              if ! mysql -h "$DB_HOST" -P "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" -D "$DB_NAME" -Nse "SHOW TABLES LIKE 'tabDefaultValue'" | grep -q tabDefaultValue; then
-                                bench new-site "$SITE_NAME" \
-                                  --force \
-                                  --db-name="$DB_NAME" \
-                                  --db-user="$DB_USER" \
-                                  --db-password="$DB_PASSWORD" \
-                                  --no-mariadb-socket \
-                                  --db-type=mariadb \
-                                  --db-host="$DB_HOST" \
-                                  --db-port="$DB_PORT" \
-                                  --admin-password="admin123" \
-                                  --mariadb-root-username="$DB_ADMIN_USER" \
-                                  --mariadb-root-password="$DB_ADMIN_PASSWORD" \
-                                  --mariadb-user-host-login-scope=%
-                              fi
-
-                              installed_apps="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
-                              case " $installed_apps " in
-                                *" telephony "*) ;;
-                                *) bench --site "$SITE_NAME" install-app --force telephony ;;
-                              esac
-                              installed_apps="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
-                              case " $installed_apps " in
-                                *" helpdesk "*) ;;
-                                *) bench --site "$SITE_NAME" install-app --force helpdesk ;;
-                              esac
+                              bench --site "$SITE_NAME" install-app --force telephony || true
+                              bench --site "$SITE_NAME" install-app --force helpdesk || true
 
                               bench --site "$SITE_NAME" migrate
                           env:
@@ -947,7 +1009,7 @@
                               valueFrom:
                                 secretKeyRef:
                                   name: erpnext-mariadb-subchart
-                                  key: mariadb-password
+                                  key: mariadb-root-password
                           volumeMounts:
                             - name: sites-dir
                               mountPath: /home/frappe/frappe-bench/sites

@@ -29,6 +29,7 @@ in
             "nginx.ingress.kubernetes.io/proxy-body-size" = "0";
             "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
             "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP";
+            "kubernetes.io/ingress.class" = "nginx";
           };
         };
       };
