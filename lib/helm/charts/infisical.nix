@@ -5,7 +5,6 @@ let
     repo = "https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/";
     chart = "infisical-standalone";
     version = "1.7.2";
-    chartHash = "sha256:-placeholder";
   };
 in
 {

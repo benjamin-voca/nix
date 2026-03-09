@@ -39,27 +39,30 @@ in
 
           echo "Deploying Infisical..."
             DB_PASSWORD=$(cat /run/secrets/infisical-db-password)
-           ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
-           AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
+            ENCRYPTION_KEY=$(cat /run/secrets/infisical-encryption-key)
+            AUTH_SECRET=$(cat /run/secrets/infisical-auth-secret)
 
-            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical \
+            ${pkgs.kubernetes-helm}/bin/helm upgrade --install infisical infisical/infisical-standalone \
               --namespace infisical \
-              --version 0.1.17 \
+              --version 1.7.2 \
+              --set infisical.image.tag=v0.158.7 \
+              --set infisical.replicaCount=1 \
+              --set infisical.kubeSecretRef=infisical-secrets \
               --set global.domain=infisical.quadtech.dev \
-              --set global.encryptionKey="$ENCRYPTION_KEY" \
-              --set global.authJwtSecret="$AUTH_SECRET" \
               --set ingress.enabled=true \
-              --set ingress.className=nginx \
-              --set ingress.hosts[0].host=infisical.quadtech.dev \
-              --set ingress.hosts[0].paths[0].path=/ \
-              --set ingress.hosts[0].paths[0].pathType=Prefix \
-              --set ingress-nginx.enabled=false \
-              --set ingressClass.enabled=false \
-              --set ingressClass.create=false \
-              --wait --timeout 5m || true
+              --set ingress.hostName=infisical.quadtech.dev \
+              --set ingress.ingressClassName=nginx \
+              --set ingress.nginx.enabled=false \
+              --set postgresql.enabled=false \
+              --set postgresql.useExistingPostgresSecret.enabled=true \
+              --set postgresql.useExistingPostgresSecret.existingConnectionStringSecret.name=infisical-secrets \
+              --set postgresql.useExistingPostgresSecret.existingConnectionStringSecret.key=DB_CONNECTION_URI \
+              --set redis.enabled=false \
+              --wait --timeout 10m || true
 
             $kubectl create secret generic infisical-secrets \
-              --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+              --from-literal=DB_CONNECTION_URI="postgresql://infisical:$DB_PASSWORD@infisical-db-rw.infisical.svc.cluster.local:5432/infisical" \
+              --from-literal=REDIS_URL="redis://redis-master.default.svc.cluster.local:6379" \
               --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
               --from-literal=AUTH_SECRET="$AUTH_SECRET" \
               -n infisical || true
