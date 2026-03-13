@@ -43,7 +43,7 @@ in
       };
 
       redis = {
-        enabled = false;
+        enabled = true;
       };
     };
   };

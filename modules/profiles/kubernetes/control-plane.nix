@@ -42,6 +42,8 @@ in
     pki.cfsslAPIExtraSANs = [
       config.networking.hostName
       config.networking.fqdn
+      "localhost"
+      "127.0.0.1"
     ];
     apiserver.extraOpts = "--allow-privileged=true";
   };

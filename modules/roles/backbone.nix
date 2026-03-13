@@ -20,6 +20,7 @@
     nfs-utils
     apacheHttpd  # For htpasswd utility
     openssl
+    procps  # For pkill command used by cloudflared scripts
   ];
 
   services.openiscsi = {
@@ -255,7 +256,7 @@
       sleep 2
     done
     
-    # Write cloudflared config - use host IP (192.168.1.15) with NodePorts
+    # Write cloudflared config - use localhost with NodePorts
     cat > /etc/cloudflared/config/config.yaml << 'EOF'
 tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
 credentials-file: /etc/cloudflared/creds/credentials.json
@@ -266,13 +267,15 @@ ingress:
   - hostname: backbone-01.quadtech.dev
     service: ssh://localhost:22
   - hostname: gitea-ssh.quadtech.dev
-    service: tcp://192.168.1.15:32222
+    service: tcp://localhost:32222
   - hostname: gitea.quadtech.dev
-    service: http://192.168.1.15:30856
+    service: http://localhost:30856
   - hostname: argocd.quadtech.dev
-    service: http://192.168.1.15:30856
+    service: http://localhost:30856
   - hostname: harbor.quadtech.dev
-    service: http://192.168.1.15:30856
+    service: http://localhost:30856
+  - hostname: infisical.quadtech.dev
+    service: http://localhost:30856
   - service: http_status:404
 EOF
     
