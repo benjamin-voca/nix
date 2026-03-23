@@ -898,6 +898,8 @@ spec:
         value: "true"
       - name: expose.tls.certSource
         value: auto
+      - name: expose.ingress.enabled
+        value: "false"
       - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/ssl-redirect
         value: "false"
       - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/backend-protocol
@@ -947,6 +949,80 @@ spec:
     automated:
       prune: true
       selfHeal: true
+EOF
+
+        # Create custom Ingress for Harbor (Harbor chart generates incorrect ingress for /v2/)
+        # The chart routes /v2/ to harbor-core:80, but docker auth requires harbor-registry:5000
+        cat > $out/12-harbor-ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbor-ingress
+  namespace: harbor
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - harbor.quadtech.dev
+    secretName: harbor-ingress
+  rules:
+  - host: harbor.quadtech.dev
+    http:
+      paths:
+      - path: /api/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      - path: /service/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      - path: /v2/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-registry
+            port:
+              number: 5000
+      - path: /c/
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-core
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: harbor-portal
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbor-ingress-tls
+  namespace: harbor
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - harbor.quadtech.dev
+    secretName: harbor-ingress
 EOF
 
         # Create ArgoCD Application for Verdaccio
@@ -1092,6 +1168,8 @@ EOF
         cat $out/10-longhorn-argocd-app.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/11-harbor-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12-harbor-ingress.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

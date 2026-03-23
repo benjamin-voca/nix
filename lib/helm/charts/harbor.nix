@@ -16,6 +16,7 @@ in
     values = {
       expose = {
         type = "ingress";
+        enabled = false;
         tls = {
           enabled = true;
           certSource = "auto";
