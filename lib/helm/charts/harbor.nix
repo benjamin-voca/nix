@@ -77,6 +77,9 @@ in
 
       core = {
         replicas = 1;
+        autoredirect = {
+          enabled = false;
+        };
         env = [
           {
             name = "EXT_PUBLIC_URL";

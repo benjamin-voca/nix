@@ -205,6 +205,14 @@ let
             service = "http://192.168.1.240:80";
           }
           {
+            hostname = "educourses-pd.com";
+            service = "http://192.168.1.240:80";
+          }
+          {
+            hostname = "www.educourses-pd.com";
+            service = "http://192.168.1.240:80";
+          }
+          {
             hostname = "verdaccio.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
@@ -890,6 +898,12 @@ spec:
         value: "true"
       - name: expose.tls.certSource
         value: auto
+      - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/ssl-redirect
+        value: "false"
+      - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/backend-protocol
+        value: HTTP
+      - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-body-size
+        value: "0"
       - name: externalURL
         value: https://harbor.quadtech.dev
       - name: persistence.enabled
@@ -914,6 +928,8 @@ spec:
         value: "1"
       - name: core.replicas
         value: "1"
+      - name: core.autoredirect.enabled
+        value: "false"
       - name: jobservice.replicas
         value: "1"
       - name: registry.replicas

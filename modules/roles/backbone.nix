@@ -149,6 +149,10 @@
     22 443 6443
   ];
 
+  networking.hosts."192.168.1.240" = [
+    "harbor.quadtech.dev"
+  ];
+
     sops.secrets = {
       cloudflared-credentials = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
@@ -204,7 +208,7 @@
   };
 
    services.quadnix.infisical-deploy = {
-     enable = true;
+     enable = false;
    };
 
    services.quadnix.verdaccio-deploy = {
@@ -274,6 +278,10 @@ ingress:
     service: http://localhost:30856
   - hostname: harbor.quadtech.dev
     service: http://localhost:30856
+  - hostname: educourses-pd.com
+    service: http://localhost:30856
+  - hostname: www.educourses-pd.com
+    service: http://localhost:30856
   - hostname: infisical.quadtech.dev
     service: http://localhost:30856
   - service: http_status:404
@@ -334,5 +342,3 @@ EOF
     fi
   '';
 }
-
-
