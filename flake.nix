@@ -196,6 +196,11 @@
           kind: Namespace
           metadata:
             name: nfs-rwx
+          ---
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: quadpacient
 
           # MetalLB CRDs
           ---
@@ -1063,6 +1068,27 @@
             destination:
               server: https://kubernetes.default.svc
               namespace: erpnext
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+          # ArgoCD Application - QuadPacienti
+          ---
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: quadpacient
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              repoURL: https://gitea.quadtech.dev/QuadCoreTech/QuadPacienti.git
+              targetRevision: HEAD
+              path: k8s
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: quadpacient
             syncPolicy:
               automated:
                 prune: true
