@@ -1184,7 +1184,11 @@ data:
           "mode": "token"
         },
         "controlUi": {
-          "enabled": true
+          "enabled": true,
+          "allowedOrigins": [
+            "https://openclaw.quadtech.dev",
+            "http://openclaw.quadtech.dev"
+          ]
         }
       },
       "agents": {
