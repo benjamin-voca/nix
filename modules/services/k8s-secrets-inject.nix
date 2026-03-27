@@ -103,13 +103,17 @@ in
           fi
 
           # OpenClaw secrets
-          if [ -f /run/secrets/openclaw-gateway-token ] && [ -f /run/secrets/openclaw-minimax-api-key ]; then
+          if [ -f /run/secrets/openclaw-gateway-token ]; then
             OC_TOKEN=$(cat /run/secrets/openclaw-gateway-token)
-            OC_API_KEY=$(cat /run/secrets/openclaw-minimax-api-key)
+            OC_ARGS="--from-literal=OPENCLAW_GATEWAY_TOKEN=$OC_TOKEN"
+            if [ -f /run/secrets/openclaw-minimax-api-key ]; then
+              OC_API_KEY=$(cat /run/secrets/openclaw-minimax-api-key)
+              OC_ARGS="$OC_ARGS --from-literal=MINIMAX_API_KEY=$OC_API_KEY"
+            fi
+            # shellcheck disable=SC2086
             $kubectl create secret generic openclaw-secrets \
               --namespace=openclaw \
-              --from-literal=GATEWAY_TOKEN="$OC_TOKEN" \
-              --from-literal=MINIMAX_API_KEY="$OC_API_KEY" \
+              $OC_ARGS \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected openclaw-secrets"
           fi

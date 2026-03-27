@@ -1176,17 +1176,34 @@ metadata:
 data:
   openclaw.json: |
     {
-      "server": {
-        "host": "0.0.0.0",
-        "port": 18789
-      },
       "gateway": {
-        "enabled": true
-      }
+        "mode": "local",
+        "bind": "0.0.0.0",
+        "port": 18789,
+        "auth": {
+          "mode": "token"
+        },
+        "controlUi": {
+          "enabled": true
+        }
+      },
+      "agents": {
+        "defaults": {
+          "workspace": "~/.openclaw/workspace"
+        },
+        "list": [
+          {
+            "id": "default",
+            "name": "OpenClaw Assistant",
+            "workspace": "~/.openclaw/workspace"
+          }
+        ]
+      },
+      "cron": { "enabled": false }
     }
   AGENTS.md: |
-    ## OpenClaw Agent Configuration
-    # Add agent definitions here
+    ## OpenClaw Assistant
+    You are a helpful AI assistant running in Kubernetes.
 EOF
 
         # Create OpenClaw Deployment
@@ -1203,79 +1220,123 @@ spec:
   selector:
     matchLabels:
       app: openclaw
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
         app: openclaw
     spec:
+      automountServiceAccountToken: false
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: init-config
+        image: busybox:1.37
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - |
+          cp /config/openclaw.json /home/node/.openclaw/openclaw.json
+          mkdir -p /home/node/.openclaw/workspace
+          cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+        resources:
+          requests:
+            memory: 32Mi
+            cpu: 50m
+          limits:
+            memory: 64Mi
+            cpu: 100m
+        volumeMounts:
+        - name: openclaw-home
+          mountPath: /home/node/.openclaw
+        - name: config
+          mountPath: /config
       containers:
-      - name: openclaw
-        image: ghcr.io/openclaw/openclaw:latest
+      - name: gateway
+        image: ghcr.io/openclaw/openclaw:slim
+        imagePullPolicy: IfNotPresent
+        command:
+        - node
+        - /app/dist/index.js
+        - gateway
+        - run
         ports:
-        - containerPort: 18789
+        - name: gateway
+          containerPort: 18789
+          protocol: TCP
         env:
-        - name: GATEWAY_TOKEN
+        - name: HOME
+          value: /home/node
+        - name: OPENCLAW_CONFIG_DIR
+          value: /home/node/.openclaw
+        - name: NODE_ENV
+          value: production
+        - name: OPENCLAW_GATEWAY_TOKEN
           valueFrom:
             secretKeyRef:
               name: openclaw-secrets
-              key: GATEWAY_TOKEN
+              key: OPENCLAW_GATEWAY_TOKEN
         - name: MINIMAX_API_KEY
           valueFrom:
             secretKeyRef:
               name: openclaw-secrets
               key: MINIMAX_API_KEY
-        - name: HOST
-          value: "0.0.0.0"
-        - name: PORT
-          value: "18789"
-        volumeMounts:
-        - name: data
-          mountPath: /data
-        - name: config
-          mountPath: /app/openclaw.json
-          subPath: openclaw.json
-          readOnly: true
-        - name: agents
-          mountPath: /app/AGENTS.md
-          subPath: AGENTS.md
-          readOnly: true
+              optional: true
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
+            memory: 512Mi
+            cpu: 250m
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            memory: 2Gi
+            cpu: "1"
         livenessProbe:
-          httpGet:
-            path: /health
-            port: 18789
-          initialDelaySeconds: 15
+          exec:
+            command:
+            - node
+            - -e
+            - "require('http').get('http://127.0.0.1:18789/healthz', r => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
+          initialDelaySeconds: 60
           periodSeconds: 30
+          timeoutSeconds: 10
         readinessProbe:
-          httpGet:
-            path: /health
-            port: 18789
-          initialDelaySeconds: 5
+          exec:
+            command:
+            - node
+            - -e
+            - "require('http').get('http://127.0.0.1:18789/readyz', r => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
+          initialDelaySeconds: 15
           periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: openclaw-home
+          mountPath: /home/node/.openclaw
+        - name: tmp-volume
+          mountPath: /tmp
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
       volumes:
-      - name: data
+      - name: openclaw-home
         persistentVolumeClaim:
           claimName: openclaw-data
       - name: config
         configMap:
           name: openclaw-config
-      - name: agents
-        configMap:
-          name: openclaw-config
-          items:
-          - key: AGENTS.md
-            path: AGENTS.md
+      - name: tmp-volume
+        emptyDir: {}
 EOF
 
         # Create OpenClaw Service
