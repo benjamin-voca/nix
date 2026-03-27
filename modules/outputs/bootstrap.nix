@@ -1178,7 +1178,7 @@ data:
     {
       "gateway": {
         "mode": "local",
-        "bind": "0.0.0.0",
+        "bind": "lan",
         "port": 18789,
         "auth": {
           "mode": "token"
