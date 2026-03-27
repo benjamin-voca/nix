@@ -14,7 +14,6 @@ in
         name = "k8s-secrets-inject";
         text = ''
           #!/bin/bash
-          set -e
           export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
           kubectl="${pkgs.kubectl}/bin/kubectl"
 
@@ -22,6 +21,11 @@ in
           until $kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
             echo "Waiting for Kubernetes API..."
             sleep 5
+          done
+
+          # Ensure namespaces exist before injecting secrets
+          for ns in harbor cnpg-system minecraft erpnext openclaw quadpacienti; do
+            $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
           # Harbor admin password
