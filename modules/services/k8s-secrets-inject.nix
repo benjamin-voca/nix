@@ -47,7 +47,6 @@ in
           # Harbor docker config for quadpacienti namespace
           if [ -f /run/secrets/harbor-admin-password ]; then
             HARBOR_PW=$(cat /run/secrets/harbor-admin-password)
-            DOCKER_AUTH=$(printf 'admin:%s' "$HARBOR_PW" | base64)
             $kubectl create secret docker-registry harbor-registry \
               --namespace=quadpacienti \
               --docker-server=harbor.quadtech.dev \
