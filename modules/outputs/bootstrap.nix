@@ -1177,7 +1177,7 @@ data:
   openclaw.json: |
     {
       "gateway": {
-        "mode": "local",
+        "mode": "remote",
         "bind": "lan",
         "port": 18789,
         "auth": {
