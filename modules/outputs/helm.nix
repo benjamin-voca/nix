@@ -34,7 +34,7 @@ let
               "server.insecure" = true;
             };
             secret = {
-              argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+              argocdServerAdminPassword = "PLACEHOLDER";
             };
           };
 

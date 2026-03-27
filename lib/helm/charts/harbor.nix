@@ -14,6 +14,8 @@ in
     inherit chart;
     namespace = "harbor";
     values = {
+      harborAdminPassword = "PLACEHOLDER";
+
       expose = {
         type = "ingress";
         enabled = false;
@@ -99,6 +101,11 @@ in
 
       registry = {
         replicas = 1;
+        credentials = {
+          username = "harbor_registry_user";
+          password = "PLACEHOLDER";
+          htpasswdString = "$2y$05$U.haVkY0IczOsQ46qpFH.eleok5nmZG/8fKQZw6.0UWRKBKrFtZ4G";
+        };
       };
 
       trivy = {

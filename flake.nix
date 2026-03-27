@@ -77,7 +77,7 @@
                   "server.insecure" = true;
                 };
                 secret = {
-                  argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+                  argocdServerAdminPassword = "PLACEHOLDER";
                 };
               };
 
@@ -617,7 +617,7 @@
                     export DB_HOST="erpnext-mariadb-subchart"
                     export DB_PORT="3306"
                     export DB_ADMIN_USER="frappe_admin"
-                    export DB_ADMIN_PASSWORD="9mZw4cl1SC"
+                    export DB_ADMIN_PASSWORD="$DB_ADMIN_PASSWORD"
 
                     wait_for_db_admin() {
                       until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" --silent >/dev/null 2>&1; do
@@ -633,7 +633,7 @@
                       --db-type=mariadb \
                       --db-host="$DB_HOST" \
                       --db-port="$DB_PORT" \
-                      --admin-password="admin123" \
+                      --admin-password="$ERPNEXT_ADMIN_PASSWORD" \
                       --mariadb-root-username="$DB_ADMIN_USER" \
                       --mariadb-root-password="$DB_ADMIN_PASSWORD" \
                       --mariadb-user-host-login-scope=% \
@@ -653,7 +653,15 @@
                   - name: DB_ADMIN_USER
                     value: frappe_admin
                   - name: DB_ADMIN_PASSWORD
-                    value: "9mZw4cl1SC"
+                    valueFrom:
+                      secretKeyRef:
+                        name: erpnext-mariadb-subchart
+                        key: mariadb-root-password
+                  - name: ERPNEXT_ADMIN_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: erpnext-admin
+                        key: password
                   volumeMounts:
                   - name: sites-dir
                     mountPath: /home/frappe/frappe-bench/sites
@@ -991,7 +999,7 @@
                                 --db-type=mariadb \
                                 --db-host="$DB_HOST" \
                                 --db-port="$DB_PORT" \
-                                --admin-password="admin123" \
+                                --admin-password="$ERPNEXT_ADMIN_PASSWORD" \
                                 --mariadb-root-username="$DB_ADMIN_USER" \
                                 --mariadb-root-password="$DB_ADMIN_PASSWORD" \
                                 --mariadb-user-host-login-scope=% \
@@ -1015,6 +1023,11 @@
                                 secretKeyRef:
                                   name: erpnext-mariadb-subchart
                                   key: mariadb-root-password
+                            - name: ERPNEXT_ADMIN_PASSWORD
+                              valueFrom:
+                                secretKeyRef:
+                                  name: erpnext-admin
+                                  key: password
                           volumeMounts:
                             - name: sites-dir
                               mountPath: /home/frappe/frappe-bench/sites

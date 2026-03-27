@@ -73,8 +73,8 @@ let
        rm "$CONFIG_FILE"
        
        # Create htpasswd file with admin user
-       # Generate Apache md5 hash for admin:adminpass123
-       ADMIN_HASH=$(${pkgs.apacheHttpd}/bin/htpasswd -nbB admin adminpass123 2>/dev/null | cut -d: -f2)
+       ADMIN_PASSWORD=$(cat /run/secrets/verdaccio-admin-password)
+       ADMIN_HASH=$(${pkgs.apacheHttpd}/bin/htpasswd -nbB admin "$ADMIN_PASSWORD" 2>/dev/null | cut -d: -f2)
        
        HTPASSWD_FILE=$(mktemp)
        echo "admin:$ADMIN_HASH" > "$HTPASSWD_FILE"
@@ -118,7 +118,7 @@ let
       
       echo "Verdaccio deployed successfully!"
       echo "Admin username: admin"
-      echo "Admin password: adminpass123"
+      echo "Admin password: read from /run/secrets/verdaccio-admin-password"
     '';
   };
 

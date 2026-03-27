@@ -151,7 +151,7 @@ let
                 "server.forceHttp" = true;
               };
               secret = {
-                argocdServerAdminPassword = "$2a$10$bX.6MmE5x1n.KlTA./3ax.xXzgP5CzLu1CyFyvMnEeh.vN9tDVVLC";
+                argocdServerAdminPassword = "PLACEHOLDER";
               };
             };
             server = {
@@ -230,6 +230,10 @@ let
           }
           {
             hostname = "quadpacienti.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
+            hostname = "openclaw.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
           {
@@ -497,7 +501,7 @@ metadata:
 type: Opaque
 stringData:
   username: edukurs
-  password: edukurs-password
+  password: PLACEHOLDER
   dbname: edukurs
 ---
 apiVersion: postgresql.cnpg.io/v1
@@ -908,6 +912,8 @@ spec:
         value: "0"
       - name: externalURL
         value: https://harbor.quadtech.dev
+      - name: harborAdminPassword
+        value: PLACEHOLDER
       - name: persistence.enabled
         value: "true"
       - name: persistence.resourcePolicy
@@ -936,6 +942,12 @@ spec:
         value: "1"
       - name: registry.replicas
         value: "1"
+      - name: registry.credentials.username
+        value: harbor_registry_user
+      - name: registry.credentials.password
+        value: PLACEHOLDER
+      - name: registry.credentials.htpasswdString
+        value: $2y$05$U.haVkY0IczOsQ46qpFH.eleok5nmZG/8fKQZw6.0UWRKBKrFtZ4G
       - name: trivy.enabled
         value: "true"
       - name: notary.enabled
@@ -951,8 +963,8 @@ spec:
       selfHeal: true
 EOF
 
-        # Create custom Ingress for Harbor (Harbor chart generates incorrect ingress for /v2/)
-        # The chart routes /v2/ to harbor-core:80, but docker auth requires harbor-registry:5000
+        # Create custom Ingress for Harbor
+        # /v2/ must go through harbor-core for token-based Docker auth
         cat > $out/12-harbor-ingress.yaml << 'EOF'
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -992,9 +1004,9 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: harbor-registry
+            name: harbor-core
             port:
-              number: 5000
+              number: 80
       - path: /c/
         pathType: Prefix
         backend:
@@ -1089,7 +1101,7 @@ spec:
           difficulty: normal
           allow-flight: true
           enable-rcon: true
-          rcon.password: "minecraft-rcon-password"
+          rcon.password: "PLACEHOLDER"
           rcon.port: 25575
           query.enabled: true
           query.port: 25565
@@ -1126,6 +1138,188 @@ spec:
     automated:
       prune: true
       selfHeal: true
+EOF
+
+        # Create OpenClaw namespace
+        cat > $out/17-openclaw-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openclaw
+  labels:
+    app.kubernetes.io/name: openclaw
+EOF
+
+        # Create OpenClaw PVC
+        cat > $out/17a-openclaw-pvc.yaml << 'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openclaw-data
+  namespace: openclaw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 10Gi
+EOF
+
+        # Create OpenClaw ConfigMap
+        cat > $out/17b-openclaw-configmap.yaml << 'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openclaw-config
+  namespace: openclaw
+data:
+  openclaw.json: |
+    {
+      "server": {
+        "host": "0.0.0.0",
+        "port": 18789
+      },
+      "gateway": {
+        "enabled": true
+      }
+    }
+  AGENTS.md: |
+    ## OpenClaw Agent Configuration
+    # Add agent definitions here
+EOF
+
+        # Create OpenClaw Deployment
+        cat > $out/17c-openclaw-deployment.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openclaw
+  namespace: openclaw
+  labels:
+    app: openclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openclaw
+  template:
+    metadata:
+      labels:
+        app: openclaw
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: openclaw
+        image: ghcr.io/openclaw/openclaw:latest
+        ports:
+        - containerPort: 18789
+        env:
+        - name: GATEWAY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: openclaw-secrets
+              key: GATEWAY_TOKEN
+        - name: MINIMAX_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openclaw-secrets
+              key: MINIMAX_API_KEY
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "18789"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /app/openclaw.json
+          subPath: openclaw.json
+          readOnly: true
+        - name: agents
+          mountPath: /app/AGENTS.md
+          subPath: AGENTS.md
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 18789
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 18789
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: openclaw-data
+      - name: config
+        configMap:
+          name: openclaw-config
+      - name: agents
+        configMap:
+          name: openclaw-config
+          items:
+          - key: AGENTS.md
+            path: AGENTS.md
+EOF
+
+        # Create OpenClaw Service
+        cat > $out/17d-openclaw-service.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: openclaw
+  namespace: openclaw
+spec:
+  type: ClusterIP
+  ports:
+  - port: 18789
+    targetPort: 18789
+    protocol: TCP
+  selector:
+    app: openclaw
+EOF
+
+        # Create OpenClaw Ingress
+        cat > $out/17e-openclaw-ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openclaw
+  namespace: openclaw
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/websocket-services: "openclaw"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: openclaw.quadtech.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: openclaw
+            port:
+              number: 18789
 EOF
 
         # Create combined file
@@ -1188,6 +1382,18 @@ EOF
         cat $out/16-batllavatourist-argocd-app.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/16-quadpacienti-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/17-openclaw-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/17a-openclaw-pvc.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/17b-openclaw-configmap.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/17c-openclaw-deployment.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/17d-openclaw-service.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/17e-openclaw-ingress.yaml >> $out/bootstrap.yaml
       '';
 
 in

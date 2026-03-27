@@ -13,6 +13,7 @@
     ../services/verdaccio-deploy.nix
     ../services/infiscal-deploy.nix
     ../services/argocd-apps.nix
+    ../services/k8s-secrets-inject.nix
     ../gitea/runner.nix
   ];
 
@@ -201,6 +202,42 @@
         group = "root";
         mode = "0400";
       };
+      harbor-admin-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/harbor-admin-password";
+      };
+      harbor-registry-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/harbor-registry-password";
+      };
+      cnpg-edukurs-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/cnpg-edukurs-password";
+      };
+      minecraft-rcon-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/minecraft-rcon-password";
+      };
+      verdaccio-admin-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/verdaccio-admin-password";
+      };
+      erpnext-db-admin-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/erpnext-db-admin-password";
+      };
+      erpnext-admin-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/erpnext-admin-password";
+      };
+      openclaw-gateway-token = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/openclaw-gateway-token";
+      };
+      openclaw-minimax-api-key = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/openclaw-minimax-api-key";
+      };
     };
 
   services.quadnix.argocd-deploy = {
@@ -219,6 +256,10 @@
     enable = true;
     harbor = true;
     verdaccio = true;
+  };
+
+  services.quadnix.k8s-secrets-inject = {
+    enable = true;
   };
 
   # Gitea Actions Runners are now running on Kubernetes
@@ -260,7 +301,7 @@
       sleep 2
     done
     
-    # Write cloudflared config - use localhost with NodePorts
+    # Write cloudflared config - use 127.0.0.1 with NodePorts
     cat > /etc/cloudflared/config/config.yaml << 'EOF'
 tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
 credentials-file: /etc/cloudflared/creds/credentials.json
@@ -269,21 +310,23 @@ metrics: 0.0.0.0:2000
 no-autoupdate: true
 ingress:
   - hostname: backbone-01.quadtech.dev
-    service: ssh://localhost:22
+    service: ssh://127.0.0.1:22
   - hostname: gitea-ssh.quadtech.dev
-    service: tcp://localhost:32222
+    service: tcp://127.0.0.1:32222
   - hostname: gitea.quadtech.dev
-    service: http://localhost:30856
+    service: http://127.0.0.1:30856
   - hostname: argocd.quadtech.dev
-    service: http://localhost:30856
+    service: http://127.0.0.1:30856
   - hostname: harbor.quadtech.dev
-    service: http://localhost:30856
+    service: http://127.0.0.1:30856
   - hostname: educourses-pd.com
-    service: http://localhost:30856
+    service: http://127.0.0.1:30856
   - hostname: www.educourses-pd.com
-    service: http://localhost:30856
+    service: http://127.0.0.1:30856
   - hostname: infisical.quadtech.dev
-    service: http://localhost:30856
+    service: http://127.0.0.1:30856
+  - hostname: openclaw.quadtech.dev
+    service: http://127.0.0.1:30856
   - service: http_status:404
 EOF
     
