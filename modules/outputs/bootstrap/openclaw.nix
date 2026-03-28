@@ -28,11 +28,6 @@ let
     channels = {
       discord = {
         enabled = true;
-        token = {
-          source = "env";
-          provider = "default";
-          id = "DISCORD_BOT_TOKEN";
-        };
       };
     };
     agents = {
