@@ -106,6 +106,10 @@ in
           if [ -f /run/secrets/openclaw-gateway-token ]; then
             OC_TOKEN=$(cat /run/secrets/openclaw-gateway-token)
             OC_ARGS="--from-literal=OPENCLAW_GATEWAY_TOKEN=$OC_TOKEN"
+            if [ -f /run/secrets/openclaw-gateway-password ]; then
+              OC_PASSWORD=$(cat /run/secrets/openclaw-gateway-password)
+              OC_ARGS="$OC_ARGS --from-literal=OPENCLAW_GATEWAY_PASSWORD=$OC_PASSWORD"
+            fi
             if [ -f /run/secrets/openclaw-minimax-api-key ]; then
               OC_API_KEY=$(cat /run/secrets/openclaw-minimax-api-key)
               OC_ARGS="$OC_ARGS --from-literal=MINIMAX_API_KEY=$OC_API_KEY"
