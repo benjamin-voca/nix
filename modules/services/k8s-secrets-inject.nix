@@ -114,6 +114,18 @@ in
               OC_API_KEY=$(cat /run/secrets/openclaw-minimax-api-key)
               OC_ARGS="$OC_ARGS --from-literal=MINIMAX_API_KEY=$OC_API_KEY"
             fi
+            if [ -f /run/secrets/openclaw-discord-bot-token ]; then
+              OC_DISCORD_BOT_TOKEN=$(cat /run/secrets/openclaw-discord-bot-token)
+              OC_ARGS="$OC_ARGS --from-literal=DISCORD_BOT_TOKEN=$OC_DISCORD_BOT_TOKEN"
+            fi
+            if [ -f /run/secrets/openclaw-server-id ]; then
+              OC_DISCORD_SERVER_ID=$(cat /run/secrets/openclaw-server-id)
+              OC_ARGS="$OC_ARGS --from-literal=OPENCLAW_DISCORD_SERVER_ID=$OC_DISCORD_SERVER_ID"
+            fi
+            if [ -f /run/secrets/openclaw-beni-discord-id ]; then
+              OC_BENI_DISCORD_ID=$(cat /run/secrets/openclaw-beni-discord-id)
+              OC_ARGS="$OC_ARGS --from-literal=OPENCLAW_BENI_DISCORD_ID=$OC_BENI_DISCORD_ID"
+            fi
             # shellcheck disable=SC2086
             $kubectl create secret generic openclaw-secrets \
               --namespace=openclaw \

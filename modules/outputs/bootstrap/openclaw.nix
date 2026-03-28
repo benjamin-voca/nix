@@ -25,6 +25,16 @@ let
         dangerouslyDisableDeviceAuth = true;
       };
     };
+    channels = {
+      discord = {
+        enabled = true;
+        token = {
+          source = "env";
+          provider = "default";
+          id = "DISCORD_BOT_TOKEN";
+        };
+      };
+    };
     agents = {
       defaults = {
         workspace = "~/.openclaw/workspace";
@@ -197,6 +207,36 @@ let
                     secretKeyRef = {
                       name = "openclaw-secrets";
                       key = "OPENCLAW_GATEWAY_TOKEN";
+                    };
+                  };
+                }
+                {
+                  name = "DISCORD_BOT_TOKEN";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "openclaw-secrets";
+                      key = "DISCORD_BOT_TOKEN";
+                      optional = true;
+                    };
+                  };
+                }
+                {
+                  name = "OPENCLAW_DISCORD_SERVER_ID";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "openclaw-secrets";
+                      key = "OPENCLAW_DISCORD_SERVER_ID";
+                      optional = true;
+                    };
+                  };
+                }
+                {
+                  name = "OPENCLAW_BENI_DISCORD_ID";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "openclaw-secrets";
+                      key = "OPENCLAW_BENI_DISCORD_ID";
+                      optional = true;
                     };
                   };
                 }
