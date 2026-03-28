@@ -35,6 +35,14 @@ let
     agents = {
       defaults = {
         workspace = "~/.openclaw/workspace";
+        models = {
+          "minimax/MiniMax-M2.7" = {
+            alias = "minimax-portal";
+          };
+        };
+        model = {
+          primary = "minimax/MiniMax-M2.7";
+        };
       };
       list = [
         {
