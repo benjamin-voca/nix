@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find . -type f -name *.toml -o -name *.conf -o -name *.config -o -name *.ini)",
+      "WebSearch",
+      "Bash(sops -d secrets/backbone-01.yaml)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(ssh root@backbone-01 \"cd /etc/nixos && git pull && nixos-rebuild switch\")",
+      "Bash(ssh:*)",
+      "Bash(ssh root@backbone-01 \"export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig && kubectl get pods -n openclaw && echo ''---'' && kubectl describe pod openclaw-7797bddfcf-5rqsh -n openclaw | tail -20\")",
+      "Bash(ssh root@backbone-01 \"export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig && kubectl get pods -n openclaw && echo ''---LOGS---'' && kubectl logs -n openclaw -l app=openclaw --tail=15\")",
+      "Bash(git pull:*)",
+      "Bash(ssh root@backbone-01 \"export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig && kubectl get pods -n openclaw && echo ''---LOGS---'' && kubectl logs -n openclaw -l app=openclaw --tail=10\")",
+      "Bash(ssh root@backbone-01 \"export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig && kubectl get pods -n openclaw && echo ''---'' && kubectl logs -n openclaw -l app=openclaw --tail=8\")",
+      "Bash(ssh root@backbone-01 \"export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig && kubectl get pods -n openclaw && echo ''---LOGS---'' && kubectl logs -n openclaw -l app=openclaw --tail=8\")",
+      "Bash(kubectl:*)"
+    ]
+  }
+}
