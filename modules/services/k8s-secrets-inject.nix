@@ -114,8 +114,8 @@ in
               OC_API_KEY=$(cat /run/secrets/openclaw-minimax-api-key)
               OC_ARGS="$OC_ARGS --from-literal=MINIMAX_API_KEY=$OC_API_KEY"
             fi
-            if [ -f /run/secrets/openclaw-discord-bot-token ]; then
-              OC_DISCORD_BOT_TOKEN=$(cat /run/secrets/openclaw-discord-bot-token)
+            if [ -f /run/secrets/openclaw-discord-id ]; then
+              OC_DISCORD_BOT_TOKEN=$(cat /run/secrets/openclaw-discord-id)
               OC_ARGS="$OC_ARGS --from-literal=DISCORD_BOT_TOKEN=$OC_DISCORD_BOT_TOKEN"
             fi
             if [ -f /run/secrets/openclaw-server-id ]; then

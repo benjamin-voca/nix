@@ -238,9 +238,9 @@
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
         path = "/run/secrets/openclaw-minimax-api-key";
       };
-      openclaw-discord-bot-token = {
+      openclaw-discord-id = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/openclaw-discord-bot-token";
+        path = "/run/secrets/openclaw-discord-id";
       };
       openclaw-server-id = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
