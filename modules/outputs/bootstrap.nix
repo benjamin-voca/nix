@@ -1181,7 +1181,7 @@ data:
         "bind": "lan",
         "port": 18789,
         "auth": {
-          "mode": "none"
+          "mode": "password"
         },
         "trustedProxies": [
           "10.0.0.0/8",
@@ -1293,6 +1293,11 @@ spec:
             secretKeyRef:
               name: openclaw-secrets
               key: OPENCLAW_GATEWAY_TOKEN
+        - name: OPENCLAW_GATEWAY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: openclaw-secrets
+              key: OPENCLAW_GATEWAY_PASSWORD
         - name: MINIMAX_API_KEY
           valueFrom:
             secretKeyRef:
