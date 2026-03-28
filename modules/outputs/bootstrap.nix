@@ -1177,7 +1177,7 @@ data:
   openclaw.json: |
     {
       "gateway": {
-        "mode": "remote",
+        "mode": "local",
         "bind": "lan",
         "port": 18789,
         "auth": {
@@ -1276,6 +1276,7 @@ spec:
         - /app/dist/index.js
         - gateway
         - run
+        - --allow-unconfigured
         ports:
         - name: gateway
           containerPort: 18789
