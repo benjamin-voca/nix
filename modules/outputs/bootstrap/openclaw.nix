@@ -28,6 +28,8 @@ let
     channels = {
       discord = {
         enabled = true;
+        groupPolicy = "open";
+        historyLimit = 20;
       };
     };
     agents = {
@@ -86,6 +88,17 @@ let
       "AGENTS.md" = ''
         ## OpenClaw Assistant
         You are a helpful AI assistant running in Kubernetes.
+        
+        ## Discord behavior
+        - In Discord guild channels, respond when mentioned with @OpenClaw.
+        - When asked to summarize recent chat, summarize the latest 20 channel messages.
+
+        ## Gitea integration
+        - Gitea is hosted at https://gitea.quadtech.dev.
+        - Use the GITEA_AGENT_TOKEN environment variable for API authentication.
+        - Use this endpoint for REST calls: https://gitea.quadtech.dev/api/v1.
+        - Send header: Authorization: token <GITEA_AGENT_TOKEN>.
+        - When asked to turn a summary into issues, create issues in Gitea with clear titles and markdown descriptions.
       '';
     };
   };
@@ -231,6 +244,16 @@ let
                     secretKeyRef = {
                       name = "openclaw-secrets";
                       key = "OPENCLAW_BENI_DISCORD_ID";
+                      optional = true;
+                    };
+                  };
+                }
+                {
+                  name = "GITEA_AGENT_TOKEN";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "openclaw-secrets";
+                      key = "GITEA_AGENT_TOKEN";
                       optional = true;
                     };
                   };

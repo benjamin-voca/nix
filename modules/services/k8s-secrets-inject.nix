@@ -126,6 +126,10 @@ in
               OC_BENI_DISCORD_ID=$(cat /run/secrets/openclaw-beni-discord-id)
               OC_ARGS="$OC_ARGS --from-literal=OPENCLAW_BENI_DISCORD_ID=$OC_BENI_DISCORD_ID"
             fi
+            if [ -f /run/secrets/gitea-agent-token ]; then
+              OC_GITEA_AGENT_TOKEN=$(cat /run/secrets/gitea-agent-token)
+              OC_ARGS="$OC_ARGS --from-literal=GITEA_AGENT_TOKEN=$OC_GITEA_AGENT_TOKEN"
+            fi
             # shellcheck disable=SC2086
             $kubectl create secret generic openclaw-secrets \
               --namespace=openclaw \
