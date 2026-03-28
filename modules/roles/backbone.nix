@@ -242,14 +242,6 @@
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
         path = "/run/secrets/openclaw-discord-id";
       };
-      openclaw-server-id = {
-        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/openclaw-server-id";
-      };
-      openclaw-beni-discord-id = {
-        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/openclaw-beni-discord-id";
-      };
       gitea-agent-token = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
         path = "/run/secrets/gitea-agent-token";
