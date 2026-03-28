@@ -687,7 +687,7 @@ spec:
             - -c
             - |
               cat > /runner/config.yaml << CONFIGEOF
-runner:
+              runner:
                 url: https://gitea.quadtech.dev
                 token: $(cat /run/secrets/token)
                 extra:
