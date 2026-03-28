@@ -1181,8 +1181,7 @@ data:
         "bind": "lan",
         "port": 18789,
         "auth": {
-          "mode": "password",
-          "password": "QuadMakesHellaBread"
+          "mode": "none"
         },
         "trustedProxies": [
           "10.0.0.0/8",
