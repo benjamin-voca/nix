@@ -1083,6 +1083,90 @@ spec:
       selfHeal: true
 EOF
 
+        # Create monitoring namespace
+        cat > $out/11-monitoring-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/name: monitoring
+EOF
+
+        # Create ArgoCD Application for kube-prometheus-stack
+        cat > $out/12-monitoring-argocd-app.yaml << 'EOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: kube-prometheus-stack
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 82.15.1
+    helm:
+      parameters:
+      - name: prometheus.enabled
+        value: "true"
+      - name: prometheus.prometheusSpec.replicas
+        value: "2"
+      - name: prometheus.prometheusSpec.retention
+        value: "30d"
+      - name: prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName
+        value: longhorn
+      - name: prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage
+        value: 50Gi
+      - name: prometheus.prometheusSpec.resources.requests.cpu
+        value: 500m
+      - name: prometheus.prometheusSpec.resources.requests.memory
+        value: 2Gi
+      - name: prometheus.prometheusSpec.resources.limits.cpu
+        value: 2000m
+      - name: prometheus.prometheusSpec.resources.limits.memory
+        value: 4Gi
+      - name: alertmanager.enabled
+        value: "true"
+      - name: alertmanager.alertmanagerSpec.replicas
+        value: "2"
+      - name: alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName
+        value: longhorn
+      - name: alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage
+        value: 10Gi
+      - name: grafana.enabled
+        value: "true"
+      - name: grafana.ingress.enabled
+        value: "true"
+      - name: grafana.ingress.ingressClassName
+        value: nginx
+      - name: grafana.ingress.hosts[0]
+        value: grafana.k8s.quadtech.dev
+      - name: grafana.ingress.tls[0].secretName
+        value: grafana-tls
+      - name: grafana.ingress.tls[0].hosts[0]
+        value: grafana.k8s.quadtech.dev
+      - name: grafana.persistence.enabled
+        value: "true"
+      - name: grafana.persistence.storageClassName
+        value: longhorn
+      - name: grafana.persistence.size
+        value: 10Gi
+      - name: nodeExporter.enabled
+        value: "true"
+      - name: kubeStateMetrics.enabled
+        value: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+
         # Create ArgoCD Application for Minecraft
         cat > $out/14-minecraft-argocd-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
@@ -1199,6 +1283,10 @@ EOF
         cat $out/12-harbor-ingress.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12-monitoring-argocd-app.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

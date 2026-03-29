@@ -14,7 +14,6 @@
     ../services/infiscal-deploy.nix
     ../services/argocd-apps.nix
     ../services/k8s-secrets-inject.nix
-    ../services/kube-prometheus-deploy.nix
     ../gitea/runner.nix
   ];
 
@@ -247,10 +246,6 @@
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
         path = "/run/secrets/gitea-agent-token";
       };
-      grafana-admin-password = {
-        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/grafana-admin-password";
-      };
     };
 
   services.quadnix.argocd-deploy = {
@@ -272,10 +267,6 @@
   };
 
   services.quadnix.k8s-secrets-inject = {
-    enable = true;
-  };
-
-  services.quadnix.kube-prometheus-deploy = {
     enable = true;
   };
 
