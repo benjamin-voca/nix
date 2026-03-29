@@ -1144,10 +1144,6 @@ spec:
         value: nginx
       - name: grafana.ingress.hosts[0]
         value: grafana.k8s.quadtech.dev
-      - name: grafana.ingress.tls[0].secretName
-        value: grafana-tls
-      - name: grafana.ingress.tls[0].hosts[0]
-        value: grafana.k8s.quadtech.dev
       - name: grafana.persistence.enabled
         value: "true"
       - name: grafana.persistence.storageClassName
