@@ -241,6 +241,10 @@ let
             service = "http://192.168.1.240:80";
           }
           {
+            hostname = "grafana.k8s.quadtech.dev";
+            service = "http://192.168.1.240:80";
+          }
+          {
             hostname = "*.quadtech.dev";
             service = "http://192.168.1.240:80";
           }

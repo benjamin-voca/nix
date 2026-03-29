@@ -16,6 +16,7 @@
             volumeClaimTemplate = {
               spec = {
                 accessModes = [ "ReadWriteOnce" ];
+                storageClassName = "longhorn";
                 resources = {
                   requests = {
                     storage = "50Gi";
@@ -45,15 +46,16 @@
         ingress = {
           enabled = true;
           ingressClassName = "nginx";
-          hosts = [ "grafana.example.com" ];
+          hosts = [ "grafana.k8s.quadtech.dev" ];
           tls = [{
             secretName = "grafana-tls";
-            hosts = [ "grafana.example.com" ];
+            hosts = [ "grafana.k8s.quadtech.dev" ];
           }];
         };
         persistence = {
           enabled = true;
           size = "10Gi";
+          storageClassName = "longhorn";
         };
       };
 
@@ -66,6 +68,7 @@
             volumeClaimTemplate = {
               spec = {
                 accessModes = [ "ReadWriteOnce" ];
+                storageClassName = "longhorn";
                 resources = {
                   requests = {
                     storage = "10Gi";
