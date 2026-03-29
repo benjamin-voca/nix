@@ -241,7 +241,7 @@ let
             service = "http://192.168.1.240:80";
           }
           {
-            hostname = "grafana.k8s.quadtech.dev";
+            hostname = "grafana.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
           {
@@ -1143,7 +1143,7 @@ spec:
       - name: grafana.ingress.ingressClassName
         value: nginx
       - name: grafana.ingress.hosts[0]
-        value: grafana.k8s.quadtech.dev
+        value: grafana.quadtech.dev
       - name: grafana.persistence.enabled
         value: "true"
       - name: grafana.persistence.storageClassName
