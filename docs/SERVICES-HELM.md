@@ -100,13 +100,13 @@ kubectl apply -f ./result
 - https://verdaccio.quadtech.dev
 - https://infisical.quadtech.dev
 
-## Storage (Longhorn)
+## Storage (Rook/Ceph)
 
-Longhorn provides the default StorageClass used by CNPG and other workloads.
+Ceph provides the default StorageClass (`ceph-block`) used by CNPG and other workloads.
 
 ```sh
-nix build .#helmCharts.x86_64-linux.all.longhorn
-kubectl apply -f ./result
+nix build .#bootstrap.aarch64-darwin
+kubectl apply -f ./result/bootstrap.yaml
 ```
 
 ## Notes

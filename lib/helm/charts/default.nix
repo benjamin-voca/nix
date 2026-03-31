@@ -10,9 +10,10 @@ let
   cloudnative-pg = import ./cloudnative-pg.nix { inherit helmLib; };
   verdaccio = import ./verdaccio.nix { inherit helmLib; };
   infisical = import ./infisical.nix { inherit helmLib; };
-  longhorn = import ./longhorn.nix { inherit helmLib; };
   metallb = import ./metallb.nix { inherit helmLib; };
   harbor = import ./harbor.nix { inherit helmLib; };
+  rookCeph = import ./rook-ceph.nix { inherit helmLib; };
+  rookCephCluster = import ./rook-ceph-cluster.nix { inherit helmLib; };
 in
 {
   # Re-export all charts
@@ -25,9 +26,10 @@ in
   inherit (cloudnative-pg) cloudnative-pg;
   inherit (verdaccio) verdaccio;
   inherit (infisical) infisical;
-  inherit (longhorn) longhorn;
   inherit (metallb) metallb;
   inherit (harbor) harbor;
+  "rook-ceph" = rookCeph."rook-ceph";
+  "rook-ceph-cluster" = rookCephCluster."rook-ceph-cluster";
 
   # Convenience function to get all charts
   all = {
@@ -40,8 +42,9 @@ in
     inherit (cloudnative-pg) cloudnative-pg;
     inherit (verdaccio) verdaccio;
     inherit (infisical) infisical;
-    inherit (longhorn) longhorn;
     inherit (metallb) metallb;
     inherit (harbor) harbor;
+    "rook-ceph" = rookCeph."rook-ceph";
+    "rook-ceph-cluster" = rookCephCluster."rook-ceph-cluster";
   };
 }

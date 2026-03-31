@@ -73,7 +73,7 @@
         create = true;
         mount = true;
         size = "50Gi";
-        storageClass = "longhorn";
+        storageClass = "ceph-block";
         claimName = "gitea-shared-storage";
       };
 

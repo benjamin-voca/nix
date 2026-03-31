@@ -2,11 +2,43 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
+  name: edukurs-db
+  namespace: edukurs
+spec:
+  instances: 1
+  storage:
+    storageClass: ceph-block
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: mydatabase
+      owner: myuser
+      secret:
+        name: edukurs-db-secret
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://cnpg-backups/edukurs-db"
+      endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
+      s3Credentials:
+        accessKeyId:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_SECRET_KEY
+        region:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_REGION
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
   name: gitea-db
   namespace: gitea
 spec:
   instances: 1
   storage:
+    storageClass: ceph-block
     size: 10Gi
   bootstrap:
     initdb:
@@ -14,16 +46,6 @@ spec:
       owner: gitea
       secret:
         name: gitea-db
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitea-db
-  namespace: gitea
-type: kubernetes.io/basic-auth
-stringData:
-  username: gitea
-  password: ${GITEA_DB_PASSWORD}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -33,6 +55,7 @@ metadata:
 spec:
   instances: 1
   storage:
+    storageClass: ceph-block
     size: 10Gi
   bootstrap:
     initdb:

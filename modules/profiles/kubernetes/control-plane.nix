@@ -44,6 +44,7 @@ in
       config.networking.fqdn
       "localhost"
       "127.0.0.1"
+      "kubernetes.quadtech.dev"
     ];
     apiserver.extraOpts = "--allow-privileged=true";
   };

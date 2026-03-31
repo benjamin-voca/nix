@@ -112,27 +112,13 @@ let
           kubelib.buildHelmChart
         ];
 
-      # Longhorn chart for persistent storage
-      longhornChart = pkgs.lib.pipe
-        {
-          name = "longhorn";
-          chart = charts.longhorn.longhorn;
-          namespace = "longhorn-system";
-          values = {
-            persistence = {
-              defaultClass = true;
-              defaultClassReplicaCount = 1;
-            };
-            service = {
-              ui = {
-                type = "ClusterIP";
-              };
-            };
-          };
-        }
-        [
-          kubelib.buildHelmChart
-        ];
+      # Rook/Ceph operator and cluster charts for storage
+      rookCephChart = existingCharts."rook-ceph";
+      rookCephClusterChart = existingCharts."rook-ceph-cluster";
+
+      # Harbor and monitoring charts rendered from repo-managed values
+      harborChart = existingCharts.harbor;
+      monitoringChart = existingCharts.prometheus;
 
       # ArgoCD chart configuration  
       argocdChart = pkgs.lib.pipe
@@ -462,11 +448,16 @@ METALLB_CRDS_EOF
         # Copy ingress-nginx chart (will get IP from MetalLB)
         cp ${ingressNginxChart} $out/01-ingress-nginx.yaml
         
-        # Copy Longhorn chart (for persistent storage)
-        cp ${longhornChart} $out/02-longhorn.yaml
-        
+        # Copy Rook/Ceph operator and cluster charts
+        cp ${rookCephChart} $out/02-rook-ceph.yaml
+        cp ${rookCephClusterChart} $out/03-rook-ceph-cluster.yaml
+
         # Copy CNPG operator chart
         cp ${existingCharts.cloudnative-pg} $out/02a-cnpg-operator.yaml
+
+        # Copy Harbor and monitoring charts from declarative chart configs
+        cp ${harborChart} $out/11-harbor-chart.yaml
+        cp ${monitoringChart} $out/12-monitoring-chart.yaml
         
         # Create CNPG cluster manifest for shared postgres
         cat > $out/02b-cnpg-cluster.yaml << 'EOF'
@@ -479,7 +470,7 @@ spec:
   instances: 1
   imageName: docker.io/cloudnative-pg/container:1.22.1
   storage:
-    storageClass: longhorn
+    storageClass: ceph-block
     size: 10Gi
   resources:
     requests:
@@ -498,8 +489,20 @@ spec:
     pg_hba:
       - host all all 0.0.0.0/0 md5
       - host all all ::0/0 md5
-  monitoring:
-    enabled: false
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://cnpg-backups/"
+      endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
+      s3Credentials:
+        accessKeyId:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_SECRET_KEY
+        region:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_REGION
 ---
 apiVersion: v1
 kind: Secret
@@ -531,6 +534,85 @@ spec:
   cluster:
     name: shared-pg
   owner: app
+EOF
+
+        # Create rook-ceph namespace
+        cat > $out/02d-rook-ceph-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook-ceph
+  labels:
+    app.kubernetes.io/name: rook-ceph
+EOF
+
+        # Create Ceph RGW user used by CNPG backups
+        cat > $out/02e-ceph-rgw-cnpg-user.yaml << 'EOF'
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
+metadata:
+  name: cnpg-backups
+  namespace: rook-ceph
+spec:
+  store: ceph-objectstore
+  displayName: CNPG Backups
+EOF
+
+        # Create deterministic RGW bucket for CNPG backups
+        cat > $out/02f-ceph-rgw-cnpg-bucket-job.yaml << 'EOF'
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ceph-rgw-cnpg-backups-bucket
+  namespace: rook-ceph
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: amazon/aws-cli:2.17.40
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-object-user-ceph-objectstore-cnpg-backups
+                  key: AccessKey
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-object-user-ceph-objectstore-cnpg-backups
+                  key: SecretKey
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              ENDPOINT="http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
+              if aws --endpoint-url "$ENDPOINT" s3api head-bucket --bucket cnpg-backups >/dev/null 2>&1; then
+                echo "Bucket cnpg-backups already exists"
+                exit 0
+              fi
+              aws --endpoint-url "$ENDPOINT" s3api create-bucket --bucket cnpg-backups
+              echo "Bucket cnpg-backups created"
+EOF
+
+        # Create scheduled CNPG backup for edukurs cluster
+        cat > $out/02g-edukurs-cnpg-scheduled-backup.yaml << 'EOF'
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: edukurs-db-ceph-hourly
+  namespace: edukurs
+spec:
+  schedule: "0 0 * * * *"
+  immediate: true
+  backupOwnerReference: cluster
+  method: barmanObjectStore
+  cluster:
+    name: edukurs-db
 EOF
 
         # Create cnpg-system namespace for the CNPG operator
@@ -659,7 +741,7 @@ stringData:
 EOF
         
         # Create gitea-actions runner deployment inline
-        cat > $out/04-gitea-actions.yaml << 'EOF'
+        cat > $out/04-gitea-actions.yaml << 'GITEA_ACTIONS_EOF'
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -690,16 +772,18 @@ spec:
             - sh
             - -c
             - |
-              cat > /runner/config.yaml << CONFIGEOF
+              TOKEN=$(cat /run/secrets/token)
+              cat > /runner/config.yaml <<'CONFIGEOF'
               runner:
                 url: https://gitea.quadtech.dev
-                token: $(cat /run/secrets/token)
+                token: __TOKEN__
                 extra:
                   - ubuntu-latest
                   - linux
                   - x86_64
                   - self-hosted
-CONFIGEOF
+              CONFIGEOF
+              sed -i "s/__TOKEN__/$TOKEN/" /runner/config.yaml
               exec /bin/act_runner daemon --config /runner/config.yaml
           env:
             - name: GITEA_RUNNER_TOKEN
@@ -744,7 +828,7 @@ CONFIGEOF
         - name: runner-token
           secret:
             secretName: gitea-runner-token
-EOF
+GITEA_ACTIONS_EOF
 
         # Create Gitea repository credentials for ArgoCD
         # NOTE: These are now applied via argocd-deploy service after deployment
@@ -857,118 +941,10 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: longhorn
+  storageClassName: ceph-block
   resources:
     requests:
       storage: 10Gi
-EOF
-
-        # Create ArgoCD Application for Longhorn (storage)
-        cat > $out/10-longhorn-argocd-app.yaml << 'EOF'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: longhorn
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-  source:
-    chart: longhorn
-    repoURL: https://charts.longhorn.io
-    targetRevision: 1.11.0
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: longhorn-system
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-EOF
-
-        # Create ArgoCD Application for Harbor
-        cat > $out/11-harbor-argocd-app.yaml << 'EOF'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: harbor
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-  source:
-    chart: harbor
-    repoURL: https://helm.goharbor.io
-    targetRevision: 1.18.1
-    helm:
-      parameters:
-      - name: expose.ingress.hosts.core
-        value: harbor.quadtech.dev
-      - name: expose.tls.enabled
-        value: "true"
-      - name: expose.tls.certSource
-        value: auto
-      - name: expose.ingress.enabled
-        value: "false"
-      - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/ssl-redirect
-        value: "false"
-      - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/backend-protocol
-        value: HTTP
-      - name: expose.ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-body-size
-        value: "0"
-      - name: externalURL
-        value: https://harbor.quadtech.dev
-      - name: harborAdminPassword
-        value: PLACEHOLDER
-      - name: persistence.enabled
-        value: "true"
-      - name: persistence.resourcePolicy
-        value: keep
-      - name: persistence.persistentVolumeClaim.registry.storageClass
-        value: longhorn
-      - name: persistence.persistentVolumeClaim.registry.size
-        value: 100Gi
-      - name: persistence.persistentVolumeClaim.database.size
-        value: 10Gi
-      - name: persistence.persistentVolumeClaim.redis.size
-        value: 5Gi
-      - name: persistence.persistentVolumeClaim.trivy.size
-        value: 10Gi
-      - name: database.type
-        value: internal
-      - name: redis.type
-        value: internal
-      - name: portal.replicas
-        value: "1"
-      - name: core.replicas
-        value: "1"
-      - name: core.autoredirect.enabled
-        value: "false"
-      - name: jobservice.replicas
-        value: "1"
-      - name: registry.replicas
-        value: "1"
-      - name: registry.credentials.username
-        value: harbor_registry_user
-      - name: registry.credentials.password
-        value: PLACEHOLDER
-      - name: registry.credentials.htpasswdString
-        value: $2y$05$U.haVkY0IczOsQ46qpFH.eleok5nmZG/8fKQZw6.0UWRKBKrFtZ4G
-      - name: trivy.enabled
-        value: "true"
-      - name: notary.enabled
-        value: "false"
-      - name: chartmuseum.enabled
-        value: "false"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: harbor
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
 EOF
 
         # Create custom Ingress for Harbor
@@ -1029,20 +1005,6 @@ spec:
             name: harbor-portal
             port:
               number: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: harbor-ingress-tls
-  namespace: harbor
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - harbor.quadtech.dev
-    secretName: harbor-ingress
 EOF
 
         # Create ArgoCD Application for Verdaccio
@@ -1093,76 +1055,6 @@ metadata:
     app.kubernetes.io/name: monitoring
 EOF
 
-        # Create ArgoCD Application for kube-prometheus-stack
-        cat > $out/12-monitoring-argocd-app.yaml << 'EOF'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: monitoring
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-  source:
-    chart: kube-prometheus-stack
-    repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 82.15.1
-    helm:
-      parameters:
-      - name: prometheus.enabled
-        value: "true"
-      - name: prometheus.prometheusSpec.replicas
-        value: "2"
-      - name: prometheus.prometheusSpec.retention
-        value: "30d"
-      - name: prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName
-        value: longhorn
-      - name: prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage
-        value: 50Gi
-      - name: prometheus.prometheusSpec.resources.requests.cpu
-        value: 500m
-      - name: prometheus.prometheusSpec.resources.requests.memory
-        value: 2Gi
-      - name: prometheus.prometheusSpec.resources.limits.cpu
-        value: 2000m
-      - name: prometheus.prometheusSpec.resources.limits.memory
-        value: 4Gi
-      - name: alertmanager.enabled
-        value: "true"
-      - name: alertmanager.alertmanagerSpec.replicas
-        value: "2"
-      - name: alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName
-        value: longhorn
-      - name: alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage
-        value: 10Gi
-      - name: grafana.enabled
-        value: "true"
-      - name: grafana.ingress.enabled
-        value: "true"
-      - name: grafana.ingress.ingressClassName
-        value: nginx
-      - name: grafana.ingress.hosts[0]
-        value: grafana.quadtech.dev
-      - name: grafana.persistence.enabled
-        value: "true"
-      - name: grafana.persistence.storageClassName
-        value: longhorn
-      - name: grafana.persistence.size
-        value: 10Gi
-      - name: nodeExporter.enabled
-        value: "true"
-      - name: kubeStateMetrics.enabled
-        value: "true"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-EOF
-
         # Create ArgoCD Application for Minecraft
         cat > $out/14-minecraft-argocd-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
@@ -1195,7 +1087,7 @@ spec:
           query.port: 25565
         persistence:
           enabled: true
-          storageClass: longhorn
+          storageClass: ceph-block
           size: 20Gi
         service:
           type: LoadBalancer
@@ -1242,7 +1134,17 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/01-ingress-nginx.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/02-longhorn.yaml >> $out/bootstrap.yaml
+        cat $out/02d-rook-ceph-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/02-rook-ceph.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/03-rook-ceph-cluster.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/02e-ceph-rgw-cnpg-user.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/02f-ceph-rgw-cnpg-bucket-job.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/02g-edukurs-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/02a-cnpg-operator.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -1272,9 +1174,7 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/10a-verdaccio-pvc.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/10-longhorn-argocd-app.yaml >> $out/bootstrap.yaml
-        echo "---" >> $out/bootstrap.yaml
-        cat $out/11-harbor-argocd-app.yaml >> $out/bootstrap.yaml
+        cat $out/11-harbor-chart.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/12-harbor-ingress.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -1282,7 +1182,7 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/12-monitoring-argocd-app.yaml >> $out/bootstrap.yaml
+        cat $out/12-monitoring-chart.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

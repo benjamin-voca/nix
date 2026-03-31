@@ -24,7 +24,7 @@ in
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system minecraft erpnext openclaw quadpacienti; do
+          for ns in harbor cnpg-system edukurs gitea quadpacient minecraft erpnext openclaw quadpacienti rook-ceph; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -70,6 +70,42 @@ in
               --from-literal=dbname=edukurs \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected shared-pg-app secret"
+          fi
+
+          # Gitea database password
+          if [ -f /run/secrets/gitea-db-password ]; then
+            GITEA_DB_PW=$(cat /run/secrets/gitea-db-password)
+            $kubectl create secret generic gitea-db \
+              --namespace=gitea \
+              --type=kubernetes.io/basic-auth \
+              --from-literal=username=gitea \
+              --from-literal=password="$GITEA_DB_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected gitea-db secret"
+          fi
+
+          # Ceph RGW S3 credentials for CNPG backups
+          S3_ACCESS_KEY=""
+          S3_SECRET_KEY=""
+
+          if $kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-cnpg-backups >/dev/null 2>&1; then
+            S3_ACCESS_KEY=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-cnpg-backups -o jsonpath='{.data.AccessKey}' | base64 -d)
+            S3_SECRET_KEY=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-cnpg-backups -o jsonpath='{.data.SecretKey}' | base64 -d)
+          elif [ -f /run/secrets/ceph-rgw-s3-access-key ] && [ -f /run/secrets/ceph-rgw-s3-secret-key ]; then
+            S3_ACCESS_KEY=$(cat /run/secrets/ceph-rgw-s3-access-key)
+            S3_SECRET_KEY=$(cat /run/secrets/ceph-rgw-s3-secret-key)
+          fi
+
+          if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
+            for target_ns in cnpg-system edukurs gitea quadpacient; do
+              $kubectl create secret generic ceph-rgw-s3-credentials \
+                --namespace="$target_ns" \
+                --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
+                --from-literal=ACCESS_SECRET_KEY="$S3_SECRET_KEY" \
+                --from-literal=ACCESS_REGION="us-east-1" \
+                --dry-run=client -o yaml | $kubectl apply -f -
+              echo "Injected ceph-rgw-s3-credentials in $target_ns"
+            done
           fi
 
           # Minecraft RCON password

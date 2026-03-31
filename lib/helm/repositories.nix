@@ -62,6 +62,11 @@
       url = "https://grafana.github.io/helm-charts";
       charts = [ "grafana" "loki" "tempo" "mimir" ];
     }
+    {
+      name = "rook-release";
+      url = "https://charts.rook.io/release";
+      charts = [ "rook-ceph" "rook-ceph-cluster" ];
+    }
   ];
 
   # OCI repositories (using oci:// scheme)

@@ -48,7 +48,7 @@ let
     inherit stringData;
   };
 
-  mkPVC = name: namespace: { storageClass ? "longhorn", accessModes ? ["ReadWriteOnce"], size ? "10Gi" }:
+  mkPVC = name: namespace: { storageClass ? "ceph-block", accessModes ? ["ReadWriteOnce"], size ? "10Gi" }:
     {
       apiVersion = "v1";
       kind = "PersistentVolumeClaim";
@@ -437,7 +437,7 @@ ${separator}
     in composeChartValues [dbConfig extraValues];
 
   presetWithLonghorn = {
-    persistence = { enabled = true; storageClass = "longhorn"; };
+    persistence = { enabled = true; storageClass = "ceph-block"; };
   };
 
   presetWithIngress = {

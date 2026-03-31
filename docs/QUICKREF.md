@@ -346,6 +346,8 @@ kubectl autoscale deployment <name> -n <namespace> --min=2 --max=10 --cpu-percen
 ## Documentation
 
 - **Deployment Guide**: `docs/DEPLOYMENT.md`
+- **Ceph/Rook Architecture**: `docs/CEPH-ROOK-ARCHITECTURE.md`
+- **Ceph/Rook Operations**: `docs/CEPH-ROOK-OPERATIONS.md`
 - **Helm Charts**: `lib/helm/README.md`
 - **Cachix Setup**: `docs/CACHIX.md`
 - **Helm Chart Catalog**: `lib/helm/CHARTS.md`

@@ -1,0 +1,12 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: edukurs-db-ceph-hourly
+  namespace: edukurs
+spec:
+  schedule: "0 0 * * * *"
+  immediate: true
+  backupOwnerReference: cluster
+  method: barmanObjectStore
+  cluster:
+    name: edukurs-db

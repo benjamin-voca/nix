@@ -3,7 +3,7 @@
 {
   # Prometheus configuration using kube-prometheus-stack
   prometheus = helmLib.buildChart {
-    name = "prometheus";
+    name = "monitoring";
     chart = helmLib.charts.prometheus-community.kube-prometheus-stack;
     namespace = "monitoring";
     values = {
@@ -16,7 +16,7 @@
             volumeClaimTemplate = {
               spec = {
                 accessModes = [ "ReadWriteOnce" ];
-                storageClassName = "longhorn";
+                storageClassName = "ceph-block";
                 resources = {
                   requests = {
                     storage = "50Gi";
@@ -55,7 +55,7 @@
         persistence = {
           enabled = true;
           size = "10Gi";
-          storageClassName = "longhorn";
+          storageClassName = "ceph-block";
         };
       };
 
@@ -68,7 +68,7 @@
             volumeClaimTemplate = {
               spec = {
                 accessModes = [ "ReadWriteOnce" ];
-                storageClassName = "longhorn";
+                storageClassName = "ceph-block";
                 resources = {
                   requests = {
                     storage = "10Gi";

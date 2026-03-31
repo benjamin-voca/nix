@@ -171,12 +171,6 @@
           kind: Namespace
           metadata:
             name: ingress-nginx
-          ---
-          apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: longhorn-system
-          ---
           apiVersion: v1
           kind: Namespace
           metadata:
@@ -233,7 +227,7 @@
           spec:
             accessModes:
               - ReadWriteOnce
-            storageClassName: longhorn
+            storageClassName: ceph-block
             resources:
               requests:
                 storage: 10Gi
@@ -340,27 +334,6 @@
                 prune: true
                 selfHeal: true
 
-          # ArgoCD Application - Longhorn
-          ---
-          apiVersion: argoproj.io/v1alpha1
-          kind: Application
-          metadata:
-            name: longhorn
-            namespace: argocd
-          spec:
-            project: default
-            source:
-              chart: longhorn
-              repoURL: https://charts.longhorn.io
-              targetRevision: 1.11.0
-            destination:
-              server: https://kubernetes.default.svc
-              namespace: longhorn-system
-            syncPolicy:
-              automated:
-                prune: true
-                selfHeal: true
-
           # ArgoCD Application - Harbor
           ---
           apiVersion: argoproj.io/v1alpha1
@@ -445,7 +418,7 @@
           spec:
             accessModes:
               - ReadWriteOnce
-            storageClassName: longhorn
+            storageClassName: ceph-block
             resources:
               requests:
                 storage: 20Gi
@@ -464,27 +437,6 @@
             resources:
               requests:
                 storage: 20Gi
-
-          # Longhorn single-replica storage class for single-node shared services
-          ---
-          apiVersion: storage.k8s.io/v1
-          kind: StorageClass
-          metadata:
-            name: longhorn-single
-          provisioner: driver.longhorn.io
-          allowVolumeExpansion: true
-          reclaimPolicy: Delete
-          volumeBindingMode: Immediate
-          parameters:
-            numberOfReplicas: "1"
-            staleReplicaTimeout: "30"
-            fromBackup: ""
-            fsType: ext4
-            dataLocality: disabled
-            unmapMarkSnapChainRemoved: ignored
-            disableRevisionCounter: "true"
-            dataEngine: v1
-            backupTargetName: default
 
           # Host-backed PV for in-cluster NFS storage
           ---
@@ -539,7 +491,7 @@
                   args:
                   - |
                     set -euo pipefail
-                    if [ -f /new/.migrated-from-longhorn ]; then
+                    if [ -f /new/.migrated-sites-v4 ]; then
                       echo "ERPNext sites already migrated"
                       exit 0
                     fi
@@ -550,7 +502,7 @@
                     fi
 
                     mkdir -p /new/apps
-                    touch /new/.migrated-from-longhorn
+                    touch /new/.migrated-sites-v4
                   volumeMounts:
                   - name: old-sites
                     mountPath: /old

@@ -44,24 +44,21 @@ in
         resourcePolicy = "keep";
         persistentVolumeClaim = {
           registry = {
-            storageClass = "longhorn";
-            size = "100Gi";
+            existingClaim = "harbor-registry-ceph";
           };
           jobservice = {
-            storageClass = "longhorn";
-            size = "5Gi";
+            jobLog = {
+              existingClaim = "harbor-jobservice-ceph";
+            };
           };
           database = {
-            storageClass = "longhorn";
-            size = "10Gi";
+            existingClaim = "harbor-database-ceph";
           };
           redis = {
-            storageClass = "longhorn";
-            size = "5Gi";
+            existingClaim = "harbor-redis-ceph";
           };
           trivy = {
-            storageClass = "longhorn";
-            size = "10Gi";
+            existingClaim = "harbor-trivy-ceph";
           };
         };
       };
