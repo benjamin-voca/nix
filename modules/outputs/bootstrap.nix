@@ -612,7 +612,7 @@ spec:
   backupOwnerReference: cluster
   method: barmanObjectStore
   cluster:
-    name: edukurs-db
+    name: edukurs-db-ceph
 EOF
 
         # Create cnpg-system namespace for the CNPG operator
@@ -725,8 +725,37 @@ spec:
       selfHeal: true
 EOF
         
-        # Copy gitea chart from existing charts
+      # Copy gitea chart from existing charts
         cp ${existingCharts.gitea} $out/03-gitea.yaml
+
+        # Ensure Gitea shared storage claim exists on Ceph
+        cat > $out/03a-gitea-shared-storage-ceph-pvc.yaml << 'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-shared-storage-ceph
+  namespace: gitea
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 50Gi
+EOF
+
+        # Ensure Gitea DB cluster is explicitly Ceph-backed
+        cat > $out/03b-gitea-db-storageclass-patch.yaml << 'EOF'
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: gitea-db
+  namespace: gitea
+spec:
+  storage:
+    storageClass: ceph-block
+    size: 10Gi
+EOF
         
         # Create gitea runner token secret (base64 encoded - will be replaced with actual secret via SOPS or external secret operator)
         cat > $out/04-gitea-runner-secret.yaml << 'EOF'
@@ -755,7 +784,7 @@ metadata:
   namespace: gitea
 spec:
   serviceName: gitea-actions
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: gitea-actions
@@ -764,6 +793,7 @@ spec:
       labels:
         app.kubernetes.io/name: gitea-actions
     spec:
+      automountServiceAccountToken: false
       serviceAccountName: gitea-actions
       containers:
         - name: act-runner
@@ -772,19 +802,17 @@ spec:
             - sh
             - -c
             - |
+              cd /runner
               TOKEN=$(cat /run/secrets/token)
-              cat > /runner/config.yaml <<'CONFIGEOF'
-              runner:
-                url: https://gitea.quadtech.dev
-                token: __TOKEN__
-                extra:
-                  - ubuntu-latest
-                  - linux
-                  - x86_64
-                  - self-hosted
-              CONFIGEOF
-              sed -i "s/__TOKEN__/$TOKEN/" /runner/config.yaml
-              exec /bin/act_runner daemon --config /runner/config.yaml
+              if [ ! -f .runner ]; then
+                /usr/local/bin/act_runner register \
+                  --no-interactive \
+                  --instance https://gitea.quadtech.dev \
+                  --token "$TOKEN" \
+                  --name "k8s-runner-$(hostname)" \
+                  --labels "ubuntu-latest,linux,x86_64,self-hosted"
+              fi
+              exec /usr/local/bin/act_runner daemon
           env:
             - name: GITEA_RUNNER_TOKEN
               valueFrom:
@@ -1153,6 +1181,10 @@ EOF
         cat $out/02c-cnpg-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/03-gitea.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/03a-gitea-shared-storage-ceph-pvc.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/03b-gitea-db-storageclass-patch.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/04-gitea-runner-secret.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

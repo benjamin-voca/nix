@@ -84,6 +84,16 @@ in
             echo "Injected gitea-db secret"
           fi
 
+          # Gitea Actions runner registration token
+          if [ -f /run/secrets/gitea-runner-token ]; then
+            GITEA_RUNNER_TOKEN=$(cat /run/secrets/gitea-runner-token)
+            $kubectl create secret generic gitea-runner-token \
+              --namespace=gitea \
+              --from-literal=token="$GITEA_RUNNER_TOKEN" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected gitea-runner-token secret"
+          fi
+
           # Ceph RGW S3 credentials for CNPG backups
           S3_ACCESS_KEY=""
           S3_SECRET_KEY=""
@@ -108,6 +118,29 @@ in
             done
           fi
 
+          # Keep app DB URLs pinned to Ceph CNPG services
+          if $kubectl -n edukurs get secret edukurs-app-secrets >/dev/null 2>&1 && \
+             $kubectl -n edukurs get secret edukurs-db-ceph-secret >/dev/null 2>&1; then
+            EDUKURS_DB_USER=$($kubectl -n edukurs get secret edukurs-db-ceph-secret -o jsonpath='{.data.username}' | base64 -d)
+            EDUKURS_DB_PASS=$($kubectl -n edukurs get secret edukurs-db-ceph-secret -o jsonpath='{.data.password}' | base64 -d)
+            EDUKURS_DB_URL="postgresql://$EDUKURS_DB_USER:$EDUKURS_DB_PASS@edukurs-db-ceph-rw.edukurs.svc.cluster.local:5432/mydatabase"
+            EDUKURS_DB_URL_B64=$(printf '%s' "$EDUKURS_DB_URL" | base64 | tr -d '\n')
+            $kubectl -n edukurs patch secret edukurs-app-secrets --type merge \
+              -p "{\"data\":{\"POSTGRES_URL\":\"$EDUKURS_DB_URL_B64\"}}"
+            echo "Pinned edukurs-app-secrets POSTGRES_URL to Ceph"
+          fi
+
+          if $kubectl -n quadpacient get secret quadpacient-app-secrets >/dev/null 2>&1 && \
+             $kubectl -n quadpacient get secret quadpacient-db-ceph-secret >/dev/null 2>&1; then
+            QUADPACIENT_DB_USER=$($kubectl -n quadpacient get secret quadpacient-db-ceph-secret -o jsonpath='{.data.username}' | base64 -d)
+            QUADPACIENT_DB_PASS=$($kubectl -n quadpacient get secret quadpacient-db-ceph-secret -o jsonpath='{.data.password}' | base64 -d)
+            QUADPACIENT_DB_URL="postgresql://$QUADPACIENT_DB_USER:$QUADPACIENT_DB_PASS@quadpacient-db-ceph-rw.quadpacient.svc.cluster.local:5432/quadpacient"
+            QUADPACIENT_DB_URL_B64=$(printf '%s' "$QUADPACIENT_DB_URL" | base64 | tr -d '\n')
+            $kubectl -n quadpacient patch secret quadpacient-app-secrets --type merge \
+              -p "{\"data\":{\"POSTGRES_URL\":\"$QUADPACIENT_DB_URL_B64\"}}"
+            echo "Pinned quadpacient-app-secrets POSTGRES_URL to Ceph"
+          fi
+
           # Minecraft RCON password
           if [ -f /run/secrets/minecraft-rcon-password ]; then
             MC_RCON=$(cat /run/secrets/minecraft-rcon-password)
@@ -126,6 +159,13 @@ in
               --from-literal=password="$ERPNEXT_DB_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected erpnext-db-admin secret"
+
+            $kubectl create secret generic erpnext-mariadb-auth \
+              --namespace=erpnext \
+              --from-literal=mariadb-root-password="$ERPNEXT_DB_PW" \
+              --from-literal=mariadb-password="$ERPNEXT_DB_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected erpnext-mariadb-auth secret"
           fi
 
           # ERPNext admin password

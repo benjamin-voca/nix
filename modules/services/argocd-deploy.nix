@@ -93,19 +93,6 @@ in
             sleep 5
           done
 
-          echo "Cleaning up any existing ArgoCD installation..."
-          ${pkgs.kubernetes-helm}/bin/helm uninstall argocd -n argocd --ignore-not-found 2>/dev/null || true
-          $kubectl delete ingress argocd-server -n argocd --ignore-not-found 2>/dev/null || true
-
-          echo "Cleaning up ArgoCD CRDs and cluster resources..."
-          $kubectl delete crd applications.argoproj.io --ignore-not-found 2>/dev/null || true
-          $kubectl delete crd appprojects.argoproj.io --ignore-not-found 2>/dev/null || true
-          $kubectl delete crd applicationsets.argoproj.io --ignore-not-found 2>/dev/null || true
-          $kubectl delete clusterrole argocd-application-controller --ignore-not-found 2>/dev/null || true
-          $kubectl delete clusterrole argocd-server --ignore-not-found 2>/dev/null || true
-          $kubectl delete clusterrolebinding argocd-application-controller --ignore-not-found 2>/dev/null || true
-          $kubectl delete clusterrolebinding argocd-server --ignore-not-found 2>/dev/null || true
-
           echo "Creating ArgoCD namespace..."
           $kubectl create namespace argocd --dry-run=client -o yaml | $kubectl apply -f - || true
 
@@ -241,7 +228,7 @@ EOF
         Type = "oneshot";
         RemainAfterExit = true;
         ExecStart = "/run/current-system/sw/bin/argocd-deploy";
-        ExecStop = "/run/current-system/sw/bin/argocd-cleanup";
+        ExecStop = "${pkgs.coreutils}/bin/true";
       };
     };
   };

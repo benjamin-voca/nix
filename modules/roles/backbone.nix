@@ -19,10 +19,16 @@
 
   environment.systemPackages = with pkgs; [
     nfs-utils
+    openiscsi
     apacheHttpd  # For htpasswd utility
     openssl
     procps  # For pkill command used by cloudflared scripts
   ];
+
+  services.openiscsi = {
+    enable = true;
+    name = "iqn.2026-04.dev.quadtech:${config.networking.hostName}";
+  };
 
 
   networking.firewall.allowedTCPPorts = [
@@ -144,13 +150,13 @@
    };
 
    services.quadnix.verdaccio-deploy = {
-     enable = true;
+     enable = false;
    };
 
   services.quadnix.argocdApps = {
     enable = true;
     harbor = true;
-    verdaccio = true;
+    verdaccio = false;
   };
 
   services.quadnix.k8s-secrets-inject = {

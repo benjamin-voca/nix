@@ -6,6 +6,8 @@
     system = "x86_64-linux";
     hardwareModule = ../hardware/backbone-01.nix;
     roleModule = ../roles/backbone.nix;
+    extraModules = [
+    ];
     taints = [
       { key = "role"; value = "backbone"; effect = "NoSchedule"; }
       { key = "infra"; value = "true"; effect = "NoSchedule"; }

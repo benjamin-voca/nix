@@ -18,7 +18,7 @@ in
 
       expose = {
         type = "ingress";
-        enabled = false;
+        enabled = true;
         tls = {
           enabled = true;
           certSource = "auto";
@@ -101,7 +101,7 @@ in
         credentials = {
           username = "harbor_registry_user";
           password = "PLACEHOLDER";
-          htpasswdString = "$2y$05$U.haVkY0IczOsQ46qpFH.eleok5nmZG/8fKQZw6.0UWRKBKrFtZ4G";
+          htpasswdString = "harbor_registry_user:$2y$05$zrpiBawMMpLbr6Hl1g1PhOCcf1RllfEv/YkkI69O9XC/mZ1/CVcAi";
         };
       };
 

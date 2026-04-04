@@ -131,6 +131,8 @@
         argocdChart = forAllSystems (system: argocdChartFor system);
         packages = forAllSystems (system: {
           inherit (inputs.nixhelm.packages.${system}) helmupdater;
+          bootstrap = argocdBootstrap.${system};
+          boostrap = argocdBootstrap.${system};
         });
         apps = forAllSystems (system: {
           inherit (inputs.nixhelm.apps.${system}) helmupdater;
@@ -171,15 +173,11 @@
           kind: Namespace
           metadata:
             name: ingress-nginx
-          apiVersion: v1
-          kind: Namespace
-          metadata:
-            name: harbor
           ---
           apiVersion: v1
           kind: Namespace
           metadata:
-            name: verdaccio
+            name: harbor
           ---
           apiVersion: v1
           kind: Namespace
@@ -216,21 +214,6 @@
           spec:
             ipAddressPools:
             - default
-
-          # Verdaccio PVC
-          ---
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: verdaccio-data
-            namespace: verdaccio
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            storageClassName: ceph-block
-            resources:
-              requests:
-                storage: 10Gi
 
           # ArgoCD Application - ArgoCD itself
           ---
@@ -366,43 +349,23 @@
                   value: https://harbor.quadtech.dev
                 - name: expose.ingress.hosts.core
                   value: harbor.quadtech.dev
+                - name: persistence.enabled
+                  value: "true"
+                - name: persistence.resourcePolicy
+                  value: keep
+                - name: persistence.persistentVolumeClaim.registry.existingClaim
+                  value: harbor-registry-ceph
+                - name: persistence.persistentVolumeClaim.jobservice.jobLog.existingClaim
+                  value: harbor-jobservice-ceph
+                - name: persistence.persistentVolumeClaim.database.existingClaim
+                  value: harbor-database-ceph
+                - name: persistence.persistentVolumeClaim.redis.existingClaim
+                  value: harbor-redis-ceph
+                - name: persistence.persistentVolumeClaim.trivy.existingClaim
+                  value: harbor-trivy-ceph
             destination:
               server: https://kubernetes.default.svc
               namespace: harbor
-            syncPolicy:
-              automated:
-                prune: true
-                selfHeal: true
-
-          # ArgoCD Application - Verdaccio
-          ---
-          apiVersion: argoproj.io/v1alpha1
-          kind: Application
-          metadata:
-            name: verdaccio
-            namespace: argocd
-          spec:
-            ignoreDifferences:
-            - group: networking.k8s.io
-              kind: Ingress
-              jsonPointers:
-              - /metadata/annotations
-            project: default
-            source:
-              chart: verdaccio
-              repoURL: https://charts.verdaccio.org
-              targetRevision: 4.29.0
-              helm:
-                parameters:
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/ssl-redirect
-                  value: "false"
-                - name: ingress.annotations nginx\.ingress\.kubernetes\.io/backend-protocol
-                  value: HTTP
-                - name: ingress.tls
-                  value: "true"
-            destination:
-              server: https://kubernetes.default.svc
-              namespace: verdaccio
             syncPolicy:
               automated:
                 prune: true
@@ -423,17 +386,73 @@
               requests:
                 storage: 20Gi
 
-          # ERPNext shared sites PVC on RWX storage
+          # CephFS for ERPNext shared RWX data
+          ---
+          apiVersion: ceph.rook.io/v1
+          kind: CephFilesystemSubVolumeGroup
+          metadata:
+            name: ceph-filesystem-csi
+            namespace: rook-ceph
+          spec:
+            name: csi
+            filesystemName: ceph-filesystem
+            pinning:
+              distributed: 1
+
+          ---
+          apiVersion: ceph.rook.io/v1
+          kind: CephFilesystem
+          metadata:
+            name: ceph-filesystem
+            namespace: rook-ceph
+          spec:
+            metadataPool:
+              replicated:
+                size: 1
+            dataPools:
+              - name: data0
+                failureDomain: host
+                replicated:
+                  size: 1
+            metadataServer:
+              activeCount: 1
+              activeStandby: true
+
+          ---
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: ceph-filesystem-csi
+          provisioner: rook-ceph.cephfs.csi.ceph.com
+          allowVolumeExpansion: true
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          parameters:
+            clusterID: rook-ceph
+            fsName: ceph-filesystem
+            pool: ceph-filesystem-data0
+            subvolumeGroup: csi
+            csi.storage.k8s.io/provisioner-secret-name: rook-csi-cephfs-provisioner
+            csi.storage.k8s.io/provisioner-secret-namespace: rook-ceph
+            csi.storage.k8s.io/controller-expand-secret-name: rook-csi-cephfs-provisioner
+            csi.storage.k8s.io/controller-expand-secret-namespace: rook-ceph
+            csi.storage.k8s.io/controller-publish-secret-name: rook-csi-cephfs-provisioner
+            csi.storage.k8s.io/controller-publish-secret-namespace: rook-ceph
+            csi.storage.k8s.io/node-stage-secret-name: rook-csi-cephfs-node
+            csi.storage.k8s.io/node-stage-secret-namespace: rook-ceph
+            csi.storage.k8s.io/fstype: ext4
+
+          # ERPNext shared sites PVC on CephFS (migration target)
           ---
           apiVersion: v1
           kind: PersistentVolumeClaim
           metadata:
-            name: erpnext-sites-rwx-v2
+            name: erpnext-sites-rwx-ceph-v2
             namespace: erpnext
           spec:
             accessModes:
               - ReadWriteMany
-            storageClassName: nfs-rwx-v2
+            storageClassName: ceph-filesystem-csi
             resources:
               requests:
                 storage: 20Gi
@@ -469,162 +488,6 @@
             resources:
               requests:
                 storage: 50Gi
-
-          # ERPNext sites migration job
-          ---
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: erpnext-sites-migrate-v4
-            namespace: erpnext
-          spec:
-            backoffLimit: 3
-            template:
-              spec:
-                restartPolicy: OnFailure
-                containers:
-                - name: migrate-sites
-                  image: frappe/erpnext:v16.5.0
-                  command:
-                  - /bin/bash
-                  - -lc
-                  args:
-                  - |
-                    set -euo pipefail
-                    if [ -f /new/.migrated-sites-v4 ]; then
-                      echo "ERPNext sites already migrated"
-                      exit 0
-                    fi
-
-                    mkdir -p /new
-                    if [ -d /old/helpdesk.quadtech.dev ] || [ -f /old/common_site_config.json ]; then
-                      cp -a /old/. /new/
-                    fi
-
-                    mkdir -p /new/apps
-                    touch /new/.migrated-sites-v4
-                  volumeMounts:
-                  - name: old-sites
-                    mountPath: /old
-                  - name: new-sites
-                    mountPath: /new
-                volumes:
-                - name: old-sites
-                  persistentVolumeClaim:
-                    claimName: erpnext
-                - name: new-sites
-                  persistentVolumeClaim:
-                    claimName: erpnext-sites-rwx-v2
-
-          # ERPNext bootstrap helpdesk job
-          ---
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: erpnext-bootstrap-helpdesk
-            namespace: erpnext
-          spec:
-            backoffLimit: 0
-            template:
-              spec:
-                restartPolicy: OnFailure
-                containers:
-                - name: bootstrap-helpdesk
-                  image: frappe/erpnext:v16.5.0
-                  command:
-                  - /bin/bash
-                  - -lc
-                  args:
-                  - |
-                    set -euo pipefail
-
-                    export SITE_NAME="helpdesk.quadtech.dev"
-                    export PYTHONPATH="/home/frappe/frappe-bench/sites/vendor:/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk''${PYTHONPATH:+:$PYTHONPATH}"
-
-                    mkdir -p /home/frappe/frappe-bench/sites/apps
-                    mkdir -p /home/frappe/frappe-bench/sites/vendor
-
-                    sync_repo() {
-                      name="$1"
-                      url="$2"
-                      branch="$3"
-                      target="/home/frappe/frappe-bench/sites/apps/$name"
-
-                      if [ -d "$target/.git" ]; then
-                        if git -C "$target" fetch --depth 1 origin "$branch"; then
-                          git -C "$target" checkout -B "$branch" "origin/$branch"
-                          git -C "$target" reset --hard "origin/$branch"
-                        fi
-                      else
-                        rm -rf "$target"
-                        git clone --depth 1 --branch "$branch" "$url" "$target"
-                      fi
-                    }
-
-                    sync_repo telephony https://github.com/frappe/telephony.git develop
-                    sync_repo helpdesk https://github.com/frappe/helpdesk.git main
-                    /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir twilio textblob
-                    printf '%s\n' frappe erpnext telephony helpdesk > /home/frappe/frappe-bench/sites/apps.txt
-
-                    export DB_HOST="erpnext-mariadb-subchart"
-                    export DB_PORT="3306"
-                    export DB_ADMIN_USER="frappe_admin"
-                    export DB_ADMIN_PASSWORD="$DB_ADMIN_PASSWORD"
-
-                    wait_for_db_admin() {
-                      until mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" --silent >/dev/null 2>&1; do
-                        echo "Waiting for MariaDB admin access"
-                        sleep 5
-                      done
-                    }
-
-                    wait_for_db_admin
-
-                    bench new-site "$SITE_NAME" \
-                      --no-mariadb-socket \
-                      --db-type=mariadb \
-                      --db-host="$DB_HOST" \
-                      --db-port="$DB_PORT" \
-                      --admin-password="$ERPNEXT_ADMIN_PASSWORD" \
-                      --mariadb-root-username="$DB_ADMIN_USER" \
-                      --mariadb-root-password="$DB_ADMIN_PASSWORD" \
-                      --mariadb-user-host-login-scope=% \
-                      --force || true
-
-                    export PYTHONPATH="/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk:$PYTHONPATH"
-
-                    bench --site "$SITE_NAME" install-app --force telephony || true
-                    bench --site "$SITE_NAME" install-app --force helpdesk || true
-
-                    bench --site "$SITE_NAME" migrate || true
-                  env:
-                  - name: DB_HOST
-                    value: erpnext-mariadb-subchart
-                  - name: DB_PORT
-                    value: "3306"
-                  - name: DB_ADMIN_USER
-                    value: frappe_admin
-                  - name: DB_ADMIN_PASSWORD
-                    valueFrom:
-                      secretKeyRef:
-                        name: erpnext-mariadb-subchart
-                        key: mariadb-root-password
-                  - name: ERPNEXT_ADMIN_PASSWORD
-                    valueFrom:
-                      secretKeyRef:
-                        name: erpnext-admin
-                        key: password
-                  volumeMounts:
-                  - name: sites-dir
-                    mountPath: /home/frappe/frappe-bench/sites
-                  - name: logs
-                    mountPath: /home/frappe/frappe-bench/logs
-                volumes:
-                - name: sites-dir
-                  persistentVolumeClaim:
-                    claimName: erpnext-sites-rwx-v2
-                - name: logs
-                  emptyDir: {}
 
           # ArgoCD Application - In-cluster NFS provisioner
           ---
@@ -663,6 +526,115 @@
               automated:
                 prune: true
                 selfHeal: true
+
+          # ERPNext bootstrap Helpdesk job (declarative one-shot)
+          ---
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: erpnext-bootstrap-helpdesk-v20
+            namespace: erpnext
+          spec:
+            backoffLimit: 2
+            activeDeadlineSeconds: 1800
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: bootstrap-helpdesk
+                    image: frappe/erpnext:v16.5.0
+                    imagePullPolicy: IfNotPresent
+                    command:
+                      - /bin/bash
+                      - -lc
+                    args:
+                      - |
+                        set -euxo pipefail
+
+                        SITE_NAME="helpdesk.quadtech.dev"
+                        APPS_DIR="/home/frappe/frappe-bench/sites/apps"
+
+                        export PYTHONPATH="/home/frappe/frappe-bench/sites/vendor:/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk''${PYTHONPATH:+:$PYTHONPATH}"
+
+                        for i in $(seq 1 60); do if [ -f /home/frappe/frappe-bench/sites/common_site_config.json ]; then break; fi; echo "Waiting for common_site_config.json ($i/60)"; sleep 5; done
+                        [ -f /home/frappe/frappe-bench/sites/common_site_config.json ]
+
+                        for i in $(seq 1 60); do if (echo > /dev/tcp/"$DB_HOST"/"$DB_PORT") >/dev/null 2>&1; then break; fi; echo "Waiting for MariaDB TCP ($i/60)"; sleep 5; done
+                        (echo > /dev/tcp/"$DB_HOST"/"$DB_PORT") >/dev/null 2>&1
+
+                        sync_repo() {
+                          name="$1"
+                          url="$2"
+                          branch="$3"
+                          target="$APPS_DIR/$name"
+
+                          rm -rf "$target"
+                          git clone --depth 1 --branch "$branch" "$url" "$target"
+                        }
+
+                        mkdir -p "$APPS_DIR"
+                        mkdir -p /home/frappe/frappe-bench/sites/vendor
+                        sync_repo telephony https://github.com/frappe/telephony.git develop
+                        sync_repo helpdesk https://github.com/frappe/helpdesk.git main
+                        /home/frappe/frappe-bench/env/bin/pip install --no-cache-dir twilio textblob
+                        printf '%s\n' frappe erpnext telephony helpdesk > /home/frappe/frappe-bench/sites/apps.txt
+
+                        for i in $(seq 1 60); do if mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" --silent >/dev/null 2>&1; then break; fi; echo "Waiting for MariaDB admin auth ($i/60)"; sleep 5; done
+                        mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" --silent >/dev/null 2>&1
+
+                        SITE_CONFIG="/home/frappe/frappe-bench/sites/$SITE_NAME/site_config.json"
+
+                        if [ ! -f "$SITE_CONFIG" ]; then
+                          bench new-site "$SITE_NAME" \
+                            --no-mariadb-socket \
+                            --db-type=mariadb \
+                            --db-host="$DB_HOST" \
+                            --db-port="$DB_PORT" \
+                            --admin-password="$ERPNEXT_ADMIN_PASSWORD" \
+                            --mariadb-root-username="$DB_ADMIN_USER" \
+                            --mariadb-root-password="$DB_ADMIN_PASSWORD" \
+                            --mariadb-user-host-login-scope=% \
+                            --force
+                        fi
+
+                        export PYTHONPATH="/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk''${PYTHONPATH:+:$PYTHONPATH}"
+
+                        if ! bench --site "$SITE_NAME" list-apps | grep -qx telephony; then
+                          bench --site "$SITE_NAME" install-app --force telephony
+                        fi
+                        if ! bench --site "$SITE_NAME" list-apps | grep -qx helpdesk; then
+                          bench --site "$SITE_NAME" install-app --force helpdesk
+                        fi
+
+                        bench --site "$SITE_NAME" migrate
+                    env:
+                      - name: DB_HOST
+                        value: erpnext-mariadb-subchart
+                      - name: DB_PORT
+                        value: "3306"
+                      - name: DB_ADMIN_USER
+                        value: root
+                      - name: DB_ADMIN_PASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: erpnext-mariadb-auth
+                            key: mariadb-root-password
+                      - name: ERPNEXT_ADMIN_PASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: erpnext-admin
+                            key: password
+                    volumeMounts:
+                      - name: sites-dir
+                        mountPath: /home/frappe/frappe-bench/sites
+                      - name: logs
+                        mountPath: /home/frappe/frappe-bench/logs
+                volumes:
+                  - name: sites-dir
+                    persistentVolumeClaim:
+                      claimName: erpnext-sites-rwx-ceph-v2
+                  - name: logs
+                    emptyDir: {}
 
           # ArgoCD Application - ERPNext
           ---
@@ -821,16 +793,17 @@
                     enabled: true
                     worker:
                       enabled: true
-                      existingClaim: erpnext-sites-rwx-v2
+                      existingClaim: erpnext-sites-rwx-ceph-v2
                     sites:
                       enabled: true
-                      existingClaim: erpnext-sites-rwx-v2
+                      existingClaim: erpnext-sites-rwx-ceph-v2
 
                   mariadb:
                     enabled: true
 
                   mariadb-subchart:
                     auth:
+                      existingSecret: erpnext-mariadb-auth
                       database: frappe_bootstrap
                       username: frappe_admin
                     initdbScripts:
@@ -838,6 +811,9 @@
                         GRANT ALL PRIVILEGES ON *.* TO 'frappe_admin'@'%' WITH GRANT OPTION;
                         FLUSH PRIVILEGES;
                     primary:
+                      persistence:
+                        enabled: true
+                        existingClaim: erpnext-databases
                       livenessProbe:
                         enabled: false
                       readinessProbe:
@@ -883,8 +859,8 @@
                     createSite:
                       enabled: false
                     custom:
-                      enabled: true
-                      jobName: erpnext-bootstrap-helpdesk-v10
+                      enabled: false
+                      jobName: erpnext-bootstrap-helpdesk-v20
                       restartPolicy: OnFailure
                       containers:
                         - name: bootstrap-helpdesk
@@ -918,16 +894,16 @@
                                 target="/home/frappe/frappe-bench/sites/apps/$name"
 
                                 if [ -d "$target/.git" ]; then
-                                  if git -C "$target" fetch --depth 1 origin "$branch"; then
+                                  if git -C "$target" remote get-url origin >/dev/null 2>&1 && git -C "$target" fetch --depth 1 origin "$branch"; then
                                     git -C "$target" checkout -B "$branch" "origin/$branch"
                                     git -C "$target" reset --hard "origin/$branch"
-                                  else
-                                    echo "Using existing $name checkout"
+                                    return
                                   fi
-                                else
-                                  rm -rf "$target"
-                                  git clone --depth 1 --branch "$branch" "$url" "$target"
+                                  echo "Re-cloning $name checkout"
                                 fi
+
+                                rm -rf "$target"
+                                git clone --depth 1 --branch "$branch" "$url" "$target"
                               }
 
                               mkdir -p /home/frappe/frappe-bench/sites/apps
@@ -946,6 +922,14 @@
 
                               wait_for_db_admin
 
+                              mysql -h "$DB_HOST" -P "$DB_PORT" -u"$DB_ADMIN_USER" -p"$DB_ADMIN_PASSWORD" <<SQL
+                              DROP DATABASE IF EXISTS helpdesk_db;
+                              DROP USER IF EXISTS 'helpdesk_db'@'%';
+                              FLUSH PRIVILEGES;
+                              SQL
+
+                              rm -rf "/home/frappe/frappe-bench/sites/$SITE_NAME"
+
                               bench new-site "$SITE_NAME" \
                                 --no-mariadb-socket \
                                 --db-type=mariadb \
@@ -959,8 +943,12 @@
 
                               export PYTHONPATH="/home/frappe/frappe-bench/sites/apps/telephony:/home/frappe/frappe-bench/sites/apps/helpdesk:$PYTHONPATH"
 
-                              bench --site "$SITE_NAME" install-app --force telephony || true
-                              bench --site "$SITE_NAME" install-app --force helpdesk || true
+                              if ! bench --site "$SITE_NAME" list-apps | grep -qx telephony; then
+                                bench --site "$SITE_NAME" install-app --force telephony
+                              fi
+                              if ! bench --site "$SITE_NAME" list-apps | grep -qx helpdesk; then
+                                bench --site "$SITE_NAME" install-app --force helpdesk
+                              fi
 
                               bench --site "$SITE_NAME" migrate
                           env:
@@ -969,11 +957,11 @@
                             - name: DB_PORT
                               value: "3306"
                             - name: DB_ADMIN_USER
-                              value: frappe_admin
+                              value: root
                             - name: DB_ADMIN_PASSWORD
                               valueFrom:
                                 secretKeyRef:
-                                  name: erpnext-mariadb-subchart
+                                  name: erpnext-mariadb-auth
                                   key: mariadb-root-password
                             - name: ERPNEXT_ADMIN_PASSWORD
                               valueFrom:
@@ -988,7 +976,7 @@
                       volumes:
                         - name: sites-dir
                           persistentVolumeClaim:
-                            claimName: erpnext-sites-rwx-v2
+                            claimName: erpnext-sites-rwx-ceph-v2
                         - name: logs
                           emptyDir: {}
 
@@ -1038,26 +1026,6 @@
                 prune: true
                 selfHeal: true
 
-          # ArgoCD Application - QuadPacienti
-          ---
-          apiVersion: argoproj.io/v1alpha1
-          kind: Application
-          metadata:
-            name: quadpacient
-            namespace: argocd
-          spec:
-            project: default
-            source:
-              repoURL: https://gitea.quadtech.dev/QuadCoreTech/QuadPacienti.git
-              targetRevision: HEAD
-              path: k8s
-            destination:
-              server: https://kubernetes.default.svc
-              namespace: quadpacient
-            syncPolicy:
-              automated:
-                prune: true
-                selfHeal: true
           BOOTSTRAP_EOF
           ''
       );

@@ -74,7 +74,7 @@
         mount = true;
         size = "50Gi";
         storageClass = "ceph-block";
-        claimName = "gitea-shared-storage";
+        claimName = "gitea-shared-storage-ceph";
       };
 
       # PostgreSQL database
@@ -126,7 +126,7 @@
 
           database = {
             DB_TYPE = "postgres";
-            HOST = "gitea-db-rw.gitea.svc.cluster.local:5432";
+            HOST = "gitea-db-ceph-rw.gitea.svc.cluster.local:5432";
             NAME = "gitea";
             USER = "gitea";
             PASSWD = "REPLACE_ME";

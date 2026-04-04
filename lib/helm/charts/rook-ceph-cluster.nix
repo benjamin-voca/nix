@@ -121,11 +121,11 @@ in
         };
 
         storage = {
-          useAllNodes = true;
+          useAllNodes = false;
           useAllDevices = false;
           nodes = [
             {
-              name = "backbone-01";
+              name = "backbone-01.local";
               devices = [
                 {
                   name = "/dev/sda";
@@ -171,7 +171,61 @@ in
         # Add a second pool/storageClass when NVMe-backed OSDs are available.
       ];
 
-      cephFileSystems = [ ];
+      cephFileSystems = [
+        {
+          name = "ceph-filesystem";
+          spec = {
+            metadataPool = {
+              failureDomain = "host";
+              replicated = {
+                size = 1;
+              };
+            };
+            dataPools = [
+              {
+                failureDomain = "host";
+                replicated = {
+                  size = 1;
+                };
+                name = "data0";
+              }
+            ];
+            metadataServer = {
+              activeCount = 1;
+              activeStandby = true;
+              resources = {
+                limits = {
+                  memory = "2Gi";
+                };
+                requests = {
+                  cpu = "250m";
+                  memory = "512Mi";
+                };
+              };
+            };
+          };
+          storageClass = {
+            enabled = true;
+            isDefault = false;
+            name = "ceph-filesystem";
+            pool = "data0";
+            reclaimPolicy = "Delete";
+            allowVolumeExpansion = true;
+            volumeBindingMode = "Immediate";
+            parameters = {
+              "csi.storage.k8s.io/provisioner-secret-name" = "rook-csi-cephfs-provisioner";
+              "csi.storage.k8s.io/provisioner-secret-namespace" = "rook-ceph";
+              "csi.storage.k8s.io/controller-expand-secret-name" = "rook-csi-cephfs-provisioner";
+              "csi.storage.k8s.io/controller-expand-secret-namespace" = "rook-ceph";
+              "csi.storage.k8s.io/controller-publish-secret-name" = "rook-csi-cephfs-provisioner";
+              "csi.storage.k8s.io/controller-publish-secret-namespace" = "rook-ceph";
+              "csi.storage.k8s.io/node-stage-secret-name" = "rook-csi-cephfs-node";
+              "csi.storage.k8s.io/node-stage-secret-namespace" = "rook-ceph";
+              "csi.storage.k8s.io/fstype" = "ext4";
+            };
+          };
+        }
+      ];
 
       cephObjectStores = [
         {

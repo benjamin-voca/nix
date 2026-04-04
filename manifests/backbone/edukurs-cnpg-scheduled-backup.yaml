@@ -9,4 +9,4 @@ spec:
   backupOwnerReference: cluster
   method: barmanObjectStore
   cluster:
-    name: edukurs-db
+    name: edukurs-db-ceph
