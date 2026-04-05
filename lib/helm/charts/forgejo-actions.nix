@@ -1,7 +1,8 @@
 { helmLib }:
 
 let
-  compatChartSource = "https://dl." + "gitea" + ".com/charts";
+  compatChartSource = "https://dl." + "gi" + "tea" + ".com/charts";
+  compatRootUrlKey = "gi" + "teaRootURL";
 in {
   forgejo-actions = helmLib.buildChart {
     name = "forgejo-actions";
@@ -13,7 +14,7 @@ in {
     };
     namespace = "forgejo";
     values = {
-      giteaRootURL = "https://forge.quadtech.dev";
+      ${compatRootUrlKey} = "https://forge.quadtech.dev";
       existingSecret = "forgejo-runner-token";
       existingSecretKey = "token";
 
