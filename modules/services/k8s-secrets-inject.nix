@@ -113,7 +113,7 @@ in
           fi
 
           if [ -n "$FORGEJO_DEPLOY" ]; then
-            if RUNNER_TOKEN=$($kubectl -n forgejo exec "deploy/$FORGEJO_DEPLOY" -- sh -lc 'APP_INI=""; for candidate in /data/*/conf/app.ini /data/conf/app.ini; do if [ -f "$candidate" ]; then APP_INI="$candidate"; break; fi; done; [ -n "$APP_INI" ] && su-exec git /usr/local/bin/forgejo --config "$APP_INI" actions generate-runner-token' 2>/dev/null); then
+            if RUNNER_TOKEN=$($kubectl -n forgejo exec "deploy/$FORGEJO_DEPLOY" -- sh -lc "APP_INI=\"\"; for candidate in /data/*/conf/app.ini /data/conf/app.ini; do if [ -f \"\$candidate\" ]; then APP_INI=\"\$candidate\"; break; fi; done; [ -n \"\$APP_INI\" ] && su-exec git /usr/local/bin/forgejo --config \"\$APP_INI\" actions generate-runner-token" 2>/dev/null); then
               if [ -n "$RUNNER_TOKEN" ]; then
                 $kubectl create secret generic forgejo-runner-token \
                   --namespace=forgejo \
