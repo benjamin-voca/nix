@@ -6,14 +6,14 @@ This guide covers the deployment of critical backbone services with High Availab
 
 ### Core Backbone Services
 - **ArgoCD**: GitOps continuous delivery (replicas: 2)
-- **Gitea**: Git repository hosting (replicas: 2-3)
+- **Forgejo**: Git repository hosting (replicas: 2-3)
 - **Grafana**: Monitoring dashboard (replicas: 3)
 - **Loki**: Log aggregation (replicas: 3)
 - **Tempo**: Distributed tracing (replicas: 3)
 - **ClickHouse**: Time-series database (shards: 2, replicas: 2)
 - **Verdaccio**: NPM registry (replicas: 2)
 
-### Gitea Runners Distribution
+### Forgejo Runners Distribution
 - **Backbone runners**: 1-2 (on backbone nodes)
 - **Frontline runners**: 2-3 (on frontline nodes)
 
@@ -69,7 +69,7 @@ affinity:
 - **Storage**: Persistent for application manifests
 - **Health Checks**: Automatic sync with self-healing
 
-### Gitea (Complete HA Setup)
+### Forgejo (Complete HA Setup)
 - **Replicas**: 2-3
 - **PostgreSQL**: 2 replicas (primary + standby)
 - **Redis**: 2 replicas (master + slave)
@@ -106,7 +106,7 @@ affinity:
 - **Storage**: Persistent volume for packages
 - **Security**: Admin user with password management
 
-## Gitea Runners Distribution Strategy
+## Forgejo Runners Distribution Strategy
 
 ### Backbone Runners (Critical)
 - **Purpose**: Build internal infrastructure
@@ -130,7 +130,7 @@ config.services.quadnix.backbone-services.enable = true;
 # Configure specific services if needed
 config.services.quadnix.backbone-services.services = [
   "argocd"
-  "gitea"
+  "forgejo"
   "grafana"
   "loki"
   "tempo"
@@ -138,19 +138,19 @@ config.services.quadnix.backbone-services.services = [
   "verdaccio"
 ];
 
-# Configure Gitea runners
-config.services.quadnix.backbone-services.giteaRunners = 3;
+# Configure Forgejo runners
+config.services.quadnix.backbone-services.forgejoRunners = 3;
 ```
 
 ### Service-Specific Configuration
 ```bash
-# Gitea HA configuration
-config.services.quadnix.gitea-deploy.enable = true;
-config.services.quadnix.gitea-deploy.replicas = 3;
-config.services.quadnix.gitea-deploy.postgres.enable = true;
-config.services.quadnix.gitea-deploy.postgres.replicas = 2;
-config.services.quadnix.gitea-deploy.redis.enable = true;
-config.services.quadnix.gitea-deploy.redis.replicas = 2;
+# Forgejo HA configuration
+config.services.quadnix.forgejo-deploy.enable = true;
+config.services.quadnix.forgejo-deploy.replicas = 3;
+config.services.quadnix.forgejo-deploy.postgres.enable = true;
+config.services.quadnix.forgejo-deploy.postgres.replicas = 2;
+config.services.quadnix.forgejo-deploy.redis.enable = true;
+config.services.quadnix.forgejo-deploy.redis.replicas = 2;
 
 # Grafana HA configuration
 config.services.quadnix.grafana-deploy.enable = true;
@@ -175,7 +175,7 @@ Each service includes:
 - **Resource Limits**: CPU and memory constraints
 
 ### Health Check Endpoints
-- **Gitea**: `/healthz`
+- **Forgejo**: `/healthz`
 - **Grafana**: `/api/health`
 - **Loki**: `/ready` and `/metrics`
 - **ClickHouse**: `/ping`
@@ -188,7 +188,7 @@ Each service includes:
 - **S3/GCS/Azure**: Optional for Loki/Tempo
 
 ### Storage Requirements
-- **Gitea**: 50Gi (repositories + data)
+- **Forgejo**: 50Gi (repositories + data)
 - **Grafana**: 10Gi (dashboards + database)
 - **Loki**: 100Gi (logs)
 - **ClickHouse**: 100Gi per pod (time-series data)
@@ -233,7 +233,7 @@ When adding more nodes:
 ```bash
 # Check service status
 kubectl get pods -n argocd
-kubectl get pods -n gitea
+kubectl get pods -n forgejo
 
 # Check node affinity
 kubectl get pods -n argocd -o wide
@@ -242,13 +242,13 @@ kubectl get pods -n argocd -o wide
 kubectl describe pod -n argocd argocd-server-xxx
 
 # Check storage
-kubectl get pvc -n gitea
+kubectl get pvc -n forgejo
 ```
 
 ## Backup and Recovery
 
 ### Automated Backups
-- **Gitea**: Database dumps via cronjob
+- **Forgejo**: Database dumps via cronjob
 - **Grafana**: Dashboard exports
 - **ClickHouse**: Native backup tools
 - **Loki**: Table-based backups

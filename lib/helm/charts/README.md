@@ -9,9 +9,9 @@ This directory contains Nix flakes for building reproducible Helm charts for Qua
 - **Source**: Upstream ArgoCD Helm chart
 - **Purpose**: GitOps continuous delivery for Kubernetes
 
-### Gitea
+### Forgejo
 - **Version**: 4.4.0
-- **Source**: Official Gitea Helm chart
+- **Source**: Official Forgejo Helm chart
 - **Purpose**: Git repository hosting and CI/CD platform
 
 ## Building Charts
@@ -19,7 +19,7 @@ This directory contains Nix flakes for building reproducible Helm charts for Qua
 ### Local Build
 ```bash
 nix build .#argocd  # Builds ArgoCD chart
-nix build .#gitea   # Builds Gitea chart
+nix build .#forgejo   # Builds Forgejo chart
 ```
 
 ### Output
@@ -27,7 +27,7 @@ Built charts are packaged as `.tgz` files in the output directory.
 
 ## CI Integration
 
-Charts are automatically built and published via Gitea Actions when changes are pushed to the repository.
+Charts are automatically built and published via Forgejo Actions when changes are pushed to the repository.
 
 ## Chart Customization
 

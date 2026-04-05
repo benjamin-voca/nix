@@ -2,14 +2,14 @@
 
 ## Overview
 
-Added production-ready Helm chart configurations for Gitea, ClickHouse, and Grafana (with Loki and Tempo) to the QuadNix project.
+Added production-ready Helm chart configurations for Forgejo, ClickHouse, and Grafana (with Loki and Tempo) to the QuadNix project.
 
 ## Files Created
 
 ### Chart Configurations
 
-1. **lib/helm/charts/gitea.nix** (206 lines)
-   - Gitea git service with HA
+1. **lib/helm/charts/forgejo.nix** (206 lines)
+   - Forgejo git service with HA
    - PostgreSQL database
    - Redis caching
    - SSH and HTTP services
@@ -42,34 +42,34 @@ Added production-ready Helm chart configurations for Gitea, ClickHouse, and Graf
 ## Files Modified
 
 1. **lib/helm/repositories.nix**
-   - Added `gitea-charts` repository (https://dl.gitea.com/charts)
+   - Added `forgejo-charts` repository (https://dl.forgejo.com/charts)
    - Added `clickhouse` repository (https://docs.altinity.com/clickhouse-operator)
    - Added `grafana` repository (https://grafana.github.io/helm-charts)
 
 2. **lib/helm/charts/default.nix**
    - Imported new chart modules
-   - Exported: `gitea`, `clickhouse`, `clickhouse-operator`, `grafana`, `loki`, `tempo`
+   - Exported: `forgejo`, `clickhouse`, `clickhouse-operator`, `grafana`, `loki`, `tempo`
    - Updated `all` attribute set
 
 ## Chart Details
 
-### Gitea (Git Service)
+### Forgejo (Git Service)
 
 **Configuration Highlights:**
 - 2 replicas for HA
 - PostgreSQL database (20Gi storage)
 - Redis cluster for caching/sessions/queues
 - SSH service (LoadBalancer on port 2222)
-- HTTP service with ingress (gitea.quadtech.dev)
-- Gitea Actions enabled
+- HTTP service with ingress (forge.quadtech.dev)
+- Forgejo Actions enabled
 - 50Gi persistent storage for repositories
 - Pod anti-affinity for node distribution
 
 **Access:**
 ```nix
-helmCharts.gitea
+helmCharts.forgejo
 # or
-helmLib.charts.gitea-charts.gitea
+helmLib.charts.forgejo-charts.forgejo
 ```
 
 ### ClickHouse (Analytics Database)
@@ -143,8 +143,8 @@ helmLib.charts.grafana.tempo
 ### Build Charts
 
 ```sh
-# Gitea
-nix build .#chartsDerivations.x86_64-linux.gitea-charts.gitea
+# Forgejo
+nix build .#chartsDerivations.x86_64-linux.forgejo-charts.forgejo
 
 # ClickHouse
 nix build .#chartsDerivations.x86_64-linux.clickhouse.clickhouse
@@ -167,7 +167,7 @@ in
 {
   environment.systemPackages = [
     # Development
-    helmCharts.gitea
+    helmCharts.forgejo
     
     # Analytics
     helmCharts.clickhouse
@@ -194,7 +194,7 @@ Expected output:
   "cert-manager"
   "clickhouse"
   "clickhouse-operator"
-  "gitea"
+  "forgejo"
   "grafana"
   "ingress-nginx"
   "loki"
@@ -207,9 +207,9 @@ Expected output:
 
 These charts can replace/enhance existing QuadNix services:
 
-### Gitea
-**Current**: `services/gitea.nix` uses NixOS service
-**New**: `helmCharts.gitea` provides Kubernetes deployment with HA
+### Forgejo
+**Current**: `services/forgejo.nix` uses NixOS service
+**New**: `helmCharts.forgejo` provides Kubernetes deployment with HA
 
 ### ClickHouse
 **Current**: `services/clickhouse.nix` uses NixOS service
@@ -225,8 +225,8 @@ All charts use placeholder passwords that MUST be changed:
 
 ### Required Secret Updates
 
-1. **Gitea**
-   - `gitea.admin.password`: Admin user password
+1. **Forgejo**
+   - `forgejo.admin.password`: Admin user password
    - `postgresql.auth.password`: PostgreSQL password
 
 2. **ClickHouse**
@@ -240,8 +240,8 @@ All charts use placeholder passwords that MUST be changed:
 ### Recommended: Use SOPS
 
 ```nix
-sops.secrets."gitea/admin-password" = {
-  sopsFile = ../secrets/gitea.yaml;
+sops.secrets."forgejo/admin-password" = {
+  sopsFile = ../secrets/forgejo.yaml;
   key = "admin_password";
 };
 ```
@@ -250,7 +250,7 @@ sops.secrets."gitea/admin-password" = {
 
 Total resources for all new charts:
 
-**Gitea:**
+**Forgejo:**
 - CPU: 200m-2000m (request-limit)
 - Memory: 512Mi-2Gi
 - Storage: 70Gi (50Gi git + 20Gi PostgreSQL)
@@ -284,7 +284,7 @@ All charts include:
 ## Monitoring Integration
 
 Charts with Prometheus monitoring:
-- ✅ Gitea (metrics available)
+- ✅ Forgejo (metrics available)
 - ✅ ClickHouse (ServiceMonitor)
 - ✅ ClickHouse Operator (metrics exporter)
 - ✅ Grafana (ServiceMonitor)
@@ -320,7 +320,7 @@ Test the new charts:
 ## Total Line Count
 
 ```
-206  gitea.nix
+206  forgejo.nix
 280  clickhouse.nix
 426  grafana.nix
 ----

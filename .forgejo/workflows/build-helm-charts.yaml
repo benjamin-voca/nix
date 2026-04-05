@@ -30,46 +30,46 @@ jobs:
       - name: Build ArgoCD Chart
         run: nix build .#argocd --out-link argocd-chart
       
-      - name: Build Gitea Chart
-        run: nix build .#gitea --out-link gitea-chart
+      - name: Build Forgejo Chart
+        run: nix build .#forgejo --out-link forgejo-chart
       
       - name: Test Chart Validation
         run: |
           # Validate ArgoCD chart
           helm lint argocd-chart/*.tgz
           
-          # Validate Gitea chart
-          helm lint gitea-chart/*.tgz
+          # Validate Forgejo chart
+          helm lint forgejo-chart/*.tgz
       
-      - name: Publish to Gitea
+      - name: Publish to Forgejo
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          GITEA_URL: https://gitea.quadtech.dev
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://forge.quadtech.dev
           ORG_NAME: quadnix
         run: |
           # Publish ArgoCD chart
-          curl -u "${{ github.actor }}:$GITEA_TOKEN" -X POST "$GITEA_URL/api/packages/$ORG_NAME/helm" \
+          curl -u "${{ github.actor }}:$FORGEJO_TOKEN" -X POST "$FORGEJO_URL/api/packages/$ORG_NAME/helm" \
             -F "file=@argocd-chart/*.tgz"
           
-          # Publish Gitea chart
-          curl -u "${{ github.actor }}:$GITEA_TOKEN" -X POST "$GITEA_URL/api/packages/$ORG_NAME/helm" \
-            -F "file=@gitea-chart/*.tgz"
+          # Publish Forgejo chart
+          curl -u "${{ github.actor }}:$FORGEJO_TOKEN" -X POST "$FORGEJO_URL/api/packages/$ORG_NAME/helm" \
+            -F "file=@forgejo-chart/*.tgz"
       
       - name: Update Helm Repository Index
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          GITEA_URL: https://gitea.quadtech.dev
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://forge.quadtech.dev
           ORG_NAME: quadnix
         run: |
           # Get all chart files from the package registry
-          curl -s -u "${{ github.actor }}:$GITEA_TOKEN" "$GITEA_URL/api/packages/$ORG_NAME/helm" \
+          curl -s -u "${{ github.actor }}:$FORGEJO_TOKEN" "$FORGEJO_URL/api/packages/$ORG_NAME/helm" \
             | jq -r '.[].name' > chart-list.txt
           
           # Generate index.yaml
-          helm repo index . --url "$GITEA_URL/chartrepo/$ORG_NAME"
+          helm repo index . --url "$FORGEJO_URL/chartrepo/$ORG_NAME"
           
-          # Upload index.yaml to Gitea
-          curl -u "${{ github.actor }}:$GITEA_TOKEN" -X PUT "$GITEA_URL/api/packages/$ORG_NAME/helm/index.yaml" \
+          # Upload index.yaml to Forgejo
+          curl -u "${{ github.actor }}:$FORGEJO_TOKEN" -X PUT "$FORGEJO_URL/api/packages/$ORG_NAME/helm/index.yaml" \
             -H "Content-Type: application/yaml" \
             --data-binary "@index.yaml"
       
@@ -79,7 +79,7 @@ jobs:
         with:
           files: |
             argocd-chart/*.tgz
-            gitea-chart/*.tgz
+            forgejo-chart/*.tgz
             index.yaml
 
       - name: Notify ArgoCD

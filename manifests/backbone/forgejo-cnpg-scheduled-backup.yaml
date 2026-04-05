@@ -1,12 +1,12 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: gitea-db-ceph-hourly
-  namespace: gitea
+  name: forgejo-db-hourly
+  namespace: forgejo
 spec:
   schedule: "0 15 * * * *"
   immediate: true
   backupOwnerReference: cluster
   method: barmanObjectStore
   cluster:
-    name: gitea-db-ceph
+    name: forgejo-db

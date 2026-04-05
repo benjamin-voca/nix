@@ -150,11 +150,11 @@ deploy_monitoring() {
 deploy_backbone_services() {
     info "Deploying backbone services..."
     
-    # Deploy Gitea
-    info "Deploying Gitea..."
-    nix build ".#helmCharts.x86_64-linux.all.gitea"
-    helm upgrade --install gitea ./result/*.tgz \
-        -n gitea \
+    # Deploy Forgejo
+    info "Deploying Forgejo..."
+    nix build ".#helmCharts.x86_64-linux.all.forgejo"
+    helm upgrade --install forgejo ./result/*.tgz \
+        -n forgejo \
         --create-namespace \
         --wait \
         --timeout 10m
@@ -205,7 +205,7 @@ show_status() {
     echo ""
     
     info "Service URLs:"
-    echo "  Gitea:      https://git.quadtech.dev"
+    echo "  Forgejo:    https://forge.quadtech.dev"
     echo "  Grafana:    https://grafana.quadtech.dev"
     echo "  ClickHouse: https://clickhouse.quadtech.dev"
     echo "  Prometheus: https://prometheus.quadtech.dev"

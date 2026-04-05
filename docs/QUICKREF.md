@@ -7,7 +7,7 @@ Backbone (Internal Services)
 ├── backbone-01 (192.168.1.10) - Primary control plane
 ├── backbone-02 (192.168.1.11) - Secondary control plane
 └── Services:
-    ├── Gitea       gitea.quadtech.dev
+    ├── Forgejo       forge.quadtech.dev
     ├── ClickHouse  clickhouse.quadtech.dev
     ├── Grafana     grafana.quadtech.dev
     └── Prometheus  prometheus.quadtech.dev
@@ -52,7 +52,7 @@ helm install grafana <chart> -n grafana
 helm install loki <chart> -n loki
 
 # Services
-helm install gitea <chart> -n gitea
+helm install forgejo <chart> -n forgejo
 helm install clickhouse-operator <chart> -n clickhouse-operator
 helm install clickhouse <chart> -n clickhouse
 ```
@@ -123,7 +123,7 @@ helm uninstall <release> -n <namespace>
 
 ```sh
 # Build single chart
-nix build .#helmCharts.x86_64-linux.all.gitea
+nix build .#helmCharts.x86_64-linux.all.forgejo
 
 # Build all charts
 nix build .#helmCharts.x86_64-linux.all
@@ -137,7 +137,7 @@ nix eval .#helmCharts.x86_64-linux --apply 'charts: builtins.attrNames charts.al
 ### Default Credentials (⚠️ CHANGE THESE!)
 
 ```
-Gitea:      admin / changeme
+Forgejo:      admin / changeme
 Grafana:    admin / changeme
 ClickHouse: admin / changeme
 ```
@@ -145,7 +145,7 @@ ClickHouse: admin / changeme
 ### Service URLs
 
 ```
-Gitea:      https://gitea.quadtech.dev
+Forgejo:      https://forge.quadtech.dev
 Grafana:    https://grafana.quadtech.dev
 ClickHouse: https://clickhouse.quadtech.dev
 Prometheus: https://prometheus.quadtech.dev (via Grafana)
@@ -154,8 +154,8 @@ Prometheus: https://prometheus.quadtech.dev (via Grafana)
 ### SSH Access
 
 ```sh
-# Gitea SSH
-git clone git@gitea.quadtech.dev:2222/user/repo.git
+# Forgejo SSH
+git clone git@forge.quadtech.dev:2222/user/repo.git
 
 # Backbone nodes
 ssh root@mainssh.quadtech.dev  # backbone-01
@@ -289,18 +289,18 @@ sudo nixos-rebuild switch --flake .#backbone-01
 ```sh
 # Update Helm chart
 nix flake update nixhelm
-nix build .#helmCharts.x86_64-linux.all.gitea
+nix build .#helmCharts.x86_64-linux.all.forgejo
 
 # Upgrade release
-helm upgrade gitea ./result/*.tgz -n gitea
+helm upgrade forgejo ./result/*.tgz -n forgejo
 ```
 
 ### Backup
 
 ```sh
 # Backup important PVCs
-kubectl get pvc -n gitea  # Find PVC name
-kubectl exec -n gitea <pod-name> -- tar czf - /data > gitea-backup.tar.gz
+kubectl get pvc -n forgejo  # Find PVC name
+kubectl exec -n forgejo <pod-name> -- tar czf - /data > forgejo-backup.tar.gz
 ```
 
 ### Scale Application
@@ -328,7 +328,7 @@ kubectl autoscale deployment <name> -n <namespace> --min=2 --max=10 --cpu-percen
 2. Select "Loki" datasource
 3. Query examples:
    ```
-   {namespace="gitea"}
+   {namespace="forgejo"}
    {app="my-app"}
    {namespace="client-apps"} |= "error"
    ```
@@ -340,7 +340,7 @@ kubectl autoscale deployment <name> -n <namespace> --min=2 --max=10 --cpu-percen
 3. Query examples:
    ```
    rate(http_requests_total[5m])
-   container_memory_usage_bytes{namespace="gitea"}
+   container_memory_usage_bytes{namespace="forgejo"}
    ```
 
 ## Documentation

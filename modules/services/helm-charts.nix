@@ -10,9 +10,9 @@
       description = "Map of chart names to versions";
     };
     
-    giteaRepo = lib.mkOption {
+    chartRepo = lib.mkOption {
       type = lib.types.str;
-      description = "Gitea repository URL for chart hosting";
+      description = "Forgejo repository URL for chart hosting";
     };
   };
 
@@ -39,10 +39,10 @@
           # Build the chart
           nix build .#${CHART_NAME} --out-link result
           
-          # Package and push to Gitea
+          # Package and push to Forgejo
           helm package result/*.tgz --destination .
           
-          # TODO: Implement Gitea API upload
+          # TODO: Implement Forgejo API upload
           echo "Chart published: $CHART_NAME-$CHART_VERSION.tgz"
         '')
     ];

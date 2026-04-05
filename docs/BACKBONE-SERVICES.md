@@ -2,7 +2,7 @@
 
 ## TL;DR - Current Status
 
-**NO**, the current config will **NOT** run Gitea/ClickHouse/Grafana on backbone-01 because:
+**NO**, the current config will **NOT** run Forgejo/ClickHouse/Grafana on backbone-01 because:
 
 1. `modules/roles/backbone.nix` enables Kubernetes control plane
 2. No NixOS services are enabled by default
@@ -36,7 +36,7 @@ Run services directly on the NixOS host as systemd services.
   imports = [
     ../profiles/server.nix
     ../profiles/docker.nix
-    ../services/gitea.nix       # Gitea on port 443
+    ../services/forgejo.nix       # Forgejo on port 443
     ../services/clickhouse.nix  # ClickHouse on ports 8123, 9000
   ];
   
@@ -50,7 +50,7 @@ sudo nixos-rebuild switch --flake .#backbone-01
 ```
 
 **Access:**
-- Gitea: https://gitea.quadtech.dev (or http://192.168.1.10)
+- Forgejo: https://forge.quadtech.dev (or http://192.168.1.10)
 - ClickHouse: http://192.168.1.10:8123
 
 ---
@@ -92,8 +92,8 @@ Run services on Kubernetes using Helm charts.
 sudo nixos-rebuild switch --flake .#backbone-01
 
 # 2. Deploy services with Helm
-nix build .#helmCharts.x86_64-linux.all.gitea
-helm install gitea ./result/*.tgz -n gitea --create-namespace
+nix build .#helmCharts.x86_64-linux.all.forgejo
+helm install forgejo ./result/*.tgz -n forgejo --create-namespace
 ```
 
 ## Recommended Approach
@@ -123,13 +123,13 @@ Here's what to change to get services running:
   imports = [
     ../profiles/server.nix
     ../profiles/docker.nix
-    ../services/gitea.nix
+    ../services/forgejo.nix
     ../services/clickhouse.nix
   ];
 
   networking.firewall.allowedTCPPorts = [
     22 80 443     # SSH, HTTP, HTTPS
-    2222          # Gitea SSH
+    2222          # Forgejo SSH
     8123 9000     # ClickHouse HTTP, TCP
     6443          # If you add K8s later
   ];
@@ -146,10 +146,10 @@ sudo nixos-rebuild switch --flake .#backbone-01
 
 ```sh
 # Check services
-systemctl status gitea
+systemctl status forgejo
 systemctl status clickhouse
 
-# Access Gitea
+# Access Forgejo
 curl http://localhost:3000  # Or whatever port is configured
 
 # Access ClickHouse
@@ -188,8 +188,8 @@ kubectl get nodes
 
 # Or manually
 kubectl apply -f manifests/backbone/namespaces.yaml
-nix build .#helmCharts.x86_64-linux.all.gitea
-helm install gitea ./result/*.tgz -n gitea --create-namespace
+nix build .#helmCharts.x86_64-linux.all.forgejo
+helm install forgejo ./result/*.tgz -n forgejo --create-namespace
 ```
 
 ## What Each File Does
@@ -200,8 +200,8 @@ helm install gitea ./result/*.tgz -n gitea --create-namespace
 modules/roles/backbone.nix
 └── Imports K8s control-plane + cloudflared-k8s
 
-modules/services/gitea.nix
-└── Configures Gitea as a systemd service on the host
+modules/services/forgejo.nix
+└── Configures Forgejo as a systemd service on the host
 
 modules/services/clickhouse.nix
 └── Configures ClickHouse as a systemd service on the host
@@ -230,7 +230,7 @@ Then deploy Helm charts separately.
 
 ```sh
 # After deploying
-systemctl status gitea
+systemctl status forgejo
 systemctl status clickhouse
 curl http://localhost:8123  # ClickHouse
 ```
@@ -242,7 +242,7 @@ curl http://localhost:8123  # ClickHouse
 kubectl get nodes
 
 # After deploying Helm charts
-kubectl get pods -n gitea
+kubectl get pods -n forgejo
 kubectl get pods -n clickhouse
 kubectl get svc --all-namespaces
 ```

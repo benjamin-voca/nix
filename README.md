@@ -91,4 +91,4 @@ See `lib/helm/README.md` for complete documentation and examples.
 
 - **Role** = What the machine *does* (backbone vs frontline)
 - **Profile** = How the machine *behaves* (base, server, docker)
-- **Service** = What *runs* on the machine (gitea, k8s, etc.)
+- **Service** = What *runs* on the machine (forgejo, k8s, etc.)

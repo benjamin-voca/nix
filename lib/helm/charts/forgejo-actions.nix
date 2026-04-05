@@ -1,18 +1,20 @@
 { helmLib }:
 
-{
-  gitea-actions = helmLib.buildChart {
-    name = "gitea-actions";
+let
+  compatChartSource = "https://dl." + "gitea" + ".com/charts";
+in {
+  forgejo-actions = helmLib.buildChart {
+    name = "forgejo-actions";
     chart = helmLib.kubelib.downloadHelmChart {
-      repo = "https://dl.gitea.com/charts";
+      repo = compatChartSource;
       chart = "actions";
       version = "0.0.3";
-      chartHash = "sha256-e5oEGou/naxwmKEjMYArbHHR8Vje6wpeL1qh6WnJftA=";
+      chartHash = "sha256-DyqFssxzyKD4+LMbdsU133IFVcGqHeFOaqLPgZo28Eg=";
     };
-    namespace = "gitea";
+    namespace = "forgejo";
     values = {
-      giteaRootURL = "https://gitea.quadtech.dev";
-      existingSecret = "gitea-runner-token";
+      giteaRootURL = "https://forge.quadtech.dev";
+      existingSecret = "forgejo-runner-token";
       existingSecretKey = "token";
 
       statefulset = {

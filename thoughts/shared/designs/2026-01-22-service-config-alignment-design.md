@@ -6,11 +6,11 @@
 
 ## Executive Summary
 
-This document outlines the chosen approach for aligning Kubernetes control-plane and Gitea service configurations with current NixOS module options. The goal is to ensure consistent, declarative configuration management across all service deployments using NixOS's module system.
+This document outlines the chosen approach for aligning Kubernetes control-plane and Forgejo service configurations with current NixOS module options. The goal is to ensure consistent, declarative configuration management across all service deployments using NixOS's module system.
 
 ## Problem Statement
 
-Currently, Kubernetes control-plane and Gitea services are configured through a mix of:
+Currently, Kubernetes control-plane and Forgejo services are configured through a mix of:
 - Manual configuration files
 - Outdated NixOS module definitions
 - Environment-specific overrides
@@ -33,16 +33,16 @@ nix/
 │   ├── shared/
 │   │   ├── common.nix          # Shared options and defaults
 │   │   ├── kubernetes-common.nix
-│   │   └── gitea-common.nix
+│   │   └── forgejo-common.nix
 │   ├── kubernetes/
 │   │   ├── control-plane.nix   # Control-plane specific config
 │   │   └── worker.nix
-│   └── gitea/
+│   └── forgejo/
 │       ├── server.nix
 │       └── runner.nix
 ├── services/
 │   ├── kubernetes/
-│   └── gitea/
+│   └── forgejo/
 └── flake.nix
 ```
 
@@ -109,19 +109,19 @@ in {
 }
 ```
 
-## Gitea Service Alignment
+## Forgejo Service Alignment
 
 ### Current State Analysis
 
 | Component | Current Config Location | Target Module |
 |-----------|------------------------|---------------|
-| App | `/etc/gitea/conf/app.ini` | `services.gitea` (existing) |
-| Database | `/etc/gitea/conf/database.ini` | `services.gitea.database` |
-| SSH | `/etc/gitea/conf/ssh.conf` | `services.gitea.ssh` |
+| App | `/etc/forgejo/conf/app.ini` | `services.forgejo` (existing) |
+| Database | `/etc/forgejo/conf/database.ini` | `services.forgejo.database` |
+| SSH | `/etc/forgejo/conf/ssh.conf` | `services.forgejo.ssh` |
 
 ### Enhancement Strategy
 
-1. **Extend existing `services.gitea` module** with additional options
+1. **Extend existing `services.forgejo` module** with additional options
 2. **Add database migration support** for schema updates
 3. **Implement SSH configuration** through module options
 4. **Add backup/restore** primitives
@@ -139,8 +139,8 @@ in {
 - [ ] Test with staging environment
 - [ ] Document upgrade procedures
 
-### Phase 3: Gitea Enhancement (Week 5-6)
-- [ ] Extend `services.gitea` module
+### Phase 3: Forgejo Enhancement (Week 5-6)
+- [ ] Extend `services.forgejo` module
 - [ ] Add database migration handling
 - [ ] Implement SSH key management
 - [ ] Create backup automation
@@ -186,22 +186,22 @@ in {
 }
 ```
 
-### Gitea Service Deployment
+### Forgejo Service Deployment
 
 ```nix
-# gitea-prod.nix
+# forgejo-prod.nix
 { config, pkgs, lib, ... }:
 
 {
-  imports = [ ./modules/gitea/server.nix ];
+  imports = [ ./modules/forgejo/server.nix ];
 
-  services.gitea = {
+  services.forgejo = {
     enable = true;
     database = {
       type = "postgres";
       host = "postgres.quadnix.internal";
-      name = "gitea";
-      user = "gitea";
+      name = "forgejo";
+      user = "forgejo";
     };
     ssh = {
       enable = true;
@@ -238,7 +238,7 @@ in {
 ## Success Criteria
 
 - [ ] All Kubernetes control-plane services managed through Nix modules
-- [ ] Gitea service fully configured via `services.gitea` module
+- [ ] Forgejo service fully configured via `services.forgejo` module
 - [ ] Zero manual configuration files in production
 - [ ] Automated testing pipeline for configuration validation
 - [ ] Documented migration and upgrade procedures
@@ -247,4 +247,4 @@ in {
 
 - [NixOS Module System](https://nixos.org/manual/nixos/stable/#sec-module-system)
 - [Kubernetes Documentation](https://kubernetes.io/docs/home/)
-- [Gitea Configuration](https://docs.gitea.io/en-us/config-cheat-sheet/)
+- [Forgejo Configuration](https://docs.forgejo.io/en-us/config-cheat-sheet/)

@@ -16,7 +16,7 @@ cd /etc/nixos
 # Choose option 4 (Deploy all services)
 
 # 4. Access your services
-open https://gitea.quadtech.dev
+open https://forge.quadtech.dev
 open https://clickhouse.quadtech.dev
 open https://grafana.quadtech.dev
 ```
@@ -40,7 +40,7 @@ The following errors were resolved:
 ## Files Ready for Deployment
 
 ### Single-Instance Helm Charts
-- `lib/helm/charts/gitea-simple.nix` - Git service (1 replica, ClusterIP)
+- `lib/helm/charts/forgejo.nix` - Git service (1 replica, ClusterIP)
 - `lib/helm/charts/clickhouse-simple.nix` - Analytics DB (1 shard, no ZK)
 - `lib/helm/charts/grafana-simple.nix` - Observability (Grafana + Loki + Tempo)
 
@@ -65,13 +65,13 @@ ingress:
     service: http://localhost:3000
   - hostname: ssh.quadtech.dev
     service: ssh://localhost:22
-  - hostname: gitea.quadtech.dev
+  - hostname: forge.quadtech.dev
     service: http://localhost:8080  # ← Will change to :30080 (K8s NodePort)
   - service: http_status:404
 ```
 
 After deployment, it will route to:
-- `gitea.quadtech.dev` → `localhost:30080` (K8s service via NodePort)
+- `forge.quadtech.dev` → `localhost:30080` (K8s service via NodePort)
 - `clickhouse.quadtech.dev` → `localhost:30081` (new)
 - `grafana.quadtech.dev` → `localhost:30082` (new)
 
@@ -166,7 +166,7 @@ cd /etc/nixos
 ================================================
 
 Available services:
-  1) Gitea (Git service)
+  1) Forgejo (Git service)
   2) ClickHouse (Analytics database)
   3) Grafana (Observability)
   4) All services              ← Choose this
@@ -185,7 +185,7 @@ watch kubectl get pods --all-namespaces
 
 # Expected output:
 # NAMESPACE     NAME                      READY   STATUS    RESTARTS   AGE
-# gitea         gitea-xxx                 1/1     Running   0          2m
+# forgejo         forgejo-xxx                 1/1     Running   0          2m
 # clickhouse    clickhouse-0              1/1     Running   0          2m
 # grafana       grafana-xxx               1/1     Running   0          2m
 ```
@@ -194,12 +194,12 @@ watch kubectl get pods --all-namespaces
 
 ```bash
 # Test local connectivity
-curl localhost:30080  # Should return Gitea HTML
+curl localhost:30080  # Should return Forgejo HTML
 curl localhost:30081/ping  # Should return "Ok."
 curl localhost:30082  # Should return Grafana HTML
 
 # Test Cloudflare Tunnel routing
-curl https://gitea.quadtech.dev
+curl https://forge.quadtech.dev
 curl https://clickhouse.quadtech.dev/ping
 curl https://grafana.quadtech.dev
 ```
@@ -207,8 +207,8 @@ curl https://grafana.quadtech.dev
 ### 8. Access Services
 
 Open in browser:
-- **Gitea:** https://gitea.quadtech.dev
-  - Username: `gitea_admin`
+- **Forgejo:** https://forge.quadtech.dev
+  - Username: `forgejo_admin`
   - Password: `changeme` (change immediately!)
 
 - **Grafana:** https://grafana.quadtech.dev
@@ -250,7 +250,7 @@ journalctl -u kube-apiserver -f
 
 ```bash
 # Check pod details
-kubectl describe pod -n gitea <pod-name>
+kubectl describe pod -n forgejo <pod-name>
 
 # Common issues:
 # - No PersistentVolume provisioner (install local-path-provisioner)
@@ -266,7 +266,7 @@ systemctl status cloudflared
 journalctl -u cloudflared -f
 
 # Verify NodePort services exist
-kubectl get svc -n gitea
+kubectl get svc -n forgejo
 kubectl get svc -n clickhouse
 kubectl get svc -n grafana
 
@@ -282,7 +282,7 @@ If something goes wrong:
 sudo nixos-rebuild switch --rollback
 
 # Delete K8s services
-kubectl delete namespace gitea
+kubectl delete namespace forgejo
 kubectl delete namespace clickhouse
 kubectl delete namespace grafana
 ```
@@ -291,7 +291,7 @@ kubectl delete namespace grafana
 
 | Service    | Username      | Password  | Change Method |
 |------------|---------------|-----------|---------------|
-| Gitea      | `gitea_admin` | `changeme`| Via web UI    |
+| Forgejo      | `forgejo_admin` | `changeme`| Via web UI    |
 | Grafana    | `admin`       | `changeme`| Via web UI    |
 | ClickHouse | `admin`       | `changeme`| Update Helm chart |
 
@@ -315,21 +315,21 @@ sudo nixos-rebuild switch --flake /etc/nixos#backbone-01
 ./scripts/deploy-simple.sh
 
 # Check service status
-kubectl get pods -n gitea
+kubectl get pods -n forgejo
 kubectl get pods -n clickhouse
 kubectl get pods -n grafana
 
 # View logs
-kubectl logs -n gitea deployment/gitea
+kubectl logs -n forgejo deployment/forgejo
 kubectl logs -n clickhouse statefulset/clickhouse
 kubectl logs -n grafana deployment/grafana
 
 # Restart service
-kubectl rollout restart -n gitea deployment/gitea
+kubectl rollout restart -n forgejo deployment/forgejo
 
 # Update service
-# 1. Edit Helm chart: vim lib/helm/charts/gitea-simple.nix
-# 2. Rebuild: nix build .#helmCharts.x86_64-linux.gitea-simple
+# 1. Edit Helm chart: vim lib/helm/charts/forgejo.nix
+# 2. Rebuild: nix build .#helmCharts.x86_64-linux.forgejo
 # 3. Apply: kubectl apply -f result/
 ```
 

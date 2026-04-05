@@ -88,7 +88,7 @@ main() {
     echo "Cloudflare Tunnel integration."
     echo ""
     echo "Available services:"
-    echo "  1) Gitea (Git service)"
+    echo "  1) Forgejo (Git service)"
     echo "  2) ClickHouse (Analytics database)"
     echo "  3) Grafana (Observability)"
     echo "  4) All services"
@@ -100,8 +100,8 @@ main() {
     
     case $choice in
         1)
-            deploy_service "Gitea" "gitea-simple" "gitea"
-            expose_service "gitea-http" "gitea" 3000 30080
+            deploy_service "Forgejo" "forgejo" "forgejo"
+            expose_service "forgejo-http" "forgejo" 3000 30080
             ;;
         2)
             deploy_service "ClickHouse" "clickhouse-simple" "clickhouse"
@@ -112,11 +112,11 @@ main() {
             expose_service "grafana" "grafana" 80 30082
             ;;
         4)
-            deploy_service "Gitea" "gitea-simple" "gitea"
+            deploy_service "Forgejo" "forgejo" "forgejo"
             deploy_service "ClickHouse" "clickhouse-simple" "clickhouse"
             deploy_service "Grafana" "grafana-simple" "grafana"
             
-            expose_service "gitea-http" "gitea" 3000 30080
+            expose_service "forgejo-http" "forgejo" 3000 30080
             expose_service "clickhouse" "clickhouse" 8123 30081
             expose_service "grafana" "grafana" 80 30082
             
@@ -125,7 +125,7 @@ main() {
         5)
             info "Service status:"
             echo ""
-            kubectl get pods -n gitea
+            kubectl get pods -n forgejo
             echo ""
             kubectl get pods -n clickhouse
             echo ""
@@ -135,7 +135,7 @@ main() {
             info "Setting up port-forwards for Cloudflare Tunnel..."
             echo "Run these commands in separate terminals:"
             echo ""
-            echo "  kubectl port-forward -n gitea svc/gitea-http 30080:3000"
+            echo "  kubectl port-forward -n forgejo svc/forgejo-http 30080:3000"
             echo "  kubectl port-forward -n clickhouse svc/clickhouse 30081:8123"
             echo "  kubectl port-forward -n grafana svc/grafana 30082:80"
             echo ""

@@ -19,14 +19,14 @@ Role composition files combine multiple profiles and services into a cohesive co
   imports = [
     ../profiles/kubernetes/control-plane.nix
     ../profiles/networking/common.nix
-    ../services/gitea.nix
+    ../services/forgejo.nix
   ];
 
   # Role-specific configuration
   kubernetes.role = "control-plane";
   
   # Enable services for this role
-  services.gitea.enable = true;
+  services.forgejo.enable = true;
 }
 ```
 
@@ -45,7 +45,7 @@ roles/backbone.nix (Control Plane)
 ├── profiles/kubernetes/control-plane.nix
 ├── profiles/kubernetes/common.nix
 ├── profiles/networking/common.nix
-└── services/gitea.nix
+└── services/forgejo.nix
 
 roles/frontline.nix (Worker)
 ├── profiles/kubernetes/worker.nix

@@ -57,7 +57,7 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: gitea.quadtech.dev
+  - hostname: forge.quadtech.dev
     service: http://localhost:3000
   - hostname: clickhouse.quadtech.dev
     service: http://localhost:8123
@@ -114,7 +114,7 @@ All inbound traffic comes through the Cloudflare Tunnel (outbound connection fro
 {
   imports = [
     ../profiles/server.nix
-    ../services/gitea.nix
+    ../services/forgejo.nix
     ../services/clickhouse.nix
   ];
   
@@ -133,8 +133,8 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: gitea.quadtech.dev
-    service: http://localhost:3000  # Gitea port
+  - hostname: forge.quadtech.dev
+    service: http://localhost:3000  # Forgejo port
   - hostname: clickhouse.quadtech.dev
     service: http://localhost:8123  # ClickHouse HTTP
   - service: http_status:404
@@ -151,8 +151,8 @@ credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   # Point directly to Kubernetes services
-  - hostname: gitea.quadtech.dev
-    service: http://gitea.gitea.svc.cluster.local:3000
+  - hostname: forge.quadtech.dev
+    service: http://forgejo.forgejo.svc.cluster.local:3000
   - hostname: clickhouse.quadtech.dev
     service: http://clickhouse.clickhouse.svc.cluster.local:8123
   - hostname: grafana.quadtech.dev
@@ -166,12 +166,12 @@ ingress:
 apiVersion: v1
 kind: Service
 metadata:
-  name: gitea
-  namespace: gitea
+  name: forgejo
+  namespace: forgejo
 spec:
   type: ClusterIP  # NOT LoadBalancer
   selector:
-    app: gitea
+    app: forgejo
   ports:
   - port: 3000
 ```
@@ -190,12 +190,12 @@ Then use standard Kubernetes Ingress resources (but without TLS sections).
 
 ## Helm Chart Adjustments
 
-### Gitea Chart
+### Forgejo Chart
 
 ```nix
-# lib/helm/charts/gitea.nix
+# lib/helm/charts/forgejo.nix
 {
-  gitea = helmLib.buildChart {
+  forgejo = helmLib.buildChart {
     # ... existing config ...
     values = {
       service = {
@@ -210,7 +210,7 @@ Then use standard Kubernetes Ingress resources (but without TLS sections).
         enabled = true;
         className = "nginx";
         hosts = [{
-          host = "gitea.quadtech.dev";
+          host = "forge.quadtech.dev";
           paths = [{ path = "/"; pathType = "Prefix"; }];
         }];
         # NO tls section - Cloudflare handles it
@@ -247,7 +247,7 @@ In Cloudflare Dashboard:
 2. **Add Public Hostnames**:
    - Tunnel → Public Hostname → Add
    - For each service:
-     - Subdomain: `gitea`, `clickhouse`, `grafana`
+     - Subdomain: `forgejo`, `clickhouse`, `grafana`
      - Domain: `quadtech.dev`
      - Service: `http://localhost:3000` (or K8s service)
 
@@ -299,7 +299,7 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: gitea.quadtech.dev
+  - hostname: forge.quadtech.dev
     service: http://localhost:3000
   - hostname: clickhouse.quadtech.dev
     service: http://localhost:8123
@@ -309,7 +309,7 @@ ingress:
 EOF
 
 # Route DNS (in Cloudflare dashboard or via CLI)
-cloudflared tunnel route dns quadnix gitea.quadtech.dev
+cloudflared tunnel route dns quadnix forge.quadtech.dev
 cloudflared tunnel route dns quadnix clickhouse.quadtech.dev
 cloudflared tunnel route dns quadnix grafana.quadtech.dev
 ```
@@ -326,8 +326,8 @@ Services run on localhost, Cloudflare Tunnel exposes them.
 #### Kubernetes Services:
 ```sh
 # Deploy with adjusted Helm values (ClusterIP, no TLS)
-nix build .#helmCharts.x86_64-linux.all.gitea
-helm install gitea ./result/*.tgz -n gitea
+nix build .#helmCharts.x86_64-linux.all.forgejo
+helm install forgejo ./result/*.tgz -n forgejo
 ```
 
 ### 3. Update Cloudflared Service
@@ -343,8 +343,8 @@ Or for Kubernetes services:
 
 ```yaml
 ingress:
-  - hostname: gitea.quadtech.dev
-    service: http://gitea.gitea.svc.cluster.local:3000
+  - hostname: forge.quadtech.dev
+    service: http://forgejo.forgejo.svc.cluster.local:3000
 ```
 
 ### 4. Verify
@@ -354,7 +354,7 @@ ingress:
 cloudflared tunnel info quadnix
 
 # Check service accessibility
-curl https://gitea.quadtech.dev
+curl https://forge.quadtech.dev
 curl https://clickhouse.quadtech.dev
 ```
 
@@ -376,7 +376,7 @@ Given you have Cloudflare Tunnel, here's my **recommended approach**:
 # modules/roles/backbone.nix - NixOS Services
 {
   imports = [
-    ../services/gitea.nix
+    ../services/forgejo.nix
     ../services/clickhouse.nix
   ];
 }
@@ -388,7 +388,7 @@ tunnel: <id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: gitea.quadtech.dev
+  - hostname: forge.quadtech.dev
     service: http://localhost:3000
   - hostname: clickhouse.quadtech.dev
     service: http://localhost:8123
@@ -396,7 +396,7 @@ ingress:
 ```
 
 **Result:**
-- Services accessible at `https://gitea.quadtech.dev`, etc.
+- Services accessible at `https://forge.quadtech.dev`, etc.
 - No ingress, no cert-manager, no LoadBalancer needed
 - Cloudflare handles everything external
 

@@ -169,27 +169,27 @@ EOF
             sleep 2
           done
 
-          echo "Creating ArgoCD Gitea credentials secret..."
-          if [ -f /run/secrets/argocd-gitea-username ] && [ -f /run/secrets/argocd-gitea-token ]; then
-            GITEA_USERNAME=$(cat /run/secrets/argocd-gitea-username)
-            GITEA_TOKEN=$(cat /run/secrets/argocd-gitea-token)
+          echo "Creating ArgoCD Forgejo credentials secret..."
+          if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
+            FORGEJO_USERNAME=$(cat /run/secrets/argocd-forgejo-username)
+            FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
             $kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: gitea-quadtech-repo-creds
+  name: forgejo-quadtech-repo-creds
   namespace: argocd
   labels:
     argocd.argoproj.io/secret-type: repo-creds
 type: Opaque
 stringData:
-  url: https://gitea.quadtech.dev/QuadCoreTech
-  username: "$GITEA_USERNAME"
-  password: "$GITEA_TOKEN"
+  url: https://forge.quadtech.dev/QuadCoreTech
+  username: "$FORGEJO_USERNAME"
+  password: "$FORGEJO_TOKEN"
 EOF
           else
-            echo "Warning: Gitea credentials not found in /run/secrets/, skipping..."
-            echo "Add argocd-gitea-username and argocd-gitea-token to secrets/backbone-01.yaml"
+            echo "Warning: Forgejo credentials not found in /run/secrets/, skipping..."
+            echo "Add argocd-forgejo-username and argocd-forgejo-token to secrets/backbone-01.yaml"
           fi
         '';
       })

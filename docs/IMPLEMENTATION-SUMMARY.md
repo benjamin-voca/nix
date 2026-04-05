@@ -9,7 +9,7 @@ A production-ready Kubernetes deployment optimized for **single-instance workloa
 ### New Helm Charts (Single-Instance, Cloudflare-Optimized)
 ```
 lib/helm/charts/
-├── gitea-simple.nix         # Gitea without HA (1 replica, ClusterIP, no ingress/TLS)
+├── forgejo.nix         # Forgejo without HA (1 replica, ClusterIP, no ingress/TLS)
 ├── clickhouse-simple.nix    # ClickHouse without sharding (1 shard, 1 replica, no ZK)
 └── grafana-simple.nix       # Grafana + Loki + Tempo (1 replica each, ClusterIP)
 ```
@@ -42,7 +42,7 @@ modules/roles/backbone.nix            # Complete K8s + Cloudflare setup
 - Cloudflare Tunnel with 5 routes:
   - edukurs.quadtech.dev → localhost:3000 (existing app)
   - ssh.quadtech.dev → localhost:22 (SSH)
-  - gitea.quadtech.dev → localhost:30080 (K8s NodePort)
+  - forge.quadtech.dev → localhost:30080 (K8s NodePort)
   - clickhouse.quadtech.dev → localhost:30081 (K8s NodePort)
   - grafana.quadtech.dev → localhost:30082 (K8s NodePort)
 
@@ -85,7 +85,7 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 ┌─────────────────────────────────────────────────────────────┐
 │  Internet (Cloudflare Tunnel)                               │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │ gitea.quadtech.dev → TLS termination                   │ │
+│  │ forge.quadtech.dev → TLS termination                   │ │
 │  │ clickhouse.quadtech.dev → TLS termination              │ │
 │  │ grafana.quadtech.dev → TLS termination                 │ │
 │  └────────────────────────────────────────────────────────┘ │
@@ -95,7 +95,7 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 │  backbone-01 (NixOS Host)                                   │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │ cloudflared (systemd service)                          │ │
-│  │ ├─ gitea.quadtech.dev → localhost:30080               │ │
+│  │ ├─ forge.quadtech.dev → localhost:30080               │ │
 │  │ ├─ clickhouse.quadtech.dev → localhost:30081          │ │
 │  │ └─ grafana.quadtech.dev → localhost:30082             │ │
 │  └────────────────────────┬───────────────────────────────┘ │
@@ -103,8 +103,8 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 │  ┌────────────────────────┴───────────────────────────────┐ │
 │  │ Kubernetes Cluster                                     │ │
 │  │ ┌──────────────┐  ┌────────────────┐  ┌─────────────┐ │ │
-│  │ │ Gitea Pod    │  │ ClickHouse Pod │  │ Grafana Pod │ │ │
-│  │ │ ns:gitea     │  │ ns:clickhouse  │  │ ns:grafana  │ │ │
+│  │ │ Forgejo Pod    │  │ ClickHouse Pod │  │ Grafana Pod │ │ │
+│  │ │ ns:forgejo     │  │ ns:clickhouse  │  │ ns:grafana  │ │ │
 │  │ │ Port 3000    │  │ Port 8123      │  │ Port 3000   │ │ │
 │  │ │ → NodePort   │  │ → NodePort     │  │ → NodePort  │ │ │
 │  │ │   30080      │  │   30081        │  │   30082     │ │ │
@@ -134,7 +134,7 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
    - Exposes services via NodePort (30080, 30081, 30082)
 
 3. **Verification**
-   - Visit https://gitea.quadtech.dev (Gitea UI)
+   - Visit https://forge.quadtech.dev (Forgejo UI)
    - Visit https://clickhouse.quadtech.dev/ping (ClickHouse health)
    - Visit https://grafana.quadtech.dev (Grafana UI)
 
@@ -188,13 +188,13 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 4. **Test access:**
    ```bash
    # Should all return 200 OK
-   curl -I https://gitea.quadtech.dev
+   curl -I https://forge.quadtech.dev
    curl https://clickhouse.quadtech.dev/ping
    curl -I https://grafana.quadtech.dev
    ```
 
 5. **Change default passwords:**
-   - Gitea: https://gitea.quadtech.dev (login as gitea_admin/changeme, change in settings)
+   - Forgejo: https://forge.quadtech.dev (login as forgejo_admin/changeme, change in settings)
    - Grafana: https://grafana.quadtech.dev (login as admin/changeme, change in profile)
    - ClickHouse: Update Helm chart values and redeploy
 
@@ -217,17 +217,17 @@ kubectl get nodes
 kubectl get pods --all-namespaces
 
 # Check specific service
-kubectl get pods -n gitea
-kubectl logs -n gitea deployment/gitea
-kubectl describe pod -n gitea <pod-name>
+kubectl get pods -n forgejo
+kubectl logs -n forgejo deployment/forgejo
+kubectl describe pod -n forgejo <pod-name>
 
 # Test local connectivity
-curl localhost:30080  # Gitea
+curl localhost:30080  # Forgejo
 curl localhost:30081/ping  # ClickHouse
 curl localhost:30082  # Grafana
 
 # Port-forward for debugging
-kubectl port-forward -n gitea svc/gitea-http 3000:3000
+kubectl port-forward -n forgejo svc/forgejo-http 3000:3000
 ```
 
 ## Configuration Examples
@@ -248,7 +248,7 @@ services.cloudflared-k8s.routes = [
 ### Scaling to Multiple Replicas (if needed later)
 
 ```nix
-# lib/helm/charts/gitea-simple.nix
+# lib/helm/charts/forgejo.nix
 replicaCount = 2;  # Change from 1 to 2
 
 # Add anti-affinity
@@ -261,7 +261,7 @@ affinity = {
           matchExpressions = [{
             key = "app";
             operator = "In";
-            values = [ "gitea" ];
+            values = [ "forgejo" ];
           }];
         };
         topologyKey = "kubernetes.io/hostname";
@@ -275,7 +275,7 @@ affinity = {
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `lib/helm/charts/gitea-simple.nix` | Single-instance Gitea chart | ✅ Created |
+| `lib/helm/charts/forgejo.nix` | Single-instance Forgejo chart | ✅ Created |
 | `lib/helm/charts/clickhouse-simple.nix` | Single-instance ClickHouse chart | ✅ Created |
 | `lib/helm/charts/grafana-simple.nix` | Single-instance Grafana+Loki+Tempo | ✅ Created |
 | `modules/services/cloudflared-k8s.nix` | Cloudflare Tunnel NixOS module | ✅ Created |

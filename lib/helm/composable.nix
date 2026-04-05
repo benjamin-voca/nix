@@ -191,19 +191,19 @@ let
   mkCloudflaredDefaultIngress = service: mkCloudflaredIngress null service;
 
   # ===========================================================================
-  # Gitea Actions Runner
+  # Forgejo Actions Runner
   # ===========================================================================
 
-  mkGiteaRunnerSA = namespace: {
+  mkForgejoRunnerSA = namespace: {
     apiVersion = "v1";
     kind = "ServiceAccount";
     metadata = {
-      name = "gitea-actions";
+      name = "forgejo-actions";
       namespace = namespace;
     };
   };
 
-  mkGiteaRunnerSecret = name: namespace: tokenPlaceholder:
+  mkForgejoRunnerSecret = name: namespace: tokenPlaceholder:
     {
       apiVersion = "v1";
       kind = "Secret";
@@ -217,23 +217,23 @@ let
       };
     };
 
-  mkGiteaRunnerStatefulSet = {
-    name ? "gitea-actions",
-    namespace ? "gitea",
+  mkForgejoRunnerStatefulSet = {
+    name ? "forgejo-actions",
+    namespace ? "forgejo",
     replicas ? 2,
-    giteaInstanceUrl ? "https://gitea.quadtech.dev",
-    runnerTokenSecret ? "gitea-runner-token",
+    forgejoInstanceUrl ? "https://forge.quadtech.dev",
+    runnerTokenSecret ? "forgejo-runner-token",
     runnerName ? "k8s-runner",
     runnerLabels ? "ubuntu-latest,linux,x86_64,self-hosted",
     dindImage ? "docker:28.3.3-dind",
-    actRunnerImage ? "docker.gitea.com/act_runner:0.2.13",
+    actRunnerImage ? "code.forgejo.org/forgejo/runner:3.5.0",
   }:
     let
       container-act-runner = {
         name = "act-runner";
         image = actRunnerImage;
         env = [
-          { name = "GITEA_INSTANCE_URL"; value = giteaInstanceUrl; }
+          { name = "GITEA_INSTANCE_URL"; value = forgejoInstanceUrl; }
           { name = "GITEA_RUNNER_TOKEN"; valueFrom = { secretKeyRef = { name = runnerTokenSecret; key = "token"; }; }; }
           { name = "GITEA_RUNNER_LABELS"; value = runnerLabels; }
           { name = "GITEA_RUNNER_NAME"; value = runnerName; }
@@ -244,7 +244,7 @@ let
           cat > config.yaml << 'CFGEof'
 runner:
   name: ${runnerName}
-  url: ${giteaInstanceUrl}
+  url: ${forgejoInstanceUrl}
   token: $$GITEA_RUNNER_TOKEN
   labels:
     - ubuntu-latest
@@ -255,7 +255,7 @@ docker:
   host: tcp://localhost:2375
 CFGEof
           if [ ! -f .runner ]; then
-            act_runner register --instance $${giteaInstanceUrl} --token $${runnerTokenSecret} --name $${runnerName} --labels $${runnerLabels} --no-interactive
+            act_runner register --instance $${forgejoInstanceUrl} --token $${runnerTokenSecret} --name $${runnerName} --labels $${runnerLabels} --no-interactive
           fi
           act_runner daemon --config config.yaml
         ''];
@@ -290,7 +290,7 @@ CFGEof
         template = {
           metadata = { labels = { "app.kubernetes.io/name" = name; }; };
           spec = {
-            serviceAccountName = "gitea-actions";
+            serviceAccountName = "forgejo-actions";
             containers = [container-act-runner container-dind];
             volumes = [{ name = "runner-data"; emptyDir = {}; }];
           };
@@ -450,7 +450,7 @@ in
   inherit mkArgoHelmApp mkArgoHelmAppFromChart;
   inherit mkCNPGClusterRef mkCNPGConnectionString;
   inherit mkCloudflaredConfig mkCloudflaredIngress mkCloudflaredDefaultIngress;
-  inherit mkGiteaRunnerSA mkGiteaRunnerSecret mkGiteaRunnerStatefulSet;
+  inherit mkForgejoRunnerSA mkForgejoRunnerSecret mkForgejoRunnerStatefulSet;
   inherit mkCloudflaredDeployment;
   inherit mkMetallbIPAddressPool mkMetallbL2Advertisement mkMetallbCRDs;
   inherit smallResources mediumResources largeResources defaultArgoSyncPolicy;

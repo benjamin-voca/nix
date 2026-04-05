@@ -34,23 +34,23 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: gitea-db-ceph
-  namespace: gitea
+  name: forgejo-db
+  namespace: forgejo
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
-  instances: 1
+  instances: 3
   storage:
     storageClass: ceph-block
     size: 10Gi
   bootstrap:
     initdb:
-      database: gitea
-      owner: gitea
+      database: forgejo
+      owner: forgejo
       secret:
-        name: gitea-db-ceph
+        name: forgejo-db
   backup:
     barmanObjectStore:
-      destinationPath: "s3://cnpg-backups/gitea-db-ceph"
+      destinationPath: "s3://cnpg-backups/forgejo-db"
       endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
       s3Credentials:
         accessKeyId:

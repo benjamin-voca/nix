@@ -37,7 +37,7 @@ let
       };
 
 
-  # Bootstrap output that merges gitea, argocd, and cloudflare
+  # Bootstrap output that merges forgejo, argocd, and cloudflare
   bootstrapFor = system:
     let
       pkgs = pkgsFor system;
@@ -175,11 +175,11 @@ let
             service = "ssh://localhost:22";
           }
           {
-            hostname = "gitea-ssh.quadtech.dev";
+            hostname = "forge-ssh.quadtech.dev";
             service = "tcp://192.168.1.240:32222";
           }
           {
-            hostname = "gitea.quadtech.dev";
+            hostname = "forge.quadtech.dev";
             service = "http://192.168.1.240:80";
           }
           {
@@ -327,14 +327,14 @@ let
 
       # NodePort service for direct SSH access on fixed port 2222
       # Configure your router to forward port 2222 to the node's IP
-      giteaSSHNodePort = pkgs.writeText "gitea-ssh-nodeport.yaml" (builtins.toJSON {
+      forgejoSSHNodePort = pkgs.writeText "forgejo-ssh-nodeport.yaml" (builtins.toJSON {
         apiVersion = "v1";
         kind = "Service";
         metadata = {
-          name = "gitea-ssh-nodeport";
-          namespace = "gitea";
+          name = "forgejo-ssh-nodeport";
+          namespace = "forgejo";
           annotations = {
-            "external-dns.alpha.kubernetes.io/hostname" = "gitea-ssh.quadtech.dev";
+            "external-dns.alpha.kubernetes.io/hostname" = "forge-ssh.quadtech.dev";
           };
         };
         spec = {
@@ -346,8 +346,8 @@ let
             protocol = "TCP";
           }];
           selector = {
-            "app.kubernetes.io/name" = "gitea";
-            "app.kubernetes.io/instance" = "gitea";
+            "app.kubernetes.io/name" = "forgejo";
+            "app.kubernetes.io/instance" = "forgejo";
           };
         };
       });
@@ -615,20 +615,20 @@ spec:
     name: edukurs-db-ceph
 EOF
 
-        # Create scheduled CNPG backup for gitea cluster
-        cat > $out/02h-gitea-cnpg-scheduled-backup.yaml << 'EOF'
+        # Create scheduled CNPG backup for forgejo cluster
+        cat > $out/02h-forgejo-cnpg-scheduled-backup.yaml << 'EOF'
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: gitea-db-ceph-hourly
-  namespace: gitea
+  name: forgejo-db-hourly
+  namespace: forgejo
 spec:
   schedule: "0 15 * * * *"
   immediate: true
   backupOwnerReference: cluster
   method: barmanObjectStore
   cluster:
-    name: gitea-db-ceph
+    name: forgejo-db
 EOF
 
         # Create cnpg-system namespace for the CNPG operator
@@ -681,7 +681,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://gitea.quadtech.dev/QuadCoreTech/edukurs.git
+    repoURL: https://forge.quadtech.dev/QuadCoreTech/edukurs.git
     path: k8s
     targetRevision: main
   destination:
@@ -705,7 +705,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://gitea.quadtech.dev/QuadCoreTech/batllavatourist.git
+    repoURL: https://forge.quadtech.dev/QuadCoreTech/batllavatourist.git
     path: k8s
     targetRevision: main
   destination:
@@ -729,7 +729,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://gitea.quadtech.dev/QuadCoreTech/quadpacienti.git
+    repoURL: https://forge.quadtech.dev/QuadCoreTech/quadpacienti.git
     path: k8s
     targetRevision: main
   destination:
@@ -741,159 +741,74 @@ spec:
       selfHeal: true
 EOF
         
-      # Copy gitea chart from existing charts
-        cp ${existingCharts.gitea} $out/03-gitea.yaml
+      # Copy forgejo chart from existing charts
+        cp ${existingCharts.forgejo} $out/03-forgejo.yaml
 
-        # Ensure Gitea shared storage claim exists on Ceph
-        cat > $out/03a-gitea-shared-storage-ceph-pvc.yaml << 'EOF'
+        # Ensure Forgejo shared storage claim exists on Ceph
+        cat > $out/03a-forgejo-shared-storage-ceph-pvc.yaml << 'EOF'
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: gitea-shared-storage-ceph
-  namespace: gitea
+  name: forgejo-shared-storage-ceph
+  namespace: forgejo
 spec:
   accessModes:
-    - ReadWriteOnce
-  storageClassName: ceph-block
+    - ReadWriteMany
+  storageClassName: ceph-filesystem
   resources:
     requests:
       storage: 50Gi
 EOF
 
-        # Ensure Gitea DB cluster is explicitly Ceph-backed
-        cat > $out/03b-gitea-db-storageclass-patch.yaml << 'EOF'
+        # Ensure Forgejo DB cluster is explicitly Ceph-backed
+        cat > $out/03b-forgejo-db-storageclass-patch.yaml << 'EOF'
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: gitea-db
-  namespace: gitea
+  name: forgejo-db
+  namespace: forgejo
 spec:
   storage:
     storageClass: ceph-block
     size: 10Gi
+  instances: 3
 EOF
         
-        # Create gitea runner token secret (base64 encoded - will be replaced with actual secret via SOPS or external secret operator)
-        cat > $out/04-gitea-runner-secret.yaml << 'EOF'
+        # Create forgejo runner token secret (base64 encoded - will be replaced with actual secret via SOPS or external secret operator)
+        cat > $out/04-forgejo-runner-secret.yaml << 'EOF'
 apiVersion: v1
 kind: Secret
 metadata:
-  name: gitea-runner-token
-  namespace: gitea
+  name: forgejo-runner-token
+  namespace: forgejo
 type: Opaque
 stringData:
   token: RUNNER_TOKEN_PLACEHOLDER
 EOF
         
-        # Create gitea-actions runner deployment inline
-        cat > $out/04-gitea-actions.yaml << 'GITEA_ACTIONS_EOF'
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: gitea-actions
-  namespace: gitea
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: gitea-actions
-  namespace: gitea
-spec:
-  serviceName: gitea-actions
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: gitea-actions
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: gitea-actions
-    spec:
-      automountServiceAccountToken: false
-      serviceAccountName: gitea-actions
-      containers:
-        - name: act-runner
-          image: docker.gitea.com/act_runner:0.2.13
-          command:
-            - sh
-            - -c
-            - |
-              cd /runner
-              TOKEN=$(cat /run/secrets/token)
-              if [ ! -f .runner ]; then
-                /usr/local/bin/act_runner register \
-                  --no-interactive \
-                  --instance https://gitea.quadtech.dev \
-                  --token "$TOKEN" \
-                  --name "k8s-runner-$(hostname)" \
-                  --labels "ubuntu-latest,linux,x86_64,self-hosted"
-              fi
-              exec /usr/local/bin/act_runner daemon
-          env:
-            - name: GITEA_RUNNER_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: gitea-runner-token
-                  key: token
-          volumeMounts:
-            - name: runner-config
-              mountPath: /runner
-            - name: runner-data
-              mountPath: /data
-            - name: runner-token
-              mountPath: /run/secrets
-              readOnly: true
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 1000m
-              memory: 1Gi
-        - name: dind
-          image: docker:28.3.3-dind
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: runner-data
-              mountPath: /var/lib/docker
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 2000m
-              memory: 2Gi
-      volumes:
-        - name: runner-config
-          emptyDir: {}
-        - name: runner-data
-          emptyDir: {}
-        - name: runner-token
-          secret:
-            secretName: gitea-runner-token
-GITEA_ACTIONS_EOF
+        # Copy forgejo-actions chart from existing charts
+        cp ${existingCharts.forgejo-actions} $out/04-forgejo-actions.yaml
 
-        # Create Gitea repository credentials for ArgoCD
-        # NOTE: These are now applied via argocd-deploy service after deployment
-        # The service reads from /run/secrets/argocd-gitea-username and /run/secrets/argocd-gitea-token
+        # Create Forgejo repository credentials for ArgoCD
+        # NOTE: This is now applied via argocd-deploy service after deployment
+        # The service reads from /run/secrets/argocd-forgejo-username and /run/secrets/argocd-forgejo-token
         # which are managed via SOPS in secrets/backbone-01.yaml
 
-        # Create ArgoCD Repository CR for Gitea
-        cat > $out/04-argocd-gitea-repo.yaml << 'EOF'
+        # Create ArgoCD Repository CR for Forgejo
+        cat > $out/04-argocd-forgejo-repo.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
 kind: Repository
 metadata:
-  name: gitea-quadtech
+  name: forgejo-quadtech
   namespace: argocd
 spec:
   type: git
-  url: https://gitea.quadtech.dev/QuadCoreTech
+  url: https://forge.quadtech.dev/QuadCoreTech
   usernameSecret:
-    name: argocd-gitea-creds
+    name: argocd-forgejo-creds
     key: username
   passwordSecret:
-    name: argocd-gitea-creds
+    name: argocd-forgejo-creds
     key: password
 EOF
         
@@ -924,15 +839,15 @@ CONFIGMAP_EOF
 ${cloudflaredDeployment}
 DEPLOYMENT_EOF
 
-        # Create gitea SSH NodePort inline
-        cat > $out/07-gitea-ssh-nodeport.yaml << 'EOF'
+        # Create forgejo SSH NodePort inline
+        cat > $out/07-forgejo-ssh-nodeport.yaml << 'EOF'
 apiVersion: v1
 kind: Service
 metadata:
-  name: gitea-ssh-nodeport
-  namespace: gitea
+  name: forgejo-ssh-nodeport
+  namespace: forgejo
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: gitea-ssh.quadtech.dev
+    external-dns.alpha.kubernetes.io/hostname: forge-ssh.quadtech.dev
 spec:
   type: NodePort
   ports:
@@ -941,8 +856,8 @@ spec:
     nodePort: 32222
     protocol: TCP
   selector:
-    app.kubernetes.io/name: gitea
-    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/name: forgejo
+    app.kubernetes.io/instance: forgejo
 EOF
 
         # Create harbor namespace inline
@@ -1258,7 +1173,7 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/02g-edukurs-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/02h-gitea-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
+        cat $out/02h-forgejo-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/02a-cnpg-operator.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -1266,17 +1181,17 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/02c-cnpg-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/03-gitea.yaml >> $out/bootstrap.yaml
+        cat $out/03-forgejo.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/03a-gitea-shared-storage-ceph-pvc.yaml >> $out/bootstrap.yaml
+        cat $out/03a-forgejo-shared-storage-ceph-pvc.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/03b-gitea-db-storageclass-patch.yaml >> $out/bootstrap.yaml
+        cat $out/03b-forgejo-db-storageclass-patch.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-gitea-runner-secret.yaml >> $out/bootstrap.yaml
+        cat $out/04-forgejo-runner-secret.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-gitea-actions.yaml >> $out/bootstrap.yaml
+        cat $out/04-forgejo-actions.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        # ArgoCD Gitea credentials now applied via argocd-deploy service (not in bootstrap)
+        # ArgoCD Forgejo credentials now applied via argocd-deploy service (not in bootstrap)
         # ArgoCD is deployed separately - skip 04-argocd.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
@@ -1284,7 +1199,7 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/06-cloudflared-deployment.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/07-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
+        cat $out/07-forgejo-ssh-nodeport.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/09-harbor-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

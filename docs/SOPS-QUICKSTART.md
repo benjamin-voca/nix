@@ -172,7 +172,7 @@ ls -la /run/secrets/cloudflared-credentials.json
 systemctl status cloudflared.service
 
 # Test your tunnel
-curl https://gitea.quadtech.dev
+curl https://forge.quadtech.dev
 ```
 
 ## Troubleshooting
@@ -244,7 +244,7 @@ After successful setup:
    sops secrets/backbone-01.yaml
    
    # Add new secrets under different keys:
-   # gitea:
+   # forgejo:
    #   admin-password: "..."
    # grafana:
    #   admin-password: "..."
@@ -252,12 +252,12 @@ After successful setup:
 
 4. **Configure services to use SOPS secrets** in `modules/roles/backbone.nix`:
    ```nix
-   sops.secrets.gitea-admin-password = {
+   sops.secrets.forgejo-admin-password = {
      sopsFile = ../secrets/${config.networking.hostName}.yaml;
    };
    
-   services.gitea = {
-     database.passwordFile = config.sops.secrets.gitea-admin-password.path;
+   services.forgejo = {
+     database.passwordFile = config.sops.secrets.forgejo-admin-password.path;
    };
    ```
 

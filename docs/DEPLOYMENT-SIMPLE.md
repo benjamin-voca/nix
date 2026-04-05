@@ -1,6 +1,6 @@
 # Deployment Guide: Single-Instance Kubernetes with Cloudflare Tunnel
 
-This guide walks you through deploying internal services (Gitea, ClickHouse, Grafana) on Kubernetes with Cloudflare Tunnel for external access.
+This guide walks you through deploying internal services (Forgejo, ClickHouse, Grafana) on Kubernetes with Cloudflare Tunnel for external access.
 
 ## Architecture Overview
 
@@ -8,7 +8,7 @@ This guide walks you through deploying internal services (Gitea, ClickHouse, Gra
 ┌─────────────────────────────────────────────────────────────┐
 │  Cloudflare Tunnel (cloudflared)                            │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │ gitea.quadtech.dev → localhost:30080                   │ │
+│  │ forge.quadtech.dev → localhost:30080                   │ │
 │  │ clickhouse.quadtech.dev → localhost:30081              │ │
 │  │ grafana.quadtech.dev → localhost:30082                 │ │
 │  └────────────────────────────────────────────────────────┘ │
@@ -17,8 +17,8 @@ This guide walks you through deploying internal services (Gitea, ClickHouse, Gra
 ┌───────────────────────┴─────────────────────────────────────┐
 │  Kubernetes Cluster (backbone-01)                           │
 │  ┌────────────┐  ┌──────────────┐  ┌────────────┐          │
-│  │   Gitea    │  │  ClickHouse  │  │  Grafana   │          │
-│  │  (ns:gitea)│  │(ns:clickhouse)│ │ (ns:grafana)│         │
+│  │   Forgejo    │  │  ClickHouse  │  │  Grafana   │          │
+│  │  (ns:forgejo)│  │(ns:clickhouse)│ │ (ns:grafana)│         │
 │  │  Port 3000 │  │  Port 8123   │  │  Port 3000 │          │
 │  └────────────┘  └──────────────┘  └────────────┘          │
 └─────────────────────────────────────────────────────────────┘
@@ -77,7 +77,7 @@ If you want to keep your existing `modules/roles/backbone.nix`, add the Cloudfla
     routes = [
       { hostname = "edukurs.quadtech.dev"; service = "http://localhost:3000"; }
       { hostname = "ssh.quadtech.dev"; service = "ssh://localhost:22"; }
-      { hostname = "gitea.quadtech.dev"; service = "http://localhost:30080"; }
+      { hostname = "forge.quadtech.dev"; service = "http://localhost:30080"; }
       { hostname = "clickhouse.quadtech.dev"; service = "http://localhost:30081"; }
       { hostname = "grafana.quadtech.dev"; service = "http://localhost:30082"; }
     ];
@@ -124,7 +124,7 @@ cd /path/to/QuadNix
 ```
 
 **Menu Options:**
-1. Deploy Gitea only
+1. Deploy Forgejo only
 2. Deploy ClickHouse only
 3. Deploy Grafana only
 4. **Deploy all services** (recommended for first deployment)
@@ -137,12 +137,12 @@ If you prefer to deploy manually:
 
 ```bash
 # Build Helm charts
-nix build .#helmCharts.x86_64-linux.gitea-simple
+nix build .#helmCharts.x86_64-linux.forgejo
 nix build .#helmCharts.x86_64-linux.clickhouse-simple
 nix build .#helmCharts.x86_64-linux.grafana-simple
 
 # Create namespaces
-kubectl create namespace gitea
+kubectl create namespace forgejo
 kubectl create namespace clickhouse
 kubectl create namespace grafana
 
@@ -150,7 +150,7 @@ kubectl create namespace grafana
 kubectl apply -f result/  # For each chart
 
 # Expose via NodePort
-kubectl -n gitea patch svc gitea-http -p '{"spec":{"type":"NodePort","ports":[{"port":3000,"nodePort":30080}]}}'
+kubectl -n forgejo patch svc forgejo-http -p '{"spec":{"type":"NodePort","ports":[{"port":3000,"nodePort":30080}]}}'
 kubectl -n clickhouse patch svc clickhouse -p '{"spec":{"type":"NodePort","ports":[{"port":8123,"nodePort":30081}]}}'
 kubectl -n grafana patch svc grafana -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30082}]}}'
 ```
@@ -159,17 +159,17 @@ kubectl -n grafana patch svc grafana -p '{"spec":{"type":"NodePort","ports":[{"p
 
 ```bash
 # Check pod status
-kubectl get pods -n gitea
+kubectl get pods -n forgejo
 kubectl get pods -n clickhouse
 kubectl get pods -n grafana
 
 # Check services
-kubectl get svc -n gitea
+kubectl get svc -n forgejo
 kubectl get svc -n clickhouse
 kubectl get svc -n grafana
 
 # Check logs if there are issues
-kubectl logs -n gitea deployment/gitea
+kubectl logs -n forgejo deployment/forgejo
 kubectl logs -n clickhouse statefulset/clickhouse
 kubectl logs -n grafana deployment/grafana
 ```
@@ -178,14 +178,14 @@ kubectl logs -n grafana deployment/grafana
 
 Your services should now be accessible via Cloudflare Tunnel:
 
-- **Gitea:** https://gitea.quadtech.dev
+- **Forgejo:** https://forge.quadtech.dev
 - **ClickHouse:** https://clickhouse.quadtech.dev
 - **Grafana:** https://grafana.quadtech.dev
 
 ### Default Credentials
 
-**Gitea:**
-- Username: `gitea_admin`
+**Forgejo:**
+- Username: `forgejo_admin`
 - Password: `changeme` (change immediately!)
 
 **ClickHouse:**
@@ -200,9 +200,9 @@ Your services should now be accessible via Cloudflare Tunnel:
 
 ### Change Default Passwords
 
-**Gitea:**
+**Forgejo:**
 ```bash
-kubectl exec -n gitea deployment/gitea -- gitea admin user change-password --username gitea_admin --password <NEW_PASSWORD>
+kubectl exec -n forgejo deployment/forgejo -- forgejo admin user change-password --username forgejo_admin --password <NEW_PASSWORD>
 ```
 
 **Grafana:**
@@ -217,9 +217,9 @@ For production, integrate SOPS or sealed-secrets:
 
 ```nix
 # Example with SOPS
-sops.secrets."gitea/admin-password" = {
+sops.secrets."forgejo/admin-password" = {
   sopsFile = ./secrets.yaml;
-  owner = "gitea";
+  owner = "forgejo";
 };
 ```
 
@@ -235,13 +235,13 @@ journalctl -u cloudflared -f
 
 **Verify NodePort exposure:**
 ```bash
-kubectl get svc -n gitea gitea-http
+kubectl get svc -n forgejo forgejo-http
 # Should show TYPE: NodePort and PORT(S): 3000:30080/TCP
 ```
 
 **Test local connectivity:**
 ```bash
-curl localhost:30080  # Should return Gitea
+curl localhost:30080  # Should return Forgejo
 curl localhost:30081/ping  # Should return "Ok." from ClickHouse
 curl localhost:30082  # Should return Grafana
 ```
@@ -250,8 +250,8 @@ curl localhost:30082  # Should return Grafana
 
 **Check pod status:**
 ```bash
-kubectl describe pod -n gitea <pod-name>
-kubectl logs -n gitea <pod-name>
+kubectl describe pod -n forgejo <pod-name>
+kubectl logs -n forgejo <pod-name>
 ```
 
 **Common issues:**
@@ -264,7 +264,7 @@ kubectl logs -n gitea <pod-name>
 **Check PV/PVC status:**
 ```bash
 kubectl get pv
-kubectl get pvc -n gitea
+kubectl get pvc -n forgejo
 kubectl get pvc -n clickhouse
 kubectl get pvc -n grafana
 ```
@@ -293,7 +293,7 @@ tunnel: 9832df66-f04a-40ea-b004-f6f9b100eb14
 credentials-file: /home/klajd/.cloudflared/9832df66-f04a-40ea-b004-f6f9b100eb14.json
 
 ingress:
-  - hostname: gitea.quadtech.dev
+  - hostname: forge.quadtech.dev
     service: http://localhost:30080
   - hostname: clickhouse.quadtech.dev
     service: http://localhost:30081
@@ -306,13 +306,13 @@ ingress:
 
 | Service    | K8s Port | NodePort | Cloudflare Route            |
 |------------|----------|----------|-----------------------------|
-| Gitea      | 3000     | 30080    | gitea.quadtech.dev          |
+| Forgejo      | 3000     | 30080    | forge.quadtech.dev          |
 | ClickHouse | 8123     | 30081    | clickhouse.quadtech.dev     |
 | Grafana    | 80       | 30082    | grafana.quadtech.dev        |
 
 ### Helm Chart Locations
 
-- `lib/helm/charts/gitea-simple.nix`
+- `lib/helm/charts/forgejo.nix`
 - `lib/helm/charts/clickhouse-simple.nix`
 - `lib/helm/charts/grafana-simple.nix`
 
@@ -325,7 +325,7 @@ If something goes wrong:
 sudo nixos-rebuild switch --rollback
 
 # Delete Kubernetes deployments
-kubectl delete namespace gitea
+kubectl delete namespace forgejo
 kubectl delete namespace clickhouse
 kubectl delete namespace grafana
 
@@ -338,10 +338,10 @@ kubectl delete namespace grafana
 
 ```bash
 # Update chart configuration
-vim lib/helm/charts/gitea-simple.nix
+vim lib/helm/charts/forgejo.nix
 
 # Rebuild and redeploy
-nix build .#helmCharts.x86_64-linux.gitea-simple
+nix build .#helmCharts.x86_64-linux.forgejo
 kubectl apply -f result/
 ```
 
@@ -349,7 +349,7 @@ kubectl apply -f result/
 
 ```bash
 # Real-time logs
-kubectl logs -n gitea -f deployment/gitea
+kubectl logs -n forgejo -f deployment/forgejo
 
 # All pods in namespace
 kubectl logs -n clickhouse --all-containers=true --tail=100
@@ -360,7 +360,7 @@ kubectl logs -n clickhouse --all-containers=true --tail=100
 To scale to multiple replicas:
 
 ```bash
-kubectl scale -n gitea deployment/gitea --replicas=2
+kubectl scale -n forgejo deployment/forgejo --replicas=2
 ```
 
 ## Support

@@ -1,7 +1,7 @@
 # QuadNix Infrastructure Deployment Guide
 
 This guide walks you through deploying the complete QuadNix infrastructure:
-- **Backbone nodes**: Internal services (Gitea, ClickHouse, Grafana, Prometheus)
+- **Backbone nodes**: Internal services (Forgejo, ClickHouse, Grafana, Prometheus)
 - **Frontline nodes**: Client applications and workloads
 
 ## Architecture Overview
@@ -12,7 +12,7 @@ QuadNix Infrastructure
 │   ├── backbone-01  192.168.1.10  (Primary control plane)
 │   ├── backbone-02  192.168.1.11  (Secondary control plane, HA)
 │   └── Services:
-│       ├── Gitea         (gitea.quadtech.dev)
+│       ├── Forgejo         (forge.quadtech.dev)
 │       ├── ClickHouse    (clickhouse.quadtech.dev)
 │       ├── Grafana       (grafana.quadtech.dev)
 │       └── Prometheus    (prometheus.quadtech.dev)
@@ -213,15 +213,15 @@ helm install loki ./result/*.tgz \
   --create-namespace
 ```
 
-### 3.7 Deploy Gitea
+### 3.7 Deploy Forgejo
 
 ```sh
-# Build gitea chart
-nix build .#helmCharts.x86_64-linux.all.gitea
+# Build forgejo chart
+nix build .#helmCharts.x86_64-linux.all.forgejo
 
 # Deploy with Helm
-helm install gitea ./result/*.tgz \
-  -n gitea \
+helm install forgejo ./result/*.tgz \
+  -n forgejo \
   --create-namespace
 ```
 
@@ -264,7 +264,7 @@ kubectl get ingress --all-namespaces
 ```
 
 Expected ingresses:
-- gitea → gitea.quadtech.dev
+- forgejo → forge.quadtech.dev
 - grafana → grafana.quadtech.dev
 - clickhouse → clickhouse.quadtech.dev
 - prometheus → prometheus.quadtech.dev
@@ -274,7 +274,7 @@ Expected ingresses:
 Add DNS entries or update `/etc/hosts`:
 
 ```
-192.168.1.10  gitea.quadtech.dev
+192.168.1.10  forge.quadtech.dev
 192.168.1.10  grafana.quadtech.dev
 192.168.1.10  clickhouse.quadtech.dev
 192.168.1.10  prometheus.quadtech.dev
@@ -284,10 +284,10 @@ Or use external DNS service pointing to your ingress load balancer.
 
 ## Step 6: Access Services
 
-### Gitea
-- URL: https://gitea.quadtech.dev
-- Default admin: `gitea_admin` / `changeme` (CHANGE THIS!)
-- SSH: `gitea.quadtech.dev:2222`
+### Forgejo
+- URL: https://forge.quadtech.dev
+- Default admin: `forgejo_admin` / `changeme` (CHANGE THIS!)
+- SSH: `forge.quadtech.dev:2222`
 
 ### Grafana
 - URL: https://grafana.quadtech.dev
@@ -391,7 +391,7 @@ kubectl apply -f my-app.yaml
 
 All services have default passwords (`changeme`). Update them immediately:
 
-1. **Gitea**: Admin panel → Site Administration → User accounts
+1. **Forgejo**: Admin panel → Site Administration → User accounts
 2. **Grafana**: Admin panel → Configuration → Users
 3. **ClickHouse**: Update via SQL or config
 
@@ -401,7 +401,7 @@ Store secrets securely with SOPS:
 
 ```nix
 # secrets/services.yaml (encrypted)
-gitea:
+forgejo:
   admin_password: "<secure-password>"
 grafana:
   admin_password: "<secure-password>"
@@ -411,7 +411,7 @@ clickhouse:
 
 ```nix
 # In your service configuration
-sops.secrets."gitea/admin-password" = {
+sops.secrets."forgejo/admin-password" = {
   sopsFile = ../secrets/services.yaml;
 };
 ```
@@ -439,7 +439,7 @@ Ensure your domains point to the ingress controller's external IP.
 Logs are collected by Loki and viewable in Grafana:
 1. Grafana → Explore
 2. Select "Loki" datasource
-3. Query: `{namespace="gitea"}`
+3. Query: `{namespace="forgejo"}`
 
 ### Metrics
 
@@ -458,14 +458,14 @@ Prometheus scrapes metrics from:
 nix flake update
 
 # Rebuild and redeploy
-nix build .#helmCharts.x86_64-linux.all.gitea
-helm upgrade gitea ./result/*.tgz -n gitea
+nix build .#helmCharts.x86_64-linux.all.forgejo
+helm upgrade forgejo ./result/*.tgz -n forgejo
 ```
 
 ### Backup
 
 Important data locations:
-- **Gitea**: Persistent volume `/data`
+- **Forgejo**: Persistent volume `/data`
 - **ClickHouse**: Persistent volume `/var/lib/clickhouse`
 - **Grafana**: Persistent volume `/var/lib/grafana`
 - **Prometheus**: Persistent volume `/prometheus`
@@ -476,7 +476,7 @@ Set up Velero or similar for Kubernetes backups.
 
 ```sh
 # Scale deployments
-kubectl scale deployment gitea -n gitea --replicas=3
+kubectl scale deployment forgejo -n forgejo --replicas=3
 
 # Or update Helm values and upgrade
 ```

@@ -14,7 +14,6 @@
     ../services/infiscal-deploy.nix
     ../services/argocd-apps.nix
     ../services/k8s-secrets-inject.nix
-    ../gitea/runner.nix
   ];
 
   environment.systemPackages = with pkgs; [
@@ -47,7 +46,7 @@
         group = "root";
         mode = "0400";
       };
-      gitea-db-password = {
+      forgejo-db-password = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
       };
       infisical-db-password = {
@@ -66,23 +65,30 @@
         group = "root";
         mode = "0400";
       };
-      gitea-runner-token = {
+      forgejo-runner-token = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/gitea-runner-token";
+        path = "/run/secrets/forgejo-runner-token";
         owner = "root";
         group = "root";
         mode = "0400";
       };
-      argocd-gitea-username = {
+      forgejo-admin-password = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/argocd-gitea-username";
+        path = "/run/secrets/forgejo-admin-password";
         owner = "root";
         group = "root";
         mode = "0400";
       };
-      argocd-gitea-token = {
+      argocd-forgejo-username = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/argocd-gitea-token";
+        path = "/run/secrets/argocd-forgejo-username";
+        owner = "root";
+        group = "root";
+        mode = "0400";
+      };
+      argocd-forgejo-token = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/argocd-forgejo-token";
         owner = "root";
         group = "root";
         mode = "0400";
@@ -135,9 +141,9 @@
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
         path = "/run/secrets/openclaw-discord-id";
       };
-      gitea-agent-token = {
+      forgejo-agent-token = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-        path = "/run/secrets/gitea-agent-token";
+        path = "/run/secrets/forgejo-agent-token";
       };
     };
 
@@ -163,14 +169,7 @@
     enable = true;
   };
 
-  # Gitea Actions Runners are now running on Kubernetes
-  # Commenting out host-based runners - they are replaced by gitea-actions helm chart
-  # services.gitea.runner = {
-  #   enable = true;
-  #   instanceName = "backbone-runner-1";
-  #   tokenFile = "/run/secrets/gitea-runner-token";
-  #   labels = [ "ubuntu-latest" "linux" "x86_64" "self-hosted" ];
-  # };
+  # Forgejo Actions runners are managed in Kubernetes via forgejo-actions chart.
 
   # Cloudflared tunnel service (runs on host for SSH access via Cloudflare Tunnel)
   # Uses host IP 192.168.1.15 with NodePorts for K8s services
@@ -212,9 +211,9 @@ no-autoupdate: true
 ingress:
   - hostname: backbone-01.quadtech.dev
     service: ssh://127.0.0.1:22
-  - hostname: gitea-ssh.quadtech.dev
+  - hostname: forge-ssh.quadtech.dev
     service: tcp://127.0.0.1:32222
-  - hostname: gitea.quadtech.dev
+  - hostname: forge.quadtech.dev
     service: http://127.0.0.1:30856
   - hostname: argocd.quadtech.dev
     service: http://127.0.0.1:30856
@@ -238,7 +237,7 @@ EOF
     chmod 600 /etc/cloudflared/creds/credentials.json
   '';
 
-  # Host-based runners removed - runners now run on Kubernetes via gitea-actions helm chart
+  # Host-based runners removed - runners now run on Kubernetes via forgejo-actions helm chart
 
   systemd.timers.git-pull = {
     description = "Pull git repo hourly";
@@ -256,35 +255,4 @@ EOF
       User = "root";
     };
   };
-  systemd.services.gitea-runner-3.preStart = ''
-    mkdir -p /etc/gitea/runner /var/lib/gitea-runner-3
-    
-    echo "Waiting for Gitea to be accessible..."
-    for i in $(seq 1 60); do
-      if curl -fsSk https://gitea.quadtech.dev >/dev/null 2>&1; then
-        break
-      fi
-      echo "Waiting for Gitea..."
-      sleep 5
-    done
-    
-    cat > /etc/gitea/runner/config-3.yaml << EOF
-runner:
-  name: backbone-runner-3
-  labels:
-    - ubuntu-latest
-    - linux
-    - x86_64
-    - self-hosted
-  token: $(cat /run/secrets/gitea-runner-token)
-  url: https://gitea.quadtech.dev
-  state_dir: /var/lib/gitea-runner-3
-EOF
-    # Register runner if not already registered
-    if [ ! -f /var/lib/gitea-runner-3/.runner ]; then
-      cd /var/lib/gitea-runner-3
-      TOKEN=$(cat /run/secrets/gitea-runner-token)
-      ${pkgs.gitea-actions-runner}/bin/act_runner register --instance https://gitea.quadtech.dev --token "$TOKEN" --name backbone-runner-3 --no-interactive || true
-    fi
-  '';
 }

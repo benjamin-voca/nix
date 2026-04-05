@@ -31,14 +31,14 @@ Create the Postgres clusters and app secrets:
 
 ```sh
 SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml \
-  | rg -n "gitea-db-password|infisical-db-password|infisical-encryption-key|infisical-auth-secret"
+  | rg -n "forgejo-db-password|infisical-db-password|infisical-encryption-key|infisical-auth-secret"
 
-gitea_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "gitea-db-password: (.*)$" -r '$1')
+forgejo_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "forgejo-db-password: (.*)$" -r '$1')
 infisical_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-db-password: (.*)$" -r '$1')
 infisical_encryption_key=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-encryption-key: (.*)$" -r '$1')
 infisical_auth_secret=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-auth-secret: (.*)$" -r '$1')
 
-GITEA_DB_PASSWORD="$gitea_db_password" \
+FORGEJO_DB_PASSWORD="$forgejo_db_password" \
 INFISICAL_DB_PASSWORD="$infisical_db_password" \
 INFISICAL_ENCRYPTION_KEY="$infisical_encryption_key" \
 INFISICAL_AUTH_SECRET="$infisical_auth_secret" \
@@ -72,10 +72,10 @@ nix build .#helmCharts.x86_64-linux.all.argocd
 kubectl apply -f ./result
 ```
 
-## Gitea
+## Forgejo
 
 ```sh
-nix build .#helmCharts.x86_64-linux.all.gitea
+nix build .#helmCharts.x86_64-linux.all.forgejo
 kubectl apply -f ./result
 ```
 
@@ -96,7 +96,7 @@ kubectl apply -f ./result
 ## Endpoints
 
 - https://argocd.quadtech.dev
-- https://gitea.quadtech.dev
+- https://forge.quadtech.dev
 - https://verdaccio.quadtech.dev
 - https://infisical.quadtech.dev
 

@@ -31,10 +31,10 @@ else
     success "Kubernetes control plane is ENABLED"
 fi
 
-if grep -q "../services/gitea.nix" roles/backbone.nix 2>/dev/null; then
-    success "Gitea NixOS service is ENABLED"
+if grep -q "../services/forgejo.nix" roles/backbone.nix 2>/dev/null; then
+    success "Forgejo NixOS service is ENABLED"
 else
-    warning "Gitea NixOS service is DISABLED"
+    warning "Forgejo NixOS service is DISABLED"
 fi
 
 if grep -q "# ../services/clickhouse.nix" roles/backbone.nix 2>/dev/null; then
@@ -51,12 +51,12 @@ echo ""
 echo "1) NixOS Services (Simple)"
 echo "   - Services run directly on the host as systemd services"
 echo "   - Good for: Single server, testing, simpler setup"
-echo "   - Services: Gitea, ClickHouse on backbone-01"
+echo "   - Services: Forgejo, ClickHouse on backbone-01"
 echo ""
 echo "2) Kubernetes Services (Production)"
 echo "   - Services run on Kubernetes cluster using Helm charts"
 echo "   - Good for: Multi-node, HA, production, client separation"
-echo "   - Services: Gitea, ClickHouse, Grafana, Prometheus, etc."
+echo "   - Services: Forgejo, ClickHouse, Grafana, Prometheus, etc."
 echo ""
 echo "3) Show difference between options"
 echo ""
@@ -84,7 +84,7 @@ case $choice in
   imports = [
     ../profiles/server.nix
     ../profiles/docker.nix
-    ../services/gitea.nix
+    ../services/forgejo.nix
     ../services/clickhouse.nix
   ];
 
@@ -92,8 +92,8 @@ case $choice in
     22        # SSH
     80        # HTTP
     443       # HTTPS
-    2222      # Gitea SSH
-    3000      # Gitea HTTP (if not on 443)
+    2222      # Forgejo SSH
+    3000      # Forgejo HTTP (if not on 443)
     8123      # ClickHouse HTTP
     9000      # ClickHouse TCP
   ];
@@ -113,11 +113,11 @@ EOF
         echo "     sudo nixos-rebuild switch --flake .#backbone-01"
         echo ""
         echo "  2. Verify services:"
-        echo "     systemctl status gitea"
+        echo "     systemctl status forgejo"
         echo "     systemctl status clickhouse"
         echo ""
         echo "  3. Access services:"
-        echo "     Gitea: http://192.168.1.10:3000 or https://git.quadtech.dev"
+        echo "     Forgejo: http://192.168.1.10:3000 or https://forge.quadtech.dev"
         echo "     ClickHouse: http://192.168.1.10:8123"
         ;;
     
@@ -200,7 +200,7 @@ EOF
         info "Showing differences between options..."
         echo ""
         echo "=== OPTION 1: NixOS Services ==="
-        echo "• Gitea runs as systemd service"
+        echo "• Forgejo runs as systemd service"
         echo "• ClickHouse runs as systemd service"
         echo "• Access: Direct to ports (3000, 8123, etc.)"
         echo "• Management: systemctl, journalctl"
@@ -209,10 +209,10 @@ EOF
         echo "=== OPTION 2: Kubernetes Services ==="
         echo "• All services run in Kubernetes pods"
         echo "• Deployed via Helm charts (from lib/helm/charts/)"
-        echo "• Access: Via ingress (git.quadtech.dev, etc.)"
+        echo "• Access: Via ingress (forge.quadtech.dev, etc.)"
         echo "• Management: kubectl, helm"
         echo "• Multi-node, high availability"
-        echo "• Includes: Gitea, ClickHouse, Grafana, Prometheus, Loki"
+        echo "• Includes: Forgejo, ClickHouse, Grafana, Prometheus, Loki"
         echo ""
         echo "See docs/BACKBONE-SERVICES.md for detailed comparison"
         ;;

@@ -24,7 +24,7 @@ in
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs gitea quadpacient minecraft erpnext openclaw quadpacienti rook-ceph; do
+          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -72,26 +72,56 @@ in
             echo "Injected shared-pg-app secret"
           fi
 
-          # Gitea database password
-          if [ -f /run/secrets/gitea-db-password ]; then
-            GITEA_DB_PW=$(cat /run/secrets/gitea-db-password)
-            $kubectl create secret generic gitea-db \
-              --namespace=gitea \
+          # Forgejo database password
+          if [ -f /run/secrets/forgejo-db-password ]; then
+            FORGEJO_DB_PW=$(cat /run/secrets/forgejo-db-password)
+            $kubectl create secret generic forgejo-db \
+              --namespace=forgejo \
               --type=kubernetes.io/basic-auth \
-              --from-literal=username=gitea \
-              --from-literal=password="$GITEA_DB_PW" \
+              --from-literal=username=forgejo \
+              --from-literal=password="$FORGEJO_DB_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected gitea-db secret"
+            echo "Injected forgejo-db secret"
           fi
 
-          # Gitea Actions runner registration token
-          if [ -f /run/secrets/gitea-runner-token ]; then
-            GITEA_RUNNER_TOKEN=$(cat /run/secrets/gitea-runner-token)
-            $kubectl create secret generic gitea-runner-token \
-              --namespace=gitea \
-              --from-literal=token="$GITEA_RUNNER_TOKEN" \
+          # Forgejo admin credentials
+          if [ -f /run/secrets/forgejo-admin-password ]; then
+            FORGEJO_ADMIN_PW=$(cat /run/secrets/forgejo-admin-password)
+            $kubectl create secret generic forgejo-admin \
+              --namespace=forgejo \
+              --from-literal=username=forgejo_admin \
+              --from-literal=password="$FORGEJO_ADMIN_PW" \
+              --from-literal=email=admin@quadtech.dev \
               --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected gitea-runner-token secret"
+            echo "Injected forgejo-admin secret"
+          fi
+
+          # Forgejo Actions runner registration token
+          if [ -f /run/secrets/forgejo-runner-token ]; then
+            FORGEJO_RUNNER_TOKEN=$(cat /run/secrets/forgejo-runner-token)
+            $kubectl create secret generic forgejo-runner-token \
+              --namespace=forgejo \
+              --from-literal=token="$FORGEJO_RUNNER_TOKEN" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected forgejo-runner-token secret"
+          fi
+
+          # Keep forgejo-runner-token refreshed from live Forgejo instance
+          FORGEJO_DEPLOY=""
+          if $kubectl -n forgejo get deploy forgejo >/dev/null 2>&1; then
+            FORGEJO_DEPLOY="forgejo"
+          fi
+
+          if [ -n "$FORGEJO_DEPLOY" ]; then
+            if RUNNER_TOKEN=$($kubectl -n forgejo exec "deploy/$FORGEJO_DEPLOY" -- sh -lc 'APP_INI=""; for candidate in /data/*/conf/app.ini /data/conf/app.ini; do if [ -f "$candidate" ]; then APP_INI="$candidate"; break; fi; done; [ -n "$APP_INI" ] && su-exec git /usr/local/bin/forgejo --config "$APP_INI" actions generate-runner-token' 2>/dev/null); then
+              if [ -n "$RUNNER_TOKEN" ]; then
+                $kubectl create secret generic forgejo-runner-token \
+                  --namespace=forgejo \
+                  --from-literal=token="$RUNNER_TOKEN" \
+                  --dry-run=client -o yaml | $kubectl apply -f -
+                echo "Refreshed forgejo-runner-token from Forgejo"
+              fi
+            fi
           fi
 
           # Ceph RGW S3 credentials for CNPG backups
@@ -107,7 +137,7 @@ in
           fi
 
           if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
-            for target_ns in cnpg-system edukurs gitea quadpacient; do
+            for target_ns in cnpg-system edukurs forgejo quadpacient; do
               $kubectl create secret generic ceph-rgw-s3-credentials \
                 --namespace="$target_ns" \
                 --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
@@ -202,9 +232,9 @@ in
               OC_BENI_DISCORD_ID=$(cat /run/secrets/openclaw-beni-discord-id)
               OC_ARGS="$OC_ARGS --from-literal=OPENCLAW_BENI_DISCORD_ID=$OC_BENI_DISCORD_ID"
             fi
-            if [ -f /run/secrets/gitea-agent-token ]; then
-              OC_GITEA_AGENT_TOKEN=$(cat /run/secrets/gitea-agent-token)
-              OC_ARGS="$OC_ARGS --from-literal=GITEA_AGENT_TOKEN=$OC_GITEA_AGENT_TOKEN"
+            if [ -f /run/secrets/forgejo-agent-token ]; then
+              OC_FORGEJO_AGENT_TOKEN=$(cat /run/secrets/forgejo-agent-token)
+              OC_ARGS="$OC_ARGS --from-literal=FORGEJO_AGENT_TOKEN=$OC_FORGEJO_AGENT_TOKEN"
             fi
             # shellcheck disable=SC2086
             $kubectl create secret generic openclaw-secrets \

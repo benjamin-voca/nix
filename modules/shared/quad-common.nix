@@ -17,10 +17,10 @@ in {
         default = "1.29.3";
         description = "Pinned Kubernetes version for control-plane/worker.";
       };
-      gitea = mkOption {
+      forgejo = mkOption {
         type = types.str;
         default = "1.21.5";
-        description = "Pinned Gitea version for server/runner.";
+        description = "Pinned Forgejo version for server/runner.";
       };
     };
 

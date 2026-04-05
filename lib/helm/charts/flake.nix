@@ -39,12 +39,12 @@
         src = helm-charts.legacyPackages.${system}.argocd;
       };
       
-      # Build Gitea chart (simplified version)
-      giteaChart = buildHelmChart {
-        chartName = "gitea";
+      # Build Forgejo chart (simplified version)
+      forgejoChart = buildHelmChart {
+        chartName = "forgejo";
         chartVersion = "4.4.0";  # Update this when upgrading
         src = pkgs.fetchFromGitHub {
-          owner = "go-gitea";
+          owner = "forgejo";
           repo = "helm-charts";
           rev = "v${chartVersion}";
           hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";  # Update this hash
@@ -116,7 +116,7 @@
       
       # Expose all charts
       packages.argocd = argocdChart;
-      packages.gitea = giteaChart;
+      packages.forgejo = forgejoChart;
       packages.grafana = grafanaChart;
       packages.loki = lokiChart;
       packages.tempo = tempoChart;
@@ -126,7 +126,7 @@
       # Hydra jobs for CI
       hydraJobs = {
         argocd = argocdChart;
-        gitea = giteaChart;
+        forgejo = forgejoChart;
         grafana = grafanaChart;
         loki = lokiChart;
         tempo = tempoChart;

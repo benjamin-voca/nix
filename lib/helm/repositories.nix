@@ -48,9 +48,9 @@
       charts = [ "metallb" ];
     }
     {
-      name = "gitea-charts";
-      url = "https://dl.gitea.com/charts";
-      charts = [ "gitea" ];
+      name = "forgejo-charts";
+      url = "oci://code.forgejo.org/forgejo-helm";
+      charts = [ "forgejo" ];
     }
     {
       name = "clickhouse";

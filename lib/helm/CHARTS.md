@@ -40,16 +40,16 @@ Pre-configured Helm charts for the QuadNix infrastructure.
 
 ### Development Tools
 
-#### Gitea
-- **Namespace**: `gitea`
+#### Forgejo
+- **Namespace**: `forgejo`
 - **Features**: Git service with PostgreSQL & Redis
 - **Components**: 
   - HTTP service on port 3000
   - SSH on port 2222 (LoadBalancer)
   - Actions enabled
 - **Storage**: 50Gi for git data, 20Gi for PostgreSQL
-- **Access**: `helmCharts.gitea`
-- **URL**: https://gitea.quadtech.dev
+- **Access**: `helmCharts.forgejo`
+- **URL**: https://forge.quadtech.dev
 
 ### Databases & Analytics
 
@@ -84,8 +84,8 @@ Pre-configured Helm charts for the QuadNix infrastructure.
 ### Build Individual Charts
 
 ```sh
-# Build Gitea chart
-nix build .#chartsDerivations.x86_64-linux.gitea-charts.gitea
+# Build Forgejo chart
+nix build .#chartsDerivations.x86_64-linux.forgejo-charts.forgejo
 
 # Build ClickHouse chart
 nix build .#chartsDerivations.x86_64-linux.clickhouse.clickhouse
@@ -118,19 +118,19 @@ in
 let
   helmLib = inputs.self.helmLib.x86_64-linux;
   
-  customGitea = helmLib.buildChart {
-    name = "gitea";
-    chart = helmLib.charts.gitea-charts.gitea;
-    namespace = "gitea";
+  customForgejo = helmLib.buildChart {
+    name = "forgejo";
+    chart = helmLib.charts.forgejo-charts.forgejo;
+    namespace = "forgejo";
     values = {
       replicaCount = 3;
-      gitea.config.server.DOMAIN = "git.example.com";
+      forgejo.config.server.DOMAIN = "git.example.com";
       # ... your custom values
     };
   };
 in
 {
-  environment.systemPackages = [ customGitea ];
+  environment.systemPackages = [ customForgejo ];
 }
 ```
 
@@ -138,7 +138,7 @@ in
 
 The following chart repositories are tracked:
 
-- **Gitea**: https://dl.gitea.com/charts
+- **Forgejo**: https://dl.forgejo.com/charts
 - **ClickHouse**: https://docs.altinity.com/clickhouse-operator
 - **Grafana**: https://grafana.github.io/helm-charts
 - **Prometheus**: https://prometheus-community.github.io/helm-charts
@@ -155,8 +155,8 @@ All charts use placeholder passwords (`changeme`). In production:
 
 1. **Use SOPS for secrets**:
    ```nix
-   sops.secrets."gitea-admin-password" = {
-     sopsFile = ../secrets/gitea.yaml;
+   sops.secrets."forgejo-admin-password" = {
+     sopsFile = ../secrets/forgejo.yaml;
    };
    ```
 
@@ -165,7 +165,7 @@ All charts use placeholder passwords (`changeme`). In production:
    apiVersion: v1
    kind: Secret
    metadata:
-     name: gitea-admin
+     name: forgejo-admin
    stringData:
      password: <actual-password>
    ```
@@ -174,7 +174,7 @@ All charts use placeholder passwords (`changeme`). In production:
 
 ### Required Secrets
 
-- **Gitea**: admin password, PostgreSQL password
+- **Forgejo**: admin password, PostgreSQL password
 - **ClickHouse**: admin password, ZooKeeper credentials
 - **Grafana**: admin password, PostgreSQL password, secret key
 - **PostgreSQL** (all): database passwords
@@ -190,7 +190,7 @@ nix flake update nixhelm
 ### 2. Build Desired Charts
 
 ```sh
-nix build .#helmCharts.x86_64-linux.all.gitea
+nix build .#helmCharts.x86_64-linux.all.forgejo
 nix build .#helmCharts.x86_64-linux.all.clickhouse
 nix build .#helmCharts.x86_64-linux.all.grafana
 ```
@@ -199,10 +199,10 @@ nix build .#helmCharts.x86_64-linux.all.grafana
 
 ```sh
 # Using Helm
-helm install gitea ./result/*.tgz -n gitea --create-namespace
+helm install forgejo ./result/*.tgz -n forgejo --create-namespace
 
 # Using kubectl
-helm template gitea ./result/*.tgz -n gitea | kubectl apply -f -
+helm template forgejo ./result/*.tgz -n forgejo | kubectl apply -f -
 
 # Using ArgoCD
 # Commit manifests to git and create ArgoCD Application
@@ -211,7 +211,7 @@ helm template gitea ./result/*.tgz -n gitea | kubectl apply -f -
 ### 4. Verify Deployment
 
 ```sh
-kubectl get pods -n gitea
+kubectl get pods -n forgejo
 kubectl get pods -n clickhouse
 kubectl get pods -n grafana
 ```
@@ -220,7 +220,7 @@ kubectl get pods -n grafana
 
 These charts integrate with QuadNix's existing services:
 
-- **services/gitea.nix** → Migrate to `helmCharts.gitea`
+- **services/forgejo.nix** → Migrate to `helmCharts.forgejo`
 - **services/clickhouse.nix** → Migrate to `helmCharts.clickhouse`
 - **profiles/kubernetes/helm.nix** → Already configured
 

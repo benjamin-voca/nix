@@ -18,24 +18,24 @@ Service modules encapsulate the configuration for a specific application or serv
 with lib;
 
 let
-  cfg = config.services.gitea;
+  cfg = config.services.forgejo;
 in {
-  options.services.gitea = {
-    enable = mkEnableOption "Gitea git service";
+  options.services.forgejo = {
+    enable = mkEnableOption "Forgejo git service";
     package = mkOption {
       type = types.package;
-      default = pkgs.gitea;
-      description = "Gitea package to use";
+      default = pkgs.forgejo;
+      description = "Forgejo package to use";
     };
     domain = mkOption {
       type = types.str;
       default = "git.example.com";
-      description = "Gitea domain";
+      description = "Forgejo domain";
     };
   };
 
   config = mkIf cfg.enable {
-    services.gitea = {
+    services.forgejo = {
       inherit cfg.domain;
       package = cfg.package;
     };
@@ -57,7 +57,7 @@ in {
 
 ```
 services/
-├── gitea.nix           # Git hosting service
+├── forgejo.nix           # Git hosting service
 ├── buildkite-agent.nix # CI/CD agent
 ├── otelcol.nix         # OpenTelemetry collector
 ├── clickhouse.nix      # Analytics database
@@ -94,6 +94,6 @@ services/
 ```nix
 # BAD: One service file managing multiple unrelated services
 services/monolith.nix:
-  # Contains gitea, postgres, redis, nginx...
+  # Contains forgejo, postgres, redis, nginx...
   # Should be split into separate modules
 ```

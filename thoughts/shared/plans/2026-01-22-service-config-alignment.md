@@ -1,8 +1,8 @@
 # Service Configuration Alignment Implementation Plan
 
-**Goal:** Align Kubernetes control-plane and Gitea service configuration with NixOS modules, replacing ad-hoc config files with declarative module options and generated config artifacts.
+**Goal:** Align Kubernetes control-plane and Forgejo service configuration with NixOS modules, replacing ad-hoc config files with declarative module options and generated config artifacts.
 
-**Architecture:** Implement a layered Nix module stack under `nix/modules/` with shared defaults and service-specific modules. Control-plane and Gitea modules generate `/etc` config files and systemd units from module options, while profiles/services import these modules and set environment-specific values. Design requires “control-plane” naming; this is implemented as `services.kubernetes.controlPlane` to match existing NixOS conventions and avoid invalid attribute names.
+**Architecture:** Implement a layered Nix module stack under `nix/modules/` with shared defaults and service-specific modules. Control-plane and Forgejo modules generate `/etc` config files and systemd units from module options, while profiles/services import these modules and set environment-specific values. Design requires “control-plane” naming; this is implemented as `services.kubernetes.controlPlane` to match existing NixOS conventions and avoid invalid attribute names.
 
 **Design:** `thoughts/shared/designs/2026-01-22-service-config-alignment-design.md`
 
@@ -48,10 +48,10 @@ in {
         default = "1.29.3";
         description = "Pinned Kubernetes version for control-plane/worker.";
       };
-      gitea = mkOption {
+      forgejo = mkOption {
         type = types.str;
         default = "1.21.5";
-        description = "Pinned Gitea version for server/runner.";
+        description = "Pinned Forgejo version for server/runner.";
       };
     };
 
@@ -181,9 +181,9 @@ true
 **Verify:** `nix-instantiate --eval tests/nix/shared/kubernetes-common.test.nix`
 **Commit:** `feat(modules): add shared kubernetes defaults`
 
-### Task 1.3: Shared Gitea defaults
-**File:** `nix/modules/shared/gitea-common.nix`
-**Test:** `tests/nix/shared/gitea-common.test.nix`
+### Task 1.3: Shared Forgejo defaults
+**File:** `nix/modules/shared/forgejo-common.nix`
+**Test:** `tests/nix/shared/forgejo-common.test.nix`
 **Depends:** 1.1 (uses quadnix version defaults)
 
 ```nix
@@ -191,42 +191,42 @@ true
 
 let
   inherit (lib) mkOption mkIf types;
-  cfg = config.services.gitea.common;
+  cfg = config.services.forgejo.common;
 in {
-  options.services.gitea.common = {
+  options.services.forgejo.common = {
     stateDir = mkOption {
       type = types.str;
-      default = "/var/lib/gitea";
-      description = "Gitea state directory.";
+      default = "/var/lib/forgejo";
+      description = "Forgejo state directory.";
     };
 
     configDir = mkOption {
       type = types.str;
-      default = "/etc/gitea";
-      description = "Gitea config directory.";
+      default = "/etc/forgejo";
+      description = "Forgejo config directory.";
     };
 
     user = mkOption {
       type = types.str;
-      default = "gitea";
-      description = "Gitea service user.";
+      default = "forgejo";
+      description = "Forgejo service user.";
     };
 
     group = mkOption {
       type = types.str;
-      default = "gitea";
-      description = "Gitea service group.";
+      default = "forgejo";
+      description = "Forgejo service group.";
     };
 
     version = mkOption {
       type = types.str;
-      default = config.quadnix.versions.gitea;
-      description = "Pinned Gitea version for the server.";
+      default = config.quadnix.versions.forgejo;
+      description = "Pinned Forgejo version for the server.";
     };
   };
 
-  config = mkIf (config.services.gitea.enable or false) {
-    environment.etc."gitea/conf/common.json".text = builtins.toJSON {
+  config = mkIf (config.services.forgejo.enable or false) {
+    environment.etc."forgejo/conf/common.json".text = builtins.toJSON {
       inherit (cfg) stateDir configDir user group version;
     };
   };
@@ -241,22 +241,22 @@ let
   eval = lib.evalModules {
     modules = [
       ../../nix/modules/shared/common.nix
-      ../../nix/modules/shared/gitea-common.nix
+      ../../nix/modules/shared/forgejo-common.nix
       {
-        services.gitea.enable = true;
-        services.gitea.common.stateDir = "/data/gitea";
+        services.forgejo.enable = true;
+        services.forgejo.common.stateDir = "/data/forgejo";
       }
     ];
   };
 
-  commonText = lib.attrByPath [ "environment" "etc" "gitea/conf/common.json" "text" ] null eval.config;
+  commonText = lib.attrByPath [ "environment" "etc" "forgejo/conf/common.json" "text" ] null eval.config;
 in
 assert commonText != null;
 true
 ```
 
-**Verify:** `nix-instantiate --eval tests/nix/shared/gitea-common.test.nix`
-**Commit:** `feat(modules): add shared gitea defaults`
+**Verify:** `nix-instantiate --eval tests/nix/shared/forgejo-common.test.nix`
+**Commit:** `feat(modules): add shared forgejo defaults`
 
 ---
 
@@ -519,24 +519,24 @@ true
 
 ---
 
-## Batch 3: Gitea Modules (parallel - 2 implementers)
+## Batch 3: Forgejo Modules (parallel - 2 implementers)
 
 All tasks in this batch depend on Batch 1 completing.
 
-### Task 3.1: Gitea server enhancements
-**File:** `nix/modules/gitea/server.nix`
-**Test:** `tests/nix/gitea/server.test.nix`
-**Depends:** 1.3 (uses gitea common defaults)
+### Task 3.1: Forgejo server enhancements
+**File:** `nix/modules/forgejo/server.nix`
+**Test:** `tests/nix/forgejo/server.test.nix`
+**Depends:** 1.3 (uses forgejo common defaults)
 
 ```nix
 { config, lib, pkgs, ... }:
 
 let
   inherit (lib) mkEnableOption mkIf mkOption types;
-  cfg = config.services.gitea;
+  cfg = config.services.forgejo;
   ini = pkgs.formats.ini { };
-  giteaUser = lib.attrByPath [ "services" "gitea" "user" ] "gitea" config;
-  giteaPkg = lib.attrByPath [ "services" "gitea" "package" ] pkgs.gitea config;
+  forgejoUser = lib.attrByPath [ "services" "forgejo" "user" ] "forgejo" config;
+  forgejoPkg = lib.attrByPath [ "services" "forgejo" "package" ] pkgs.forgejo config;
 
   dbConfig = {
     database = {
@@ -561,21 +561,21 @@ let
     };
   };
 
-  backupScript = pkgs.writeShellScript "gitea-backup" ''
+  backupScript = pkgs.writeShellScript "forgejo-backup" ''
     set -euo pipefail
     backup_dir="${cfg.backup.targetDir}"
     timestamp="$(date +%Y%m%d%H%M%S)"
     mkdir -p "$backup_dir"
-    ${giteaPkg}/bin/gitea dump --file "$backup_dir/gitea-$timestamp.zip"
-    ${pkgs.findutils}/bin/find "$backup_dir" -type f -name "gitea-*.zip" -mtime +${toString cfg.backup.retention} -delete
+    ${forgejoPkg}/bin/forgejo dump --file "$backup_dir/forgejo-$timestamp.zip"
+    ${pkgs.findutils}/bin/find "$backup_dir" -type f -name "forgejo-*.zip" -mtime +${toString cfg.backup.retention} -delete
   '';
 
-  migrateScript = pkgs.writeShellScript "gitea-migrate" ''
+  migrateScript = pkgs.writeShellScript "forgejo-migrate" ''
     set -euo pipefail
-    ${giteaPkg}/bin/gitea migrate ${lib.concatStringsSep " " cfg.migrations.extraArgs}
+    ${forgejoPkg}/bin/forgejo migrate ${lib.concatStringsSep " " cfg.migrations.extraArgs}
   '';
 in {
-  options.services.gitea = {
+  options.services.forgejo = {
     database = {
       type = mkOption {
         type = types.enum [ "postgres" "mysql" "sqlite3" ];
@@ -583,58 +583,58 @@ in {
       };
       host = mkOption { type = types.str; default = "localhost"; };
       port = mkOption { type = types.int; default = 5432; };
-      name = mkOption { type = types.str; default = "gitea"; };
-      user = mkOption { type = types.str; default = "gitea"; };
+      name = mkOption { type = types.str; default = "forgejo"; };
+      user = mkOption { type = types.str; default = "forgejo"; };
       passwordFile = mkOption { type = types.nullOr types.path; default = null; };
       sslMode = mkOption { type = types.str; default = "disable"; };
     };
 
     ssh = {
-      enable = mkEnableOption "Gitea SSH";
+      enable = mkEnableOption "Forgejo SSH";
       port = mkOption { type = types.port; default = 22; };
       listenHost = mkOption { type = types.str; default = "0.0.0.0"; };
       authorizedKeysOnly = mkOption { type = types.bool; default = true; };
     };
 
     backup = {
-      enable = mkEnableOption "Gitea backups";
+      enable = mkEnableOption "Forgejo backups";
       interval = mkOption { type = types.str; default = "daily"; };
       retention = mkOption { type = types.int; default = 30; };
-      targetDir = mkOption { type = types.str; default = "/var/backups/gitea"; };
+      targetDir = mkOption { type = types.str; default = "/var/backups/forgejo"; };
     };
 
     migrations = {
-      enable = mkEnableOption "Gitea database migrations";
+      enable = mkEnableOption "Forgejo database migrations";
       extraArgs = mkOption { type = types.listOf types.str; default = []; };
     };
   };
 
   config = mkIf (cfg.enable or false) {
-    environment.etc."gitea/conf/database.ini".source = ini.generate "database.ini" dbConfig;
-    environment.etc."gitea/conf/ssh.conf".source = ini.generate "ssh.conf" sshConfig;
-    environment.etc."gitea/conf/version".text = config.services.gitea.common.version;
+    environment.etc."forgejo/conf/database.ini".source = ini.generate "database.ini" dbConfig;
+    environment.etc."forgejo/conf/ssh.conf".source = ini.generate "ssh.conf" sshConfig;
+    environment.etc."forgejo/conf/version".text = config.services.forgejo.common.version;
 
-    systemd.services.gitea-migrate = mkIf cfg.migrations.enable {
-      description = "Run Gitea database migrations";
-      before = [ "gitea.service" ];
-      requiredBy = [ "gitea.service" ];
+    systemd.services.forgejo-migrate = mkIf cfg.migrations.enable {
+      description = "Run Forgejo database migrations";
+      before = [ "forgejo.service" ];
+      requiredBy = [ "forgejo.service" ];
       serviceConfig = {
         Type = "oneshot";
-        User = giteaUser;
+        User = forgejoUser;
       };
       script = migrateScript;
     };
 
-    systemd.services.gitea-backup = mkIf cfg.backup.enable {
-      description = "Gitea backup job";
+    systemd.services.forgejo-backup = mkIf cfg.backup.enable {
+      description = "Forgejo backup job";
       serviceConfig = {
         Type = "oneshot";
-        User = giteaUser;
+        User = forgejoUser;
       };
       script = backupScript;
     };
 
-    systemd.timers.gitea-backup = mkIf cfg.backup.enable {
+    systemd.timers.forgejo-backup = mkIf cfg.backup.enable {
       wantedBy = [ "timers.target" ];
       timerConfig = {
         OnCalendar = cfg.backup.interval;
@@ -653,49 +653,49 @@ let
   eval = lib.evalModules {
     modules = [
       ../../nix/modules/shared/common.nix
-      ../../nix/modules/shared/gitea-common.nix
-      ../../nix/modules/gitea/server.nix
+      ../../nix/modules/shared/forgejo-common.nix
+      ../../nix/modules/forgejo/server.nix
       {
-        services.gitea.enable = true;
-        services.gitea.database.host = "db.internal";
-        services.gitea.ssh.enable = true;
-        services.gitea.backup.enable = true;
-        services.gitea.migrations.enable = true;
+        services.forgejo.enable = true;
+        services.forgejo.database.host = "db.internal";
+        services.forgejo.ssh.enable = true;
+        services.forgejo.backup.enable = true;
+        services.forgejo.migrations.enable = true;
       }
     ];
   };
 
-  dbIni = lib.attrByPath [ "environment" "etc" "gitea/conf/database.ini" "source" ] null eval.config;
-  backupTimer = lib.attrByPath [ "systemd" "timers" "gitea-backup" "timerConfig" "OnCalendar" ] null eval.config;
+  dbIni = lib.attrByPath [ "environment" "etc" "forgejo/conf/database.ini" "source" ] null eval.config;
+  backupTimer = lib.attrByPath [ "systemd" "timers" "forgejo-backup" "timerConfig" "OnCalendar" ] null eval.config;
 in
 assert dbIni != null;
 assert backupTimer == "daily";
 true
 ```
 
-**Verify:** `nix-instantiate --eval tests/nix/gitea/server.test.nix`
-**Commit:** `feat(gitea): add server config extensions`
+**Verify:** `nix-instantiate --eval tests/nix/forgejo/server.test.nix`
+**Commit:** `feat(forgejo): add server config extensions`
 
-### Task 3.2: Gitea runner module
-**File:** `nix/modules/gitea/runner.nix`
-**Test:** `tests/nix/gitea/runner.test.nix`
-**Depends:** 1.3 (uses gitea common defaults)
+### Task 3.2: Forgejo runner module
+**File:** `nix/modules/forgejo/runner.nix`
+**Test:** `tests/nix/forgejo/runner.test.nix`
+**Depends:** 1.3 (uses forgejo common defaults)
 
 ```nix
 { config, lib, pkgs, ... }:
 
 let
   inherit (lib) mkEnableOption mkIf mkOption types;
-  cfg = config.services.gitea.runner;
+  cfg = config.services.forgejo.runner;
   yaml = pkgs.formats.yaml { };
   runnerPkg = cfg.package;
 in {
-  options.services.gitea.runner = {
-    enable = mkEnableOption "Gitea actions runner";
+  options.services.forgejo.runner = {
+    enable = mkEnableOption "Forgejo actions runner";
 
     package = mkOption {
       type = types.package;
-      default = pkgs.gitea-actions-runner;
+      default = pkgs.forgejo-actions-runner;
       description = "Runner package to execute workflows.";
     };
 
@@ -721,12 +721,12 @@ in {
 
     stateDir = mkOption {
       type = types.str;
-      default = "/var/lib/gitea-runner";
+      default = "/var/lib/forgejo-runner";
     };
   };
 
   config = mkIf cfg.enable {
-    environment.etc."gitea/runner/config.yaml".source = yaml.generate "gitea-runner.yaml" {
+    environment.etc."forgejo/runner/config.yaml".source = yaml.generate "forgejo-runner.yaml" {
       runner = {
         name = cfg.instanceName;
         labels = cfg.labels;
@@ -736,14 +736,14 @@ in {
       };
     };
 
-    systemd.services.gitea-runner = {
-      description = "Gitea actions runner";
+    systemd.services.forgejo-runner = {
+      description = "Forgejo actions runner";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
       serviceConfig = {
-        ExecStart = "${runnerPkg}/bin/act_runner daemon --config /etc/gitea/runner/config.yaml";
+        ExecStart = "${runnerPkg}/bin/act_runner daemon --config /etc/forgejo/runner/config.yaml";
         Restart = "always";
-        StateDirectory = "gitea-runner";
+        StateDirectory = "forgejo-runner";
       };
     };
   };
@@ -758,25 +758,25 @@ let
   eval = lib.evalModules {
     modules = [
       ../../nix/modules/shared/common.nix
-      ../../nix/modules/shared/gitea-common.nix
-      ../../nix/modules/gitea/runner.nix
+      ../../nix/modules/shared/forgejo-common.nix
+      ../../nix/modules/forgejo/runner.nix
       {
-        services.gitea.runner.enable = true;
-        services.gitea.runner.tokenFile = builtins.toFile "token" "runner-token";
+        services.forgejo.runner.enable = true;
+        services.forgejo.runner.tokenFile = builtins.toFile "token" "runner-token";
       }
     ];
   };
 
-  runnerConfig = lib.attrByPath [ "environment" "etc" "gitea/runner/config.yaml" "source" ] null eval.config;
-  runnerService = lib.attrByPath [ "systemd" "services" "gitea-runner" "serviceConfig" "ExecStart" ] null eval.config;
+  runnerConfig = lib.attrByPath [ "environment" "etc" "forgejo/runner/config.yaml" "source" ] null eval.config;
+  runnerService = lib.attrByPath [ "systemd" "services" "forgejo-runner" "serviceConfig" "ExecStart" ] null eval.config;
 in
 assert runnerConfig != null;
 assert runnerService != null;
 true
 ```
 
-**Verify:** `nix-instantiate --eval tests/nix/gitea/runner.test.nix`
-**Commit:** `feat(gitea): add runner module`
+**Verify:** `nix-instantiate --eval tests/nix/forgejo/runner.test.nix`
+**Commit:** `feat(forgejo): add runner module`
 
 ---
 
@@ -836,8 +836,8 @@ All tasks in this batch depend on Batches 1-3 completing.
 **Verify:** `nix-instantiate --eval profiles/kubernetes/worker.nix`
 **Commit:** `chore(profiles): align worker profile`
 
-### Task 4.3: Gitea service alignment
-**File:** `services/gitea.nix`
+### Task 4.3: Forgejo service alignment
+**File:** `services/forgejo.nix`
 **Test:** none (service config)
 **Depends:** 3.1
 
@@ -847,17 +847,17 @@ All tasks in this batch depend on Batches 1-3 completing.
 {
   imports = [
     ../nix/modules/shared/common.nix
-    ../nix/modules/shared/gitea-common.nix
-    ../nix/modules/gitea/server.nix
+    ../nix/modules/shared/forgejo-common.nix
+    ../nix/modules/forgejo/server.nix
   ];
 
-  services.gitea = {
+  services.forgejo = {
     enable = true;
     database = {
       type = "postgres";
       host = "postgres.quadtech.dev";
-      name = "gitea";
-      user = "gitea";
+      name = "forgejo";
+      user = "forgejo";
     };
     ssh = {
       enable = true;
@@ -876,5 +876,5 @@ All tasks in this batch depend on Batches 1-3 completing.
 }
 ```
 
-**Verify:** `nix-instantiate --eval services/gitea.nix`
-**Commit:** `chore(services): align gitea service config`
+**Verify:** `nix-instantiate --eval services/forgejo.nix`
+**Commit:** `chore(services): align forgejo service config`
