@@ -2,9 +2,10 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: edukurs-db
+  name: edukurs-db-ceph
   namespace: edukurs
 spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
   instances: 1
   storage:
     storageClass: ceph-block
@@ -14,10 +15,10 @@ spec:
       database: mydatabase
       owner: myuser
       secret:
-        name: edukurs-db-secret
+        name: edukurs-db-ceph-secret
   backup:
     barmanObjectStore:
-      destinationPath: "s3://cnpg-backups/edukurs-db"
+      destinationPath: "s3://cnpg-backups/edukurs-db-ceph"
       endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
       s3Credentials:
         accessKeyId:
@@ -33,9 +34,10 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: gitea-db
+  name: gitea-db-ceph
   namespace: gitea
 spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
   instances: 1
   storage:
     storageClass: ceph-block
@@ -45,7 +47,21 @@ spec:
       database: gitea
       owner: gitea
       secret:
-        name: gitea-db
+        name: gitea-db-ceph
+  backup:
+    barmanObjectStore:
+      destinationPath: "s3://cnpg-backups/gitea-db-ceph"
+      endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
+      s3Credentials:
+        accessKeyId:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_SECRET_KEY
+        region:
+          name: ceph-rgw-s3-credentials
+          key: ACCESS_REGION
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster

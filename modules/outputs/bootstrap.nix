@@ -615,6 +615,22 @@ spec:
     name: edukurs-db-ceph
 EOF
 
+        # Create scheduled CNPG backup for gitea cluster
+        cat > $out/02h-gitea-cnpg-scheduled-backup.yaml << 'EOF'
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: gitea-db-ceph-hourly
+  namespace: gitea
+spec:
+  schedule: "0 15 * * * *"
+  immediate: true
+  backupOwnerReference: cluster
+  method: barmanObjectStore
+  cluster:
+    name: gitea-db-ceph
+EOF
+
         # Create cnpg-system namespace for the CNPG operator
         cat > $out/02c-cnpg-namespace.yaml << 'EOF'
 apiVersion: v1
@@ -939,6 +955,74 @@ metadata:
     app.kubernetes.io/name: harbor
 EOF
 
+        # Ensure Harbor Ceph PVC claims exist
+        cat > $out/09a-harbor-pvcs-ceph.yaml << 'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-registry-ceph
+  namespace: harbor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-jobservice-ceph
+  namespace: harbor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-database-ceph
+  namespace: harbor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-redis-ceph
+  namespace: harbor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbor-trivy-ceph
+  namespace: harbor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 5Gi
+EOF
+
         # Create verdaccio namespace inline
         cat > $out/10-verdaccio-namespace.yaml << 'EOF'
 apiVersion: v1
@@ -1174,6 +1258,8 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/02g-edukurs-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
+        cat $out/02h-gitea-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
         cat $out/02a-cnpg-operator.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/02b-cnpg-cluster.yaml >> $out/bootstrap.yaml
@@ -1201,6 +1287,8 @@ EOF
         cat $out/07-gitea-ssh-nodeport.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/09-harbor-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/09a-harbor-pvcs-ceph.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/10-verdaccio-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

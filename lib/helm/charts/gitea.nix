@@ -118,7 +118,7 @@
             DISABLE_SSH = false;
             START_SSH_SERVER = true;
             SSH_LISTEN_PORT = 22;
-            SSH_SERVER_HOST_KEYS = "ssh/gitea.rsa,ssh/gitea.ed25519";
+            SSH_SERVER_HOST_KEYS = "gitea/ssh/gitea.rsa,gitea/ssh/gitea.ed25519";
           };
           ssh = {
             create = true;
