@@ -174,17 +174,10 @@ rec {
           };
         };
 
-        additionalConfigFromEnvs = [
-          {
-                name = "GI" + "TEA__DATABASE__PASSWD";
-                valueFrom = {
-                  secretKeyRef = {
-                    name = "forgejo-db-app";
-                    key = "password";
-                  };
-                };
-              }
-        ];
+      additionalEnvVars = [
+        { name = "SSH_INCLUDE_FILE"; value = "/data/ssh/sshd_config_override"; }
+        { name = "GI" + "TEA__DATABASE__PASSWD"; valueFrom = { secretKeyRef = { name = "forgejo-db-app"; key = "password"; }; }; }
+      ];
       };
 
       # Resource limits
@@ -223,18 +216,34 @@ rec {
 
       containerSecurityContext = { };
 
-      # Generate SSH host keys on first startup and persist them
+      # SSH server needs host keys in /etc/ssh/ AND sshd_config_override in /data/ssh/
       # Keys are relative to GITEA_ROOT (/data/gitea), so stored at /data/gitea/forgejo/ssh/
+      extraVolumes = [
+        {
+          name = "sshd-config";
+          emptyDir = { };
+        }
+      ];
+      extraVolumeMounts = [
+        {
+          name = "sshd-config";
+          mountPath = "/etc/ssh";
+          subPath = "etc-ssh";
+        }
+      ];
       preExtraInitContainers = [
         {
           name = "ssh-host-keys";
           image = forgejoImage;
           command = [ "sh" "-c" ];
           args = [''
+            set -euo pipefail
             SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
             echo "Checking for SSH host keys in $SSH_KEYS_DIR..."
             mkdir -p "$SSH_KEYS_DIR"
             mkdir -p /etc/ssh
+            
+            # Generate keys ONLY if they don't exist
             if [ ! -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
               echo "Generating new SSH host keys..."
               ssh-keygen -t rsa -b 4096 -f "$SSH_KEYS_DIR/forgejo.rsa" -N "" -C "forgejo@quadtech.dev"
@@ -243,21 +252,34 @@ rec {
             else
               echo "Using existing SSH host keys from persistent storage"
             fi
-            # Set proper permissions BEFORE copying to /etc/ssh
+            
+            # Ensure correct permissions on persistent keys
             chmod 600 "$SSH_KEYS_DIR/forgejo.rsa"
             chmod 600 "$SSH_KEYS_DIR/forgejo.ed25519"
             chmod 644 "$SSH_KEYS_DIR/forgejo.rsa.pub"
             chmod 644 "$SSH_KEYS_DIR/forgejo.ed25519.pub"
-            # Copy to /etc/ssh for the SSH server
+            
+            # Copy to /etc/ssh for current container and future restarts
             cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key
             cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub
             cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key
             cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub
-            chmod 600 /etc/ssh/ssh_host_*
-            chmod 644 /etc/ssh/ssh_host_*.pub
+            chmod 600 /etc/ssh/ssh_host_*_key
+            chmod 644 /etc/ssh/ssh_host_*_key.pub
+            
+            # Create sshd_config_override that includes StrictModes disable AND key locations
+            mkdir -p /data/ssh
+            cat > /data/ssh/sshd_config_override << 'SSHD_EOF'
+StrictModes no
+HostKey /data/gitea/forgejo/ssh/forgejo.rsa
+HostKey /data/gitea/forgejo/ssh/forgejo.ed25519
+SSHD_EOF
+            chmod 644 /data/ssh/sshd_config_override
+            
+            echo "SSH setup complete"
             ls -la /etc/ssh/
             ls -la "$SSH_KEYS_DIR/"
-            echo "Done"
+            ls -la /data/ssh/
           ''];
           volumeMounts = [
             {
@@ -311,38 +333,48 @@ rec {
           image = forgejoImage;
           command = [ "sh" "-c" ];
           args = [''
+            set -euo pipefail
+            echo "Ensuring sshd_config_override exists in PVC..."
+            if [ ! -f /data/ssh/sshd_config_override ]; then
+              mkdir -p /data/ssh
+              cat > /data/ssh/sshd_config_override << 'SSHD_EOF'
+StrictModes no
+HostKey /data/gitea/forgejo/ssh/forgejo.rsa
+HostKey /data/gitea/forgejo/ssh/forgejo.ed25519
+SSHD_EOF
+              chmod 644 /data/ssh/sshd_config_override
+              echo "Created sshd_config_override"
+            fi
+            
             echo "Fixing volume permissions..."
             chown -R 1000:1000 /data
             chmod -R 755 /data
-            # Fix SSH keys at the correct path (relative to GITEA_ROOT /data/gitea)
+            
+            # Ensure SSH keys have correct permissions
             SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
             if [ -d "$SSH_KEYS_DIR" ]; then
               echo "Fixing SSH keys at $SSH_KEYS_DIR..."
-              chown -R 1000:1000 "$SSH_KEYS_DIR"
               chmod 600 "$SSH_KEYS_DIR"/*.rsa 2>/dev/null || true
               chmod 600 "$SSH_KEYS_DIR"/*.ed25519 2>/dev/null || true
               chmod 644 "$SSH_KEYS_DIR"/*.pub 2>/dev/null || true
               ls -la "$SSH_KEYS_DIR/"
             fi
-            # Fix /data/ssh host keys used by sshd (sshd_config references /data/ssh/)
-            if [ -d /data/ssh ]; then
-              echo "Fixing sshd host keys at /data/ssh..."
-              chmod 600 /data/ssh/ssh_host_*_key 2>/dev/null || true
-              chmod 644 /data/ssh/ssh_host_*_key.pub 2>/dev/null || true
-              ls -la /data/ssh/
+            
+            # Copy host keys to /etc/ssh for sshd to find them
+            if [ -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
+              cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key 2>/dev/null || true
+              cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub 2>/dev/null || true
             fi
-            # Fix git user ssh directory
-            if [ -d /data/git ]; then
-              chmod 755 /data/git
-              chown -R 1000:1000 /data/git
-              if [ -d /data/git/.ssh ]; then
-                chmod 700 /data/git/.ssh
-                chmod 600 /data/git/.ssh/*
-              fi
+            if [ -f "$SSH_KEYS_DIR/forgejo.ed25519" ]; then
+              cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key 2>/dev/null || true
+              cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null || true
             fi
+            chmod 600 /etc/ssh/ssh_host_*_key 2>/dev/null || true
+            chmod 644 /etc/ssh/ssh_host_*_key.pub 2>/dev/null || true
+            
             mkdir -p /etc/forgejo
-            cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini
-            chown -R 1000:1000 /etc/forgejo
+            cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini 2>/dev/null || true
+            chown -R 1000:1000 /etc/forgejo 2>/dev/null || true
             echo "Done"
           ''];
           volumeMounts = [
