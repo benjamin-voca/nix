@@ -16,7 +16,7 @@
           # Resource limits
           resources = {
             requests = {
-              cpu = "500m";
+              cpu = "250m";
               memory = "2Gi";
             };
             limits = {

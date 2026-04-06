@@ -1157,7 +1157,7 @@ spec:
                 - minecraft.quadtech.dev
         resources:
           requests:
-            cpu: 1000m
+            cpu: 500m
             memory: 2Gi
           limits:
             cpu: 4000m

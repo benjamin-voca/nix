@@ -174,20 +174,34 @@ rec {
           };
         };
 
-      additionalEnvVars = [
-        { name = "SSH_INCLUDE_FILE"; value = "/data/ssh/sshd_config_override"; }
-        { name = "GI" + "TEA__DATABASE__PASSWD"; valueFrom = { secretKeyRef = { name = "forgejo-db-app"; key = "password"; }; }; }
-      ];
+        additionalConfigFromEnvs = [
+          {
+            name = "GI" + "TEA__DATABASE__PASSWD";
+            valueFrom = {
+              secretKeyRef = {
+                name = "forgejo-db-app";
+                key = "password";
+              };
+            };
+          }
+        ];
       };
+
+      deployment.env = [
+        {
+          name = "SSH_INCLUDE_FILE";
+          value = "/data/ssh/sshd_config_override";
+        }
+      ];
 
       # Resource limits
       resources = {
         requests = {
-          cpu = "200m";
+          cpu = "100m";
           memory = "512Mi";
         };
         limits = {
-          cpu = "2000m";
+          cpu = "1500m";
           memory = "2Gi";
         };
       };
@@ -346,9 +360,14 @@ SSHD_EOF
               echo "Created sshd_config_override"
             fi
             
-            echo "Fixing volume permissions..."
+            echo "Fixing volume ownership..."
             chown -R 1000:1000 /data
-            chmod -R 755 /data
+
+            # Keep SSH auth files in StrictModes-safe permissions
+            mkdir -p /data/git/.ssh
+            chmod 700 /data/git/.ssh
+            chmod 600 /data/git/.ssh/authorized_keys 2>/dev/null || true
+            chmod 600 /data/git/.ssh/environment 2>/dev/null || true
             
             # Ensure SSH keys have correct permissions
             SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"

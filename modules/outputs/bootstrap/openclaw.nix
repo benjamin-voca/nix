@@ -280,7 +280,7 @@ let
               resources = {
                 requests = {
                   memory = "512Mi";
-                  cpu = "250m";
+                  cpu = "100m";
                 };
                 limits = {
                   memory = "2Gi";

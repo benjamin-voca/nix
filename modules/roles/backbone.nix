@@ -200,7 +200,7 @@
 tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
 credentials-file: /etc/cloudflared/creds/credentials.json
 protocol: http2
-metrics: 0.0.0.0:2002
+metrics: 0.0.0.0:2003
 no-autoupdate: true
 ingress:
   - hostname: backbone-01.quadtech.dev
