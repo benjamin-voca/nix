@@ -12,19 +12,7 @@
         prometheusSpec = {
           replicas = 2;
           retention = "30d";
-          storageSpec = {
-            volumeClaimTemplate = {
-              spec = {
-                accessModes = [ "ReadWriteOnce" ];
-                storageClassName = "ceph-block";
-                resources = {
-                  requests = {
-                    storage = "50Gi";
-                  };
-                };
-              };
-            };
-          };
+          storageSpec = null;
           # Resource limits
           resources = {
             requests = {
@@ -53,7 +41,7 @@
           }];
         };
         persistence = {
-          enabled = true;
+          enabled = false;
           size = "10Gi";
           storageClassName = "ceph-block";
         };
@@ -64,19 +52,7 @@
         enabled = true;
         alertmanagerSpec = {
           replicas = 2;
-          storage = {
-            volumeClaimTemplate = {
-              spec = {
-                accessModes = [ "ReadWriteOnce" ];
-                storageClassName = "ceph-block";
-                resources = {
-                  requests = {
-                    storage = "10Gi";
-                  };
-                };
-              };
-            };
-          };
+          storage = null;
         };
       };
 

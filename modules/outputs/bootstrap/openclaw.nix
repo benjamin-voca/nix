@@ -70,12 +70,12 @@ let
     apiVersion = "v1";
     kind = "PersistentVolumeClaim";
     metadata = {
-      name = "openclaw-data-ceph";
+      name = "openclaw-data-cephfs";
       namespace = "openclaw";
     };
     spec = {
       accessModes = [ "ReadWriteOnce" ];
-      storageClassName = "ceph-block";
+      storageClassName = "ceph-filesystem-csi";
       resources = {
         requests = {
           storage = "10Gi";
@@ -337,7 +337,7 @@ let
             {
               name = "openclaw-home";
               persistentVolumeClaim = {
-                claimName = "openclaw-data-ceph";
+                claimName = "openclaw-data-cephfs";
               };
             }
             {

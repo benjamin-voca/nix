@@ -18,6 +18,7 @@
   ];
 
   environment.systemPackages = with pkgs; [
+    git
     nfs-utils
     openiscsi
     apacheHttpd  # For htpasswd utility
@@ -153,7 +154,7 @@
   };
 
    services.quadnix.infisical-deploy = {
-     enable = false;
+     enable = true;
    };
 
    services.quadnix.verdaccio-deploy = {
@@ -213,7 +214,7 @@
 tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
 credentials-file: /etc/cloudflared/creds/credentials.json
 protocol: http2
-metrics: 0.0.0.0:2001
+metrics: 0.0.0.0:2002
 no-autoupdate: true
 ingress:
   - hostname: backbone-01.quadtech.dev
@@ -256,7 +257,7 @@ EOF
   };
 
   systemd.services.git-pull = {
-    script = "cd /etc/nixos && git pull";
+    script = "cd /etc/nixos && ${pkgs.git}/bin/git pull";
     serviceConfig = {
       Type = "oneshot";
       User = "root";

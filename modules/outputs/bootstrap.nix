@@ -167,7 +167,7 @@ let
       cloudflaredConfigContent = builtins.toJSON {
         tunnel = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
         credentials-file = "/etc/cloudflared/creds/credentials.json";
-        metrics = "0.0.0.0:2001";
+        metrics = "0.0.0.0:2002";
         no-autoupdate = true;
         ingress = [
           {

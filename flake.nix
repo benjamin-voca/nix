@@ -372,17 +372,17 @@
                 prune: true
                 selfHeal: true
 
-          # ERPNext PVC
+          # ERPNext DB PVC
           ---
           apiVersion: v1
           kind: PersistentVolumeClaim
           metadata:
-            name: erpnext-databases
+            name: erpnext-databases-v2
             namespace: erpnext
           spec:
             accessModes:
               - ReadWriteOnce
-            storageClassName: ceph-block
+            storageClassName: longhorn
             resources:
               requests:
                 storage: 20Gi
@@ -448,7 +448,7 @@
           apiVersion: v1
           kind: PersistentVolumeClaim
           metadata:
-            name: erpnext-sites-rwx-ceph-v2
+            name: erpnext-sites-rwx-ceph-v3
             namespace: erpnext
           spec:
             accessModes:
@@ -533,7 +533,7 @@
           apiVersion: batch/v1
           kind: Job
           metadata:
-            name: erpnext-bootstrap-helpdesk-v20
+            name: erpnext-bootstrap-helpdesk-v21
             namespace: erpnext
           spec:
             backoffLimit: 2
@@ -633,7 +633,7 @@
                 volumes:
                   - name: sites-dir
                     persistentVolumeClaim:
-                      claimName: erpnext-sites-rwx-ceph-v2
+                      claimName: erpnext-sites-rwx-ceph-v3
                   - name: logs
                     emptyDir: {}
 
@@ -794,10 +794,10 @@
                     enabled: true
                     worker:
                       enabled: true
-                      existingClaim: erpnext-sites-rwx-ceph-v2
+                      existingClaim: erpnext-sites-rwx-ceph-v3
                     sites:
                       enabled: true
-                      existingClaim: erpnext-sites-rwx-ceph-v2
+                      existingClaim: erpnext-sites-rwx-ceph-v3
 
                   mariadb:
                     enabled: true
@@ -814,7 +814,7 @@
                     primary:
                       persistence:
                         enabled: true
-                        existingClaim: erpnext-databases
+                        existingClaim: erpnext-databases-v2
                       livenessProbe:
                         enabled: false
                       readinessProbe:
@@ -861,7 +861,7 @@
                       enabled: false
                     custom:
                       enabled: false
-                      jobName: erpnext-bootstrap-helpdesk-v20
+                      jobName: erpnext-bootstrap-helpdesk-v21
                       restartPolicy: OnFailure
                       containers:
                         - name: bootstrap-helpdesk
@@ -977,7 +977,7 @@
                       volumes:
                         - name: sites-dir
                           persistentVolumeClaim:
-                            claimName: erpnext-sites-rwx-ceph-v2
+                            claimName: erpnext-sites-rwx-ceph-v3
                         - name: logs
                           emptyDir: {}
 
