@@ -14,6 +14,7 @@
     ../services/infiscal-deploy.nix
     ../services/argocd-apps.nix
     ../services/k8s-secrets-inject.nix
+    ../services/forgejo-migration-cleanup.nix
   ];
 
   environment.systemPackages = with pkgs; [
@@ -169,6 +170,10 @@
     enable = true;
   };
 
+  services.quadnix.forgejo-migration-cleanup = {
+    enable = true;
+  };
+
   # Forgejo Actions runners are managed in Kubernetes via forgejo-actions chart.
 
   # Cloudflared tunnel service (runs on host for SSH access via Cloudflare Tunnel)
@@ -183,8 +188,10 @@
       ExecStart = "${pkgs.cloudflared}/bin/cloudflared tunnel --protocol http2 --config /etc/cloudflared/config/config.yaml run";
       Restart = "always";
       RestartSec = "5s";
-      StartLimitIntervalSec = "0";
       User = "root";
+    };
+    unitConfig = {
+      StartLimitIntervalSec = "0";
     };
   };
 
@@ -206,7 +213,7 @@
 tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
 credentials-file: /etc/cloudflared/creds/credentials.json
 protocol: http2
-metrics: 0.0.0.0:2000
+metrics: 0.0.0.0:2001
 no-autoupdate: true
 ingress:
   - hostname: backbone-01.quadtech.dev

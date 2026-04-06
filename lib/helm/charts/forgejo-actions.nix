@@ -14,6 +14,7 @@ in {
     };
     namespace = "forgejo";
     values = {
+      enabled = true;
       ${compatRootUrlKey} = "https://forge.quadtech.dev";
       existingSecret = "forgejo-runner-token";
       existingSecretKey = "token";

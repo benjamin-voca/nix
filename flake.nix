@@ -131,8 +131,8 @@
         argocdChart = forAllSystems (system: argocdChartFor system);
         packages = forAllSystems (system: {
           inherit (inputs.nixhelm.packages.${system}) helmupdater;
-          bootstrap = argocdBootstrap.${system};
-          boostrap = argocdBootstrap.${system};
+          bootstrap = eval.config.flake.bootstrap.${system};
+          boostrap = eval.config.flake.bootstrap.${system};
         });
         apps = forAllSystems (system: {
           inherit (inputs.nixhelm.apps.${system}) helmupdater;
@@ -144,7 +144,8 @@
         chartsDerivations = forAllSystems (system: helmLibFor system).chartsDerivations;
       };
 
-      # Bootstrap that creates ArgoCD Applications (declarative GitOps)
+      # Legacy bootstrap kept for compatibility/debugging only.
+      # Active bootstrap output comes from modules/outputs/bootstrap.nix.
       argocdBootstrap = forAllSystems (system:
         let
           pkgs = inputs.nixpkgs.legacyPackages.${system};
@@ -1036,5 +1037,5 @@
         ];
       };
     in
-      eval.config.flake // flakeOutputs // { inherit argocdBootstrap; };
+      eval.config.flake // flakeOutputs // { legacyArgocdBootstrap = argocdBootstrap; };
 }

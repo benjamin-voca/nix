@@ -11,10 +11,10 @@ In Cloudflare Dashboard:
 2. Select your tunnel
 3. Go to **Public Hostnames** tab
 4. Click **Add a public hostname**:
-   - **Subdomain**: `forgejo-ssh`
+   - **Subdomain**: `forge-ssh`
    - **Domain**: `quadtech.dev`
    - **Type**: `TCP`
-   - **URL**: `forgejo-ssh.forgejo.svc.cluster.local:22`
+   - **URL**: `127.0.0.1:32222`
 5. Click **Save hostname**
 
 ### 2. Configure SSH
@@ -42,7 +42,7 @@ ssh git@forge-ssh.quadtech.dev
 If you prefer direct SSH without Cloudflare:
 
 ```bash
-kubectl apply -f result/06-forgejo-ssh-nodeport.yaml
+kubectl -n forgejo get svc forgejo-ssh
 ```
 
 Then SSH to: `backbone-01.quadtech.dev:32222`

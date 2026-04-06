@@ -72,7 +72,7 @@ in
             echo "Injected shared-pg-app secret"
           fi
 
-          # Forgejo database password
+          # Forgejo database bootstrap secret (CNPG initdb)
           if [ -f /run/secrets/forgejo-db-password ]; then
             FORGEJO_DB_PW=$(cat /run/secrets/forgejo-db-password)
             $kubectl create secret generic forgejo-db \
@@ -80,6 +80,7 @@ in
               --type=kubernetes.io/basic-auth \
               --from-literal=username=forgejo \
               --from-literal=password="$FORGEJO_DB_PW" \
+              --from-literal=dbname=forgejo \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected forgejo-db secret"
           fi
@@ -113,7 +114,7 @@ in
           fi
 
           if [ -n "$FORGEJO_DEPLOY" ]; then
-            if RUNNER_TOKEN=$($kubectl -n forgejo exec "deploy/$FORGEJO_DEPLOY" -- sh -lc "APP_INI=\"\"; for candidate in /data/*/conf/app.ini /data/conf/app.ini; do if [ -f \"\$candidate\" ]; then APP_INI=\"\$candidate\"; break; fi; done; [ -n \"\$APP_INI\" ] && su-exec git /usr/local/bin/forgejo --config \"\$APP_INI\" actions generate-runner-token" 2>/dev/null); then
+            if RUNNER_TOKEN=$($kubectl -n forgejo exec "deploy/$FORGEJO_DEPLOY" -c gitea -- sh -c "APP_INI=\"\"; if [ -f /data/gitea/conf/app.ini ]; then APP_INI=/data/gitea/conf/app.ini; elif [ -f /data/forgejo/conf/app.ini ]; then APP_INI=/data/forgejo/conf/app.ini; fi; [ -n \"\$APP_INI\" ] && su-exec git /usr/local/bin/gitea --config \"\$APP_INI\" actions generate-runner-token" 2>/dev/null); then
               if [ -n "$RUNNER_TOKEN" ]; then
                 $kubectl create secret generic forgejo-runner-token \
                   --namespace=forgejo \

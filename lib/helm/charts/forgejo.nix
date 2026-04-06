@@ -48,6 +48,7 @@ rec {
           type = "NodePort";
           port = 22;
           targetPort = 2223;
+          nodePort = 32222;
           clusterIP = "";
           annotations = {
             "external-dns.alpha.kubernetes.io/hostname" = "forge-ssh.quadtech.dev";
@@ -78,9 +79,9 @@ rec {
         create = true;
         mount = true;
         size = "50Gi";
-        storageClass = "ceph-filesystem";
+        storageClass = "ceph-filesystem-csi";
         accessModes = [ "ReadWriteMany" ];
-        claimName = "forgejo-shared-storage-ceph";
+        claimName = "forgejo-shared-storage-ceph-csi";
       };
 
       # PostgreSQL database
@@ -139,14 +140,18 @@ rec {
           database = {
             DB_TYPE = "postgres";
             HOST = "forgejo-db-rw.forgejo.svc.cluster.local:5432";
-            NAME = "forgejo";
-            USER = "forgejo";
+            NAME = "app";
+            USER = "app";
             PASSWD = "REPLACE_ME";
             SSL_MODE = "disable";
           };
 
           security = {
             INSTALL_LOCK = true;
+          };
+
+          service = {
+            DISABLE_REGISTRATION = true;
           };
 
           actions = {
@@ -166,14 +171,14 @@ rec {
 
         additionalConfigFromEnvs = [
           {
-            name = "GI" + "TEA__DATABASE__PASSWD";
-            valueFrom = {
-              secretKeyRef = {
-                name = "forgejo-db";
-                key = "password";
-              };
-            };
-          }
+                name = "GI" + "TEA__DATABASE__PASSWD";
+                valueFrom = {
+                  secretKeyRef = {
+                    name = "forgejo-db-app";
+                    key = "password";
+                  };
+                };
+              }
         ];
       };
 

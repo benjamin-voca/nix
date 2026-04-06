@@ -167,7 +167,7 @@ let
       cloudflaredConfigContent = builtins.toJSON {
         tunnel = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
         credentials-file = "/etc/cloudflared/creds/credentials.json";
-        metrics = "0.0.0.0:2000";
+        metrics = "0.0.0.0:2001";
         no-autoupdate = true;
         ingress = [
           {
@@ -327,31 +327,6 @@ let
 
       # NodePort service for direct SSH access on fixed port 2222
       # Configure your router to forward port 2222 to the node's IP
-      forgejoSSHNodePort = pkgs.writeText "forgejo-ssh-nodeport.yaml" (builtins.toJSON {
-        apiVersion = "v1";
-        kind = "Service";
-        metadata = {
-          name = "forgejo-ssh-nodeport";
-          namespace = "forgejo";
-          annotations = {
-            "external-dns.alpha.kubernetes.io/hostname" = "forge-ssh.quadtech.dev";
-          };
-        };
-        spec = {
-          type = "NodePort";
-          ports = [{
-            port = 22;
-            targetPort = 22;
-            nodePort = 32222;
-            protocol = "TCP";
-          }];
-          selector = {
-            "app.kubernetes.io/name" = "forgejo";
-            "app.kubernetes.io/instance" = "forgejo";
-          };
-        };
-      });
-
       # MetalLB CRDs for IP address pool configuration (MetalLB 0.15+ uses CRDs)
       metallbIPAddressPool = ''
 apiVersion: metallb.io/v1beta1
@@ -451,6 +426,26 @@ METALLB_CRDS_EOF
         # Copy Rook/Ceph operator and cluster charts
         cp ${rookCephChart} $out/02-rook-ceph.yaml
         cp ${rookCephClusterChart} $out/03-rook-ceph-cluster.yaml
+        chmod u+w $out/03-rook-ceph-cluster.yaml
+
+        # Drop immutable legacy ceph-filesystem StorageClass object from rendered chart
+        # and rely on the managed ceph-filesystem-csi StorageClass.
+        OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
+import os
+import pathlib
+
+path = pathlib.Path(os.environ["OUT"]) / "03-rook-ceph-cluster.yaml"
+docs = path.read_text().split("\n---\n")
+filtered = []
+for doc in docs:
+    content = doc.strip()
+    if not content:
+        continue
+    if "kind: StorageClass" in doc and "name: ceph-filesystem" in doc:
+        continue
+    filtered.append(content)
+path.write_text("\n---\n".join(filtered) + "\n")
+PY
 
         # Copy CNPG operator chart
         cp ${existingCharts.cloudnative-pg} $out/02a-cnpg-operator.yaml
@@ -468,7 +463,6 @@ metadata:
   namespace: cnpg-system
 spec:
   instances: 1
-  imageName: docker.io/cloudnative-pg/container:1.22.1
   storage:
     storageClass: ceph-block
     size: 10Gi
@@ -631,6 +625,16 @@ spec:
     name: forgejo-db
 EOF
 
+        # Create forgejo namespace
+        cat > $out/02i-forgejo-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forgejo
+  labels:
+    app.kubernetes.io/name: forgejo
+EOF
+
         # Create cnpg-system namespace for the CNPG operator
         cat > $out/02c-cnpg-namespace.yaml << 'EOF'
 apiVersion: v1
@@ -749,12 +753,12 @@ EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: forgejo-shared-storage-ceph
+  name: forgejo-shared-storage-ceph-csi
   namespace: forgejo
 spec:
   accessModes:
     - ReadWriteMany
-  storageClassName: ceph-filesystem
+  storageClassName: ceph-filesystem-csi
   resources:
     requests:
       storage: 50Gi
@@ -788,6 +792,11 @@ EOF
         
         # Copy forgejo-actions chart from existing charts
         cp ${existingCharts.forgejo-actions} $out/04-forgejo-actions.yaml
+
+        if [ ! -s "$out/04-forgejo-actions.yaml" ]; then
+          echo "forgejo-actions chart render is empty; skipping" >&2
+          rm -f "$out/04-forgejo-actions.yaml"
+        fi
 
         # Create Forgejo repository credentials for ArgoCD
         # NOTE: This is now applied via argocd-deploy service after deployment
@@ -838,27 +847,6 @@ CONFIGMAP_EOF
         cat > $out/06-cloudflared-deployment.yaml << 'DEPLOYMENT_EOF'
 ${cloudflaredDeployment}
 DEPLOYMENT_EOF
-
-        # Create forgejo SSH NodePort inline
-        cat > $out/07-forgejo-ssh-nodeport.yaml << 'EOF'
-apiVersion: v1
-kind: Service
-metadata:
-  name: forgejo-ssh-nodeport
-  namespace: forgejo
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname: forge-ssh.quadtech.dev
-spec:
-  type: NodePort
-  ports:
-  - port: 22
-    targetPort: 2223
-    nodePort: 32222
-    protocol: TCP
-  selector:
-    app.kubernetes.io/name: forgejo
-    app.kubernetes.io/instance: forgejo
-EOF
 
         # Create harbor namespace inline
         cat > $out/09-harbor-namespace.yaml << 'EOF'
@@ -1173,6 +1161,8 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/02g-edukurs-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
+        cat $out/02i-forgejo-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
         cat $out/02h-forgejo-cnpg-scheduled-backup.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/02a-cnpg-operator.yaml >> $out/bootstrap.yaml
@@ -1189,8 +1179,10 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/04-forgejo-runner-secret.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
-        cat $out/04-forgejo-actions.yaml >> $out/bootstrap.yaml
-        echo "---" >> $out/bootstrap.yaml
+        if [ -f "$out/04-forgejo-actions.yaml" ]; then
+          cat $out/04-forgejo-actions.yaml >> $out/bootstrap.yaml
+          echo "---" >> $out/bootstrap.yaml
+        fi
         # ArgoCD Forgejo credentials now applied via argocd-deploy service (not in bootstrap)
         # ArgoCD is deployed separately - skip 04-argocd.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
@@ -1198,8 +1190,6 @@ EOF
         cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/06-cloudflared-deployment.yaml >> $out/bootstrap.yaml
-        echo "---" >> $out/bootstrap.yaml
-        cat $out/07-forgejo-ssh-nodeport.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/09-harbor-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

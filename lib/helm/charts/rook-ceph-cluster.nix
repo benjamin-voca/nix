@@ -208,7 +208,7 @@ in
             enabled = true;
             isDefault = false;
             name = "ceph-filesystem";
-            pool = "data0";
+            pool = "ceph-filesystem-data0";
             reclaimPolicy = "Delete";
             allowVolumeExpansion = true;
             volumeBindingMode = "Immediate";
