@@ -47,6 +47,17 @@ in
       "kubernetes.quadtech.dev"
     ];
     apiserver.extraOpts = "--allow-privileged=true --egress-proxy-dns-port=10247";
+    # K8s 1.27+ rejects kubernetes.io/* labels via --node-labels flag
+    # Override to set node labels via kubelet config file instead
+    kubeletFlags = [
+      "--node-labels=node.kubernetes.io/instance-type=standard"
+    ];
+    kubeletConfig = {
+      "nodeLabels" = {
+        "node-role.kubernetes.io/control-plane" = "";
+        "node-role.kubernetes.io/node" = "";
+      };
+    };
   };
 
 

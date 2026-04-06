@@ -135,6 +135,7 @@ rec {
             DISABLE_SSH = false;
             START_SSH_SERVER = false;
             SSH_LISTEN_PORT = 22;
+            # SSH keys are relative to GITEA_ROOT, stored in persistent volume
             SSH_SERVER_HOST_KEYS = "forgejo/ssh/forgejo.rsa,forgejo/ssh/forgejo.ed25519";
           };
           ssh = {
@@ -223,32 +224,39 @@ rec {
       containerSecurityContext = { };
 
       # Generate SSH host keys on first startup and persist them
+      # Keys are relative to GITEA_ROOT (/data/gitea), so stored at /data/gitea/forgejo/ssh/
       preExtraInitContainers = [
         {
           name = "ssh-host-keys";
           image = forgejoImage;
           command = [ "sh" "-c" ];
           args = [''
-            echo "Checking for SSH host keys in /data/forgejo/ssh..."
-            mkdir -p /data/forgejo/ssh
+            SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
+            echo "Checking for SSH host keys in $SSH_KEYS_DIR..."
+            mkdir -p "$SSH_KEYS_DIR"
             mkdir -p /etc/ssh
-            if [ ! -f /data/forgejo/ssh/forgejo.rsa ]; then
+            if [ ! -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
               echo "Generating new SSH host keys..."
-              ssh-keygen -t rsa -b 4096 -f /data/forgejo/ssh/forgejo.rsa -N "" -C "forgejo@quadtech.dev"
-              ssh-keygen -t ed25519 -f /data/forgejo/ssh/forgejo.ed25519 -N "" -C "forgejo@quadtech.dev"
+              ssh-keygen -t rsa -b 4096 -f "$SSH_KEYS_DIR/forgejo.rsa" -N "" -C "forgejo@quadtech.dev"
+              ssh-keygen -t ed25519 -f "$SSH_KEYS_DIR/forgejo.ed25519" -N "" -C "forgejo@quadtech.dev"
               echo "SSH host keys generated"
             else
               echo "Using existing SSH host keys from persistent storage"
             fi
-            echo "Copying SSH host keys to /etc/ssh..."
-            cp /data/forgejo/ssh/forgejo.rsa /etc/ssh/ssh_host_rsa_key
-            cp /data/forgejo/ssh/forgejo.rsa.pub /etc/ssh/ssh_host_rsa_key.pub
-            cp /data/forgejo/ssh/forgejo.ed25519 /etc/ssh/ssh_host_ed25519_key
-            cp /data/forgejo/ssh/forgejo.ed25519.pub /etc/ssh/ssh_host_ed25519_key.pub
+            # Set proper permissions BEFORE copying to /etc/ssh
+            chmod 600 "$SSH_KEYS_DIR/forgejo.rsa"
+            chmod 600 "$SSH_KEYS_DIR/forgejo.ed25519"
+            chmod 644 "$SSH_KEYS_DIR/forgejo.rsa.pub"
+            chmod 644 "$SSH_KEYS_DIR/forgejo.ed25519.pub"
+            # Copy to /etc/ssh for the SSH server
+            cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key
+            cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub
+            cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key
+            cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub
             chmod 600 /etc/ssh/ssh_host_*
             chmod 644 /etc/ssh/ssh_host_*.pub
             ls -la /etc/ssh/
-            ls -la /data/forgejo/ssh/
+            ls -la "$SSH_KEYS_DIR/"
             echo "Done"
           ''];
           volumeMounts = [
@@ -306,11 +314,15 @@ rec {
             echo "Fixing volume permissions..."
             chown -R 1000:1000 /data
             chmod -R 755 /data
-            # Fix SSH keys specifically - they must be readable by git user
-            if [ -d /data/forgejo/ssh ]; then
-              chown -R 1000:1000 /data/forgejo/ssh
-              chmod 600 /data/forgejo/ssh/*
-              chmod 644 /data/forgejo/ssh/*.pub 2>/dev/null || true
+            # Fix SSH keys at the correct path (relative to GITEA_ROOT /data/gitea)
+            SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
+            if [ -d "$SSH_KEYS_DIR" ]; then
+              echo "Fixing SSH keys at $SSH_KEYS_DIR..."
+              chown -R 1000:1000 "$SSH_KEYS_DIR"
+              chmod 600 "$SSH_KEYS_DIR"/*.rsa 2>/dev/null || true
+              chmod 600 "$SSH_KEYS_DIR"/*.ed25519 2>/dev/null || true
+              chmod 644 "$SSH_KEYS_DIR"/*.pub 2>/dev/null || true
+              ls -la "$SSH_KEYS_DIR/"
             fi
             # Fix git user ssh directory
             if [ -d /data/git ]; then
@@ -323,7 +335,6 @@ rec {
             mkdir -p /etc/forgejo
             cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini
             chown -R 1000:1000 /etc/forgejo
-            ls -la /data/forgejo/ssh/ 2>/dev/null || true
             echo "Done"
           ''];
           volumeMounts = [
