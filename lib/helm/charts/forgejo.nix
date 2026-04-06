@@ -34,6 +34,10 @@ rec {
       replicaCount = 2;
       strategy = {
         type = "RollingUpdate";
+        rollingUpdate = {
+          maxSurge = 0;
+          maxUnavailable = 1;
+        };
       };
 
       # Service configuration
@@ -209,10 +213,8 @@ rec {
         timeoutSeconds = 3;
       };
 
-      # Security context - let rootful image manage its own user (s6-overlay needs root for init)
-      podSecurityContext = {
-        fsGroup = 1000;
-      };
+      # Keep volume permissions strict for OpenSSH key checks.
+      podSecurityContext = { };
 
       containerSecurityContext = { };
 
