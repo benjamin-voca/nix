@@ -213,8 +213,12 @@ rec {
         timeoutSeconds = 3;
       };
 
-      # Keep volume permissions strict for OpenSSH key checks.
-      podSecurityContext = { };
+      # fsGroup allows pods to write to CephFS volumes (Forgejo runs as UID 1000)
+      podSecurityContext = {
+        fsGroup = 1000;
+        runAsUser = 0;
+        runAsGroup = 0;
+      };
 
       containerSecurityContext = { };
 
