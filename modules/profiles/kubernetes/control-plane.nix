@@ -46,7 +46,7 @@ in
       "127.0.0.1"
       "kubernetes.quadtech.dev"
     ];
-    apiserver.extraOpts = "--allow-privileged=true";
+    apiserver.extraOpts = "--allow-privileged=true --egress-proxy-dns-port=10247";
   };
 
 
