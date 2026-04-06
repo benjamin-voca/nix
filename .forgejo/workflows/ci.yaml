@@ -11,15 +11,27 @@ jobs:
   nix-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: code.forgejo.org/actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            accept-flake-config = true
+        run: |
+          if command -v nix >/dev/null 2>&1; then
+            nix --version
+          else
+            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            nix --version
+          fi
+
+      - name: Configure Nix
+        run: |
+          mkdir -p "$HOME/.config/nix"
+          {
+            echo "experimental-features = nix-command flakes"
+            echo "accept-flake-config = true"
+          } >> "$HOME/.config/nix/nix.conf"
 
       - name: Check formatting
         run: nix fmt -- --check .
@@ -37,15 +49,27 @@ jobs:
   git-cliff-k8s:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: code.forgejo.org/actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            accept-flake-config = true
+        run: |
+          if command -v nix >/dev/null 2>&1; then
+            nix --version
+          else
+            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            nix --version
+          fi
+
+      - name: Configure Nix
+        run: |
+          mkdir -p "$HOME/.config/nix"
+          {
+            echo "experimental-features = nix-command flakes"
+            echo "accept-flake-config = true"
+          } >> "$HOME/.config/nix/nix.conf"
 
       - name: Enforce k8s conventional scopes
         run: ./scripts/check-k8s-git-cliff.sh
@@ -58,24 +82,33 @@ jobs:
             --unreleased \
             --output CHANGELOG_PREVIEW.md
 
-      - name: Upload changelog preview
-        uses: actions/upload-artifact@v4
-        with:
-          name: changelog-preview
-          path: CHANGELOG_PREVIEW.md
+      - name: Show changelog preview path
+        run: ls -l CHANGELOG_PREVIEW.md
 
   chart-validation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: code.forgejo.org/actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            accept-flake-config = true
+        run: |
+          if command -v nix >/dev/null 2>&1; then
+            nix --version
+          else
+            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            nix --version
+          fi
+
+      - name: Configure Nix
+        run: |
+          mkdir -p "$HOME/.config/nix"
+          {
+            echo "experimental-features = nix-command flakes"
+            echo "accept-flake-config = true"
+          } >> "$HOME/.config/nix/nix.conf"
 
       - name: Build Helm charts from flake outputs
         run: |
@@ -94,15 +127,27 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: code.forgejo.org/actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            accept-flake-config = true
+        run: |
+          if command -v nix >/dev/null 2>&1; then
+            nix --version
+          else
+            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            nix --version
+          fi
+
+      - name: Configure Nix
+        run: |
+          mkdir -p "$HOME/.config/nix"
+          {
+            echo "experimental-features = nix-command flakes"
+            echo "accept-flake-config = true"
+          } >> "$HOME/.config/nix/nix.conf"
 
       - name: Build Helm charts
         run: |
@@ -127,26 +172,35 @@ jobs:
           cp forgejo-chart dist/
           nix shell nixpkgs#kubernetes-helm -c helm repo index dist --url "https://forge.quadtech.dev/api/packages/quadnix/helm"
 
-      - name: Upload index artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: helm-index
-          path: dist/index.yaml
+      - name: Show index path
+        run: ls -l dist/index.yaml
 
   deploy-backbone-01:
     needs: [ nix-check, git-cliff-k8s, chart-validation ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: code.forgejo.org/actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
-        with:
-          extra_nix_config: |
-            accept-flake-config = true
+        run: |
+          if command -v nix >/dev/null 2>&1; then
+            nix --version
+          else
+            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            nix --version
+          fi
+
+      - name: Configure Nix
+        run: |
+          mkdir -p "$HOME/.config/nix"
+          {
+            echo "experimental-features = nix-command flakes"
+            echo "accept-flake-config = true"
+          } >> "$HOME/.config/nix/nix.conf"
 
       - name: Deploy backbone-01
         run: nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks
