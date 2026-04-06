@@ -176,63 +176,63 @@ let
           }
           {
             hostname = "forge-ssh.quadtech.dev";
-            service = "tcp://192.168.1.240:32222";
+            service = "tcp://127.0.0.1:32222";
           }
           {
             hostname = "forge.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "argocd.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "helpdesk.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "harbor.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "educourses-pd.com";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "www.educourses-pd.com";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "verdaccio.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "minecraft.quadtech.dev";
-            service = "tcp://192.168.1.240:25565";
+            service = "tcp://127.0.0.1:25565";
           }
           {
             hostname = "edukurs.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "batllavatourist.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "quadpacienti.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "openclaw.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "grafana.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             hostname = "*.quadtech.dev";
-            service = "http://192.168.1.240:80";
+            service = "http://127.0.0.1:80";
           }
           {
             service = "http_status:404";

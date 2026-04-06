@@ -324,8 +324,16 @@ rec {
               chmod 644 "$SSH_KEYS_DIR"/*.pub 2>/dev/null || true
               ls -la "$SSH_KEYS_DIR/"
             fi
+            # Fix /data/ssh host keys used by sshd (sshd_config references /data/ssh/)
+            if [ -d /data/ssh ]; then
+              echo "Fixing sshd host keys at /data/ssh..."
+              chmod 600 /data/ssh/ssh_host_*_key 2>/dev/null || true
+              chmod 644 /data/ssh/ssh_host_*_key.pub 2>/dev/null || true
+              ls -la /data/ssh/
+            fi
             # Fix git user ssh directory
             if [ -d /data/git ]; then
+              chmod 755 /data/git
               chown -R 1000:1000 /data/git
               if [ -d /data/git/.ssh ]; then
                 chmod 700 /data/git/.ssh
