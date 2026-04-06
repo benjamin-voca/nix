@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 {
   imports = [
@@ -14,6 +14,7 @@
 
   services.kubernetes = {
     roles = [ "node" ];
+    masterAddress = lib.mkDefault "backbone-01.local";
   };
 
   virtualisation.containerd = {

@@ -747,6 +747,22 @@ EOF
         
       # Copy forgejo chart from existing charts
         cp ${existingCharts.forgejo} $out/03-forgejo.yaml
+        chmod u+w $out/03-forgejo.yaml
+
+        # Normalize Forgejo service targetPort for schema validation.
+        OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path(os.environ["OUT"]) / "03-forgejo.yaml"
+docs = path.read_text().split("\n---\n")
+updated_docs = []
+for doc in docs:
+    if "kind: Service" in doc and "\n  name: forgejo-http\n" in doc:
+        doc = doc.replace("targetPort: \n", "targetPort: 3000\n")
+    updated_docs.append(doc)
+path.write_text("\n---\n".join(updated_docs) + "\n")
+PY
 
         # Ensure Forgejo shared storage claim exists on Ceph
         cat > $out/03a-forgejo-shared-storage-ceph-pvc.yaml << 'EOF'
@@ -792,6 +808,26 @@ EOF
         
         # Copy forgejo-actions chart from existing charts
         cp ${existingCharts.forgejo-actions} $out/04-forgejo-actions.yaml
+        chmod u+w $out/04-forgejo-actions.yaml
+
+        # Inject missing StatefulSet serviceName required by Kubernetes schema.
+        OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path(os.environ["OUT"]) / "04-forgejo-actions.yaml"
+docs = path.read_text().split("\n---\n")
+updated_docs = []
+for doc in docs:
+    if "kind: StatefulSet" in doc and "\n  name: forgejo-actions-act-runner\n" in doc and "serviceName:" not in doc:
+        doc = doc.replace(
+            "\nspec:\n  replicas:",
+            "\nspec:\n  serviceName: forgejo-actions-act-runner\n  replicas:",
+            1,
+        )
+    updated_docs.append(doc)
+path.write_text("\n---\n".join(updated_docs) + "\n")
+PY
 
         if [ ! -s "$out/04-forgejo-actions.yaml" ]; then
           echo "forgejo-actions chart render is empty; skipping" >&2

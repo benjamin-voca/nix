@@ -26,6 +26,18 @@ let
       default = {};
     };
   };
+  mockBoot = {
+    options.boot = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = {};
+    };
+  };
+  mockSystemd = {
+    options.systemd = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = {};
+    };
+  };
   eval = lib.evalModules {
     specialArgs = { inherit pkgs; };
     modules = [
@@ -33,6 +45,8 @@ let
       mockNetworking
       mockServices
       mockVirtualisation
+      mockBoot
+      mockSystemd
       ../../../modules/profiles/kubernetes/control-plane.nix
       {
         networking.hostName = "backbone-01";

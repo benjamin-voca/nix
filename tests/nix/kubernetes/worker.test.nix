@@ -26,6 +26,12 @@ let
       default = {};
     };
   };
+  mockBoot = {
+    options.boot = lib.mkOption {
+      type = lib.types.attrsOf lib.types.anything;
+      default = {};
+    };
+  };
   eval = lib.evalModules {
     specialArgs = { inherit pkgs; };
     modules = [
@@ -33,6 +39,7 @@ let
       mockNetworking
       mockServices
       mockVirtualisation
+      mockBoot
       ../../../modules/profiles/kubernetes/worker.nix
       {
         networking.hostName = "frontline-01";

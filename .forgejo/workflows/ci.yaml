@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  nix-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Check formatting
+        run: nix fmt -- --check .
+
+      - name: Run all flake checks
+        run: nix flake check --all-systems --keep-going
+
+      - name: Build all NixOS configurations
+        run: |
+          nix build .#nixosConfigurations.backbone-01.config.system.build.toplevel
+          nix build .#nixosConfigurations.backbone-02.config.system.build.toplevel
+          nix build .#nixosConfigurations.frontline-01.config.system.build.toplevel
+          nix build .#nixosConfigurations.frontline-02.config.system.build.toplevel
+
+  git-cliff-k8s:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Enforce k8s conventional scopes
+        run: ./scripts/check-k8s-git-cliff.sh
+
+      - name: Generate unreleased changelog preview
+        run: |
+          nix run nixpkgs#git-cliff -- \
+            --config cliff.toml \
+            --workdir . \
+            --unreleased \
+            --output CHANGELOG_PREVIEW.md
+
+      - name: Upload changelog preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-preview
+          path: CHANGELOG_PREVIEW.md
+
+  chart-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Build Helm charts from flake outputs
+        run: |
+          nix build .#helmCharts.x86_64-linux.argocd --out-link argocd-chart
+          nix build .#helmCharts.x86_64-linux.forgejo --out-link forgejo-chart
+
+      - name: Validate chart archive contents
+        run: |
+          ls -l argocd-chart
+          ls -l forgejo-chart
+          test -f argocd-chart
+          test -f forgejo-chart
+
+  publish-helm:
+    needs: [ nix-check, git-cliff-k8s, chart-validation ]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Build Helm charts
+        run: |
+          nix build .#helmCharts.x86_64-linux.argocd --out-link argocd-chart
+          nix build .#helmCharts.x86_64-linux.forgejo --out-link forgejo-chart
+
+      - name: Publish chart packages to Forgejo registry
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://forge.quadtech.dev
+          ORG_NAME: quadnix
+        run: |
+          curl -fS -u "${{ github.actor }}:$FORGEJO_TOKEN" -X POST "$FORGEJO_URL/api/packages/$ORG_NAME/helm" \
+            -F "file=@argocd-chart"
+          curl -fS -u "${{ github.actor }}:$FORGEJO_TOKEN" -X POST "$FORGEJO_URL/api/packages/$ORG_NAME/helm" \
+            -F "file=@forgejo-chart"
+
+      - name: Build Helm repository index
+        run: |
+          mkdir -p dist
+          cp argocd-chart dist/
+          cp forgejo-chart dist/
+          nix shell nixpkgs#kubernetes-helm -c helm repo index dist --url "https://forge.quadtech.dev/api/packages/quadnix/helm"
+
+      - name: Upload index artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-index
+          path: dist/index.yaml
+
+  deploy-backbone-01:
+    needs: [ nix-check, git-cliff-k8s, chart-validation ]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Deploy backbone-01
+        run: nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks

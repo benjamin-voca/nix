@@ -18,7 +18,10 @@
     fsType = "ext4";
   };
 
+  boot.loader.grub.enable = lib.mkDefault true;
+  boot.loader.grub.devices = lib.mkDefault [ "/dev/sda" ];
+
   swapDevices = [ ];
 
-  powerManagement.cpuFreq governor = "performance";
+  powerManagement.cpuFreqGovernor = "performance";
 }

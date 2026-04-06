@@ -12,6 +12,9 @@ let
           "frontline-01" = { config = "dummy"; };
         };
       }
+      ({ ... }: {
+        _module.args.inputs = { nixpkgs = pkgs; };
+      })
       ../../../modules/outputs/nixos-configurations.nix
     ];
   };
