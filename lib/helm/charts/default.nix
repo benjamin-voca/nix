@@ -10,7 +10,6 @@ let
   grafana = import ./grafana.nix { inherit helmLib; };
   cloudnative-pg = import ./cloudnative-pg.nix { inherit helmLib; };
   verdaccio = import ./verdaccio.nix { inherit helmLib; };
-  infisical = import ./infisical.nix { inherit helmLib; };
   metallb = import ./metallb.nix { inherit helmLib; };
   harbor = import ./harbor.nix { inherit helmLib; };
   rookCeph = import ./rook-ceph.nix { inherit helmLib; };
@@ -27,7 +26,6 @@ in
   inherit (grafana) grafana loki tempo;
   inherit (cloudnative-pg) cloudnative-pg;
   inherit (verdaccio) verdaccio;
-  inherit (infisical) infisical;
   inherit (metallb) metallb;
   inherit (harbor) harbor;
   "rook-ceph" = rookCeph."rook-ceph";
@@ -44,7 +42,6 @@ in
     inherit (grafana) grafana loki tempo;
     inherit (cloudnative-pg) cloudnative-pg;
     inherit (verdaccio) verdaccio;
-    inherit (infisical) infisical;
     inherit (metallb) metallb;
     inherit (harbor) harbor;
     "rook-ceph" = rookCeph."rook-ceph";

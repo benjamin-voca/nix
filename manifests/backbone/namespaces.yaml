@@ -83,15 +83,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: infisical
-  labels:
-    app.kubernetes.io/name: infisical
-    app.kubernetes.io/component: secrets
-    environment: production
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: cnpg-system
   labels:
     app.kubernetes.io/name: cloudnative-pg

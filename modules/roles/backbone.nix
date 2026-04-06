@@ -11,7 +11,6 @@
     ../services/argocd-deploy.nix
     ../services/helm-charts.nix
     ../services/verdaccio-deploy.nix
-    ../services/infiscal-deploy.nix
     ../services/argocd-apps.nix
     ../services/k8s-secrets-inject.nix
     ../services/forgejo-migration-cleanup.nix
@@ -49,15 +48,6 @@
         mode = "0400";
       };
       forgejo-db-password = {
-        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-      };
-      infisical-db-password = {
-        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-      };
-      infisical-encryption-key = {
-        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
-      };
-      infisical-auth-secret = {
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
       };
       argocd-admin-password = {
@@ -153,10 +143,6 @@
     enable = true;
   };
 
-   services.quadnix.infisical-deploy = {
-     enable = true;
-   };
-
    services.quadnix.verdaccio-deploy = {
      enable = false;
    };
@@ -230,8 +216,6 @@ ingress:
   - hostname: educourses-pd.com
     service: http://127.0.0.1:30856
   - hostname: www.educourses-pd.com
-    service: http://127.0.0.1:30856
-  - hostname: infisical.quadtech.dev
     service: http://127.0.0.1:30856
   - hostname: openclaw.quadtech.dev
     service: http://127.0.0.1:30856

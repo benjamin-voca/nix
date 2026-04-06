@@ -31,17 +31,11 @@ Create the Postgres clusters and app secrets:
 
 ```sh
 SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml \
-  | rg -n "forgejo-db-password|infisical-db-password|infisical-encryption-key|infisical-auth-secret"
+  | rg -n "forgejo-db-password"
 
 forgejo_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "forgejo-db-password: (.*)$" -r '$1')
-infisical_db_password=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-db-password: (.*)$" -r '$1')
-infisical_encryption_key=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-encryption-key: (.*)$" -r '$1')
-infisical_auth_secret=$(SOPS_AGE_KEY_FILE=~/.sops/age/keys.txt sops -d secrets/backbone-01.yaml | rg -o "infisical-auth-secret: (.*)$" -r '$1')
 
 FORGEJO_DB_PASSWORD="$forgejo_db_password" \
-INFISICAL_DB_PASSWORD="$infisical_db_password" \
-INFISICAL_ENCRYPTION_KEY="$infisical_encryption_key" \
-INFISICAL_AUTH_SECRET="$infisical_auth_secret" \
 envsubst < manifests/backbone/cnpg.yaml | kubectl apply -f -
 ```
 
@@ -86,19 +80,11 @@ nix build .#helmCharts.x86_64-linux.all.verdaccio
 kubectl apply -f ./result
 ```
 
-## Infisical
-
-```sh
-nix build .#helmCharts.x86_64-linux.all.infisical
-kubectl apply -f ./result
-```
-
 ## Endpoints
 
 - https://argocd.quadtech.dev
 - https://forge.quadtech.dev
 - https://verdaccio.quadtech.dev
-- https://infisical.quadtech.dev
 
 ## Storage (Rook/Ceph)
 
@@ -111,6 +97,6 @@ kubectl apply -f ./result/bootstrap.yaml
 
 ## Notes
 
-- `lib/helm/charts/verdaccio.nix` and `lib/helm/charts/infisical.nix` vendor
-  upstream charts via `downloadHelmChart` with pinned hashes.
+- `lib/helm/charts/verdaccio.nix` vendors an upstream chart via
+  `downloadHelmChart` with pinned hashes.
 - If a chart is updated upstream, update the version and hash in those files.
