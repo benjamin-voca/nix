@@ -15,6 +15,8 @@ in
     namespace = "harbor";
     values = {
       harborAdminPassword = "PLACEHOLDER";
+      existingSecretAdminPassword = "harbor-admin-secret";
+      existingSecretAdminPasswordKey = "password";
 
       expose = {
         type = "ingress";
@@ -100,8 +102,7 @@ in
         replicas = 1;
         credentials = {
           username = "harbor_registry_user";
-          password = "PLACEHOLDER";
-          htpasswdString = "harbor_registry_user:$2y$05$zrpiBawMMpLbr6Hl1g1PhOCcf1RllfEv/YkkI69O9XC/mZ1/CVcAi";
+          existingSecret = "harbor-registry-secret";
         };
       };
 

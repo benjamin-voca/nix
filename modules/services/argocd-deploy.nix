@@ -66,7 +66,7 @@ let
 in
 {
   options.services.quadnix.argocd-deploy = {
-    enable = lib.mkEnableOption "Deploy ArgoCD to Kubernetes via Helm";
+    enable = lib.mkEnableOption "Reconcile ArgoCD and seed GitOps credentials";
   };
 
   config = lib.mkIf cfg.enable {
@@ -100,7 +100,9 @@ in
           ${pkgs.kubernetes-helm}/bin/helm repo add argoproj https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
           ${pkgs.kubernetes-helm}/bin/helm repo update
 
-          echo "Deploying ArgoCD..."
+          # ArgoCD is also part of the bootstrap manifests; keep this as
+          # an idempotent safety net that reconciles core settings.
+          echo "Reconciling ArgoCD Helm release..."
           PASSWORD=$(cat /run/secrets/argocd-admin-password)
            ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
              --namespace argocd \

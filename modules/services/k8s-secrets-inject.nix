@@ -40,12 +40,28 @@ in
 
           # Harbor registry password
           if [ -f /run/secrets/harbor-registry-password ]; then
+            HARBOR_REG_USER="harbor_registry_user"
             HARBOR_REG_PW=$(cat /run/secrets/harbor-registry-password)
-            $kubectl create secret generic harbor-registry-secret \
-              --namespace=harbor \
-              --from-literal=password="$HARBOR_REG_PW" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected harbor-registry-secret"
+
+            CURRENT_REGISTRY_PW=""
+            if $kubectl -n harbor get secret harbor-registry-secret >/dev/null 2>&1; then
+              CURRENT_REGISTRY_PW=$($kubectl -n harbor get secret harbor-registry-secret -o jsonpath='{.data.REGISTRY_PASSWD}' 2>/dev/null | base64 -d || true)
+            fi
+
+            if [ "$CURRENT_REGISTRY_PW" = "$HARBOR_REG_PW" ] && \
+               $kubectl -n harbor get secret harbor-registry-secret -o jsonpath='{.data.REGISTRY_HTPASSWD}' >/dev/null 2>&1; then
+              echo "Harbor registry credentials already up to date"
+            else
+              HARBOR_REG_HTPASSWD=$(${pkgs.apacheHttpd}/bin/htpasswd -nbBC 10 "$HARBOR_REG_USER" "$HARBOR_REG_PW" | tr -d '\n')
+              $kubectl create secret generic harbor-registry-secret \
+                --namespace=harbor \
+                --from-literal=password="$HARBOR_REG_PW" \
+                --from-literal=REGISTRY_PASSWD="$HARBOR_REG_PW" \
+                --from-literal=REGISTRY_HTPASSWD="$HARBOR_REG_HTPASSWD" \
+                --dry-run=client -o yaml | $kubectl apply -f -
+              $kubectl -n harbor rollout restart deployment/harbor-core deployment/harbor-jobservice deployment/harbor-registry || true
+              echo "Injected harbor-registry-secret (Harbor chart compatible keys)"
+            fi
           fi
 
           # Harbor docker config for quadpacienti namespace

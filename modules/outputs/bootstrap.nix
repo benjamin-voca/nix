@@ -422,6 +422,18 @@ METALLB_CRDS_EOF
         
         # Copy ingress-nginx chart (will get IP from MetalLB)
         cp ${ingressNginxChart} $out/01-ingress-nginx.yaml
+
+        # Create argocd namespace and deploy ArgoCD chart
+        cat > $out/01a-argocd-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+EOF
+
+        cp ${argocdChart} $out/01b-argocd.yaml
         
         # Copy Rook/Ceph operator and cluster charts
         cp ${rookCephChart} $out/02-rook-ceph.yaml
@@ -453,6 +465,75 @@ PY
         # Copy Harbor and monitoring charts from declarative chart configs
         cp ${harborChart} $out/11-harbor-chart.yaml
         cp ${monitoringChart} $out/12-monitoring-chart.yaml
+
+        # Strip last-applied-configuration annotations from CRDs to avoid the
+        # metadata.annotations 256KiB limit when manifests were previously
+        # bootstrapped with client-side apply.
+        OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
+import os
+from pathlib import Path
+
+target_files = [
+    "01b-argocd.yaml",
+    "02-rook-ceph.yaml",
+    "02a-cnpg-operator.yaml",
+    "12-monitoring-chart.yaml",
+]
+
+
+def strip_last_applied_annotation(document: str) -> str:
+    if "kind: CustomResourceDefinition" not in document:
+        return document
+
+    lines = document.splitlines()
+    cleaned = []
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        if "kubectl.kubernetes.io/last-applied-configuration:" in line:
+            indent = len(line) - len(line.lstrip(" "))
+            index += 1
+
+            while index < len(lines):
+                next_line = lines[index]
+                if next_line.strip() == "":
+                    index += 1
+                    continue
+
+                next_indent = len(next_line) - len(next_line.lstrip(" "))
+                if next_indent > indent:
+                    index += 1
+                    continue
+
+                break
+
+            continue
+
+        cleaned.append(line)
+        index += 1
+
+    return "\n".join(cleaned)
+
+
+out_dir = Path(os.environ["OUT"])
+for name in target_files:
+    path = out_dir / name
+    if not path.exists():
+        continue
+
+    # Files copied into $out are read-only by default.
+    path.chmod(0o644)
+
+    docs = path.read_text().split("\n---\n")
+    cleaned_docs = []
+    for doc in docs:
+        if not doc.strip():
+            continue
+        cleaned_docs.append(strip_last_applied_annotation(doc.strip()))
+
+    path.write_text("\n---\n".join(cleaned_docs) + "\n")
+PY
         
         # Create CNPG cluster manifest for shared postgres
         cat > $out/02b-cnpg-cluster.yaml << 'EOF'
@@ -1058,6 +1139,48 @@ spec:
               number: 80
 EOF
 
+        # Ensure ERPNext namespace exists before helpdesk redirect ingress
+        cat > $out/12aa-erpnext-namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erpnext
+  labels:
+    app.kubernetes.io/name: erpnext
+EOF
+
+        # Redirect legacy Helpdesk path to Desk module route
+        cat > $out/12a-erpnext-helpdesk-redirect-ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: erpnext-helpdesk-redirect
+  namespace: erpnext
+  annotations:
+    nginx.ingress.kubernetes.io/permanent-redirect: /desk/helpdesk
+    nginx.ingress.kubernetes.io/permanent-redirect-code: "308"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: helpdesk.quadtech.dev
+    http:
+      paths:
+      - path: /helpdesk
+        pathType: Exact
+        backend:
+          service:
+            name: erpnext
+            port:
+              number: 8080
+      - path: /helpdesk/
+        pathType: Prefix
+        backend:
+          service:
+            name: erpnext
+            port:
+              number: 8080
+EOF
+
         # Create ArgoCD Application for Verdaccio
         cat > $out/13-verdaccio-argocd-app.yaml << 'EOF'
 apiVersion: argoproj.io/v1alpha1
@@ -1185,6 +1308,10 @@ EOF
         echo "---" >> $out/bootstrap.yaml
         cat $out/01-ingress-nginx.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
+        cat $out/01a-argocd-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/01b-argocd.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
         cat $out/02d-rook-ceph-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/02-rook-ceph.yaml >> $out/bootstrap.yaml
@@ -1220,7 +1347,6 @@ EOF
           echo "---" >> $out/bootstrap.yaml
         fi
         # ArgoCD Forgejo credentials now applied via argocd-deploy service (not in bootstrap)
-        # ArgoCD is deployed separately - skip 04-argocd.yaml
         cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
@@ -1238,6 +1364,10 @@ EOF
         cat $out/11-harbor-chart.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/12-harbor-ingress.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12aa-erpnext-namespace.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12a-erpnext-helpdesk-redirect-ingress.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
