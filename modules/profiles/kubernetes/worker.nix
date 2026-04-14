@@ -33,4 +33,12 @@
       capabilities = ["pull", "resolve", "push"]
       skip_verify = true
   '';
+
+  environment.etc."containerd/certs.d/10.0.0.56:5000/hosts.toml".text = ''
+    server = "http://10.0.0.56:5000"
+
+    [host."http://10.0.0.56:5000"]
+      capabilities = ["pull", "resolve", "push"]
+      skip_verify = true
+  '';
 }

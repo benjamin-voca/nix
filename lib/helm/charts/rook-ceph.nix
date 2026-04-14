@@ -15,8 +15,9 @@ in
       };
 
       csi = {
+        enableRBDDriver = true;
+        enableCephfsDriver = false;
         rookUseCsiOperator = false;
-        enableCephfsDriver = true;
         enableNFSDriver = false;
         enableRBDSnapshotter = true;
         enableCephfsSnapshotter = false;

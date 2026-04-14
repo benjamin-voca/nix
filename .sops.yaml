@@ -1,29 +1,18 @@
 # SOPS Configuration for QuadNix
 #
-# This file defines which age keys can decrypt which secrets.
+# This file defines which keys can decrypt which secrets.
+# Supports both age keys (for hosts) and SSH keys (for users).
 # Public keys are safe to commit to git.
-#
-# SETUP INSTRUCTIONS:
-# 1. Generate age keys on each host:
-#    sudo mkdir -p /etc/sops/age
-#    sudo age-keygen -o /etc/sops/age/keys.txt
-#
-# 2. Get the public key:
-#    sudo cat /etc/sops/age/keys.txt | grep "public key:"
-#
-# 3. Replace the placeholder keys below with your actual public keys
-# 4. Delete this comment block
 
 keys:
-  # Backbone hosts
+  # SSH keys for users who can decrypt (from modules/profiles/base.nix)
+  - &benjamin ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILaEuHKb7PS/LyaBxvNzIcVzMOW0aDVHFnauM9pSjxm8
+  - &klajdi ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQisXyPG28p3bjlL6slxTsZWdQRDBcIq0eKf388kjJk
+  - &erti ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDIjDVRgzc2UBRIbtwysmmW/F+zOjLm4PhmmKeYASoZK
+  - &elion ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINxZcBLleNnJ8BXX7+3jA3xROZjlz3C5dM76VTsy/sLh
+
+  # Backbone hosts (age keys)
   - &backbone-01 age149k446qw7jhxszqs40y09a2n22um3056geunqm2mypg8e7dehgvsyn4ude
-
-  # Frontline hosts (optional)
-  # - &frontline-01 age1REPLACE_WITH_FRONTLINE_01_PUBLIC_KEY
-  # - &frontline-02 age1REPLACE_WITH_FRONTLINE_02_PUBLIC_KEY
-
-  # Your personal workstation (optional, for editing secrets)
-  - &admin age1un9trx63mfny5kt8fsac3flqjsc7cree0eq2v4gtfn0zvfmx2dmsqgyetf
 
 creation_rules:
   # Backbone-01 specific secrets
@@ -31,14 +20,22 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-          - *admin
+      - ssh:
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
 
   # Backbone-02 specific secrets
   # - path_regex: secrets/backbone-02\.yaml$
   #   key_groups:
   #   - age:
   #     - *backbone-02
-  # - *admin
+  #   - ssh:
+  #     - *benjamin
+  #     - *klajdi
+  #     - *erti
+  #     - *elion
 
   # Shared backbone secrets (both hosts can decrypt)
   - path_regex: secrets/backbone-shared\.yaml$
@@ -46,21 +43,33 @@ creation_rules:
       - age:
           - *backbone-01
           # - *backbone-02
-          - *admin
+      - ssh:
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
 
   # Frontline-01 specific secrets
   # - path_regex: secrets/frontline-01\.yaml$
   #   key_groups:
   #   - age:
   #     - *frontline-01
-  #     - *admin
+  #   - ssh:
+  #     - *benjamin
+  #     - *klajdi
+  #     - *erti
+  #     - *elion
 
   # Frontline-02 specific secrets
   # - path_regex: secrets/frontline-02\.yaml$
   #   key_groups:
   #   - age:
   #     - *frontline-02
-  #     - *admin
+  #   - ssh:
+  #     - *benjamin
+  #     - *klajdi
+  #     - *erti
+  #     - *elion
 
   # Global secrets (all hosts can decrypt)
   - path_regex: secrets/global\.yaml$
@@ -70,4 +79,8 @@ creation_rules:
           # - *backbone-02
           # - *frontline-01
           # - *frontline-02
-          - *admin
+      - ssh:
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
