@@ -231,6 +231,10 @@ let
             service = "http://127.0.0.1:80";
           }
           {
+            hostname = "api.orkestr-os.com";
+            service = "http://127.0.0.1:80";
+          }
+          {
             hostname = "*.quadtech.dev";
             service = "http://127.0.0.1:80";
           }
