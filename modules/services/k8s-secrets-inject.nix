@@ -24,7 +24,7 @@ in
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph; do
+          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph orkestr; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -154,7 +154,7 @@ in
           fi
 
           if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
-            for target_ns in cnpg-system edukurs forgejo quadpacient; do
+            for target_ns in cnpg-system edukurs forgejo quadpacient orkestr; do
               $kubectl create secret generic ceph-rgw-s3-credentials \
                 --namespace="$target_ns" \
                 --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
@@ -259,6 +259,60 @@ in
               $OC_ARGS \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected openclaw-secrets"
+          fi
+
+          # Orkestr secrets
+          if [ -f /run/secrets/orkestr-db-password ]; then
+            ORKESTR_DB_PW=$(cat /run/secrets/orkestr-db-password)
+            $kubectl create secret generic orkestr-db-secret \
+              --namespace=orkestr \
+              --type=kubernetes.io/basic-auth \
+              --from-literal=username=orkestr \
+              --from-literal=password="$ORKESTR_DB_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected orkestr-db-secret"
+          fi
+
+          if [ -f /run/secrets/orkestr-db-password ] && [ -f /run/secrets/orkestr-secret-key-base ] && [ -f /run/secrets/orkestr-token-signing-secret ] && [ -f /run/secrets/orkestr-electric-secret ]; then
+            ORKESTR_DB_PW=$(cat /run/secrets/orkestr-db-password)
+            ORKESTR_SKB=$(cat /run/secrets/orkestr-secret-key-base)
+            ORKESTR_TSS=$(cat /run/secrets/orkestr-token-signing-secret)
+            ORKESTR_ES=$(cat /run/secrets/orkestr-electric-secret)
+            $kubectl create secret generic orkestr-app-secrets \
+              --namespace=orkestr \
+              --from-literal=DATABASE_URL="postgresql://orkestr:$ORKESTR_DB_PW@orkestr-db-rw.orkestr.svc.cluster.local:5432/orkestr?sslmode=disable" \
+              --from-literal=SECRET_KEY_BASE="$ORKESTR_SKB" \
+              --from-literal=TOKEN_SIGNING_SECRET="$ORKESTR_TSS" \
+              --from-literal=PHX_SERVER="true" \
+              --from-literal=PHX_HOST="app.orkestr-os.com" \
+              --from-literal=PORT="4000" \
+              --from-literal=ELECTRIC_SYNC_ENABLED="true" \
+              --from-literal=ELECTRIC_URL="http://orkestr-electric-proxy.orkestr.svc.cluster.local/v1/shape" \
+              --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
+              --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected orkestr-app-secrets"
+
+            $kubectl create secret generic orkestr-electric-secrets \
+              --namespace=orkestr \
+              --from-literal=DATABASE_URL="postgresql://orkestr:$ORKESTR_DB_PW@orkestr-db-rw.orkestr.svc.cluster.local:5432/orkestr?sslmode=disable" \
+              --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
+              --from-literal=ELECTRIC_INSECURE="false" \
+              --from-literal=ELECTRIC_LOG_LEVEL="info" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected orkestr-electric-secrets"
+          fi
+
+          # Harbor docker config for orkestr namespace
+          if [ -f /run/secrets/harbor-admin-password ]; then
+            HARBOR_PW=$(cat /run/secrets/harbor-admin-password)
+            $kubectl create secret docker-registry harbor-registry \
+              --namespace=orkestr \
+              --docker-server=harbor.quadtech.dev \
+              --docker-username=admin \
+              --docker-password="$HARBOR_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected harbor-registry (orkestr namespace)"
           fi
 
           echo "K8s secrets injection complete."

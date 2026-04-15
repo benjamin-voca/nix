@@ -116,3 +116,12 @@ metadata:
     app.kubernetes.io/component: registry
     environment: production
     app.kubernetes.io/managed-by: quadnix
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orkestr
+  labels:
+    app.kubernetes.io/name: orkestr
+    app.kubernetes.io/component: application
+    environment: production

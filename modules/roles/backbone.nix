@@ -137,6 +137,22 @@
         sopsFile = ../../secrets/${config.networking.hostName}.yaml;
         path = "/run/secrets/forgejo-agent-token";
       };
+      orkestr-db-password = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/orkestr-db-password";
+      };
+      orkestr-secret-key-base = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/orkestr-secret-key-base";
+      };
+      orkestr-token-signing-secret = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/orkestr-token-signing-secret";
+      };
+      orkestr-electric-secret = {
+        sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+        path = "/run/secrets/orkestr-electric-secret";
+      };
     };
 
   services.quadnix.argocd-deploy = {
@@ -220,6 +236,10 @@ ingress:
   - hostname: openclaw.quadtech.dev
     service: http://127.0.0.1:30856
   - hostname: grafana.k8s.quadtech.dev
+    service: http://127.0.0.1:30856
+  - hostname: app.orkestr-os.com
+    service: http://127.0.0.1:30856
+  - hostname: api.orkestr-os.com
     service: http://127.0.0.1:30856
   - service: http_status:404
 EOF
