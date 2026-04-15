@@ -24,6 +24,9 @@ in {
 
         actRunner = {
           config = {
+            log = {
+              level = "debug";
+            };
             runner = {
               extra = [
                 "ubuntu-latest"
