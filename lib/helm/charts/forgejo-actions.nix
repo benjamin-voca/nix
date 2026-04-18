@@ -20,7 +20,7 @@ in {
       existingSecretKey = "token";
 
       statefulset = {
-        replicas = 2;
+        replicas = 3;
 
         actRunner = {
           config = {

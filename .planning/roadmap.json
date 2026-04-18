@@ -1,0 +1,56 @@
+[
+  {
+    "phase": 1,
+    "name": "Refactor Bootstrap & Cloudflared",
+    "status": "planned",
+    "description": "Break the 600-line bootstrap.nix monolith into modular, composable files. Deduplicate cloudflared ingress routes into a single shared definition. Fix the K8s cloudflared deployment to route to the correct NodePort (30856, not port 80).",
+    "scope": [
+      "modules/outputs/bootstrap.nix → split into modules/outputs/bootstrap/*.nix",
+      "Cloudflared routes → shared config in modules/shared/ or modules/services/",
+      "Fix K8s cloudflared route mismatch"
+    ],
+    "depends_on": []
+  },
+  {
+    "phase": 2,
+    "name": "Generalize Host Abstraction",
+    "status": "planning",
+    "description": "Make mkClusterHost more flexible with configurable options for master address, node labels, taints, and per-host secret paths. Ensure adding a new host requires minimal boilerplate.",
+    "scope": [
+      "modules/lib/mk-cluster-host.nix",
+      "modules/profiles/kubernetes/worker.nix",
+      "modules/roles/backbone.nix (secrets extraction)",
+      "modules/options/quad.nix (new host-level options)"
+    ],
+    "depends_on": [1]
+  },
+  {
+    "phase": 3,
+    "name": "Add Real Frontline-01 Host",
+    "status": "planning",
+    "description": "Configure frontline-01 with real hardware specs, wire it as a K8s worker node, generate per-host secrets, and verify it joins the cluster. Consider cloudflared split between hosts.",
+    "scope": [
+      "modules/hardware/frontline-01.nix (real hardware)",
+      "modules/hosts/frontline-01.nix (real config)",
+      "secrets/frontline-01.yaml",
+      "modules/outputs/deploy.nix (frontline-01 target)",
+      "Cloudflared multi-host strategy"
+    ],
+    "depends_on": [1, 2]
+  },
+  {
+    "phase": 4,
+    "name": "True GitOps CI/CD",
+    "status": "researching",
+    "description": "Establish full GitOps pipeline: push to main triggers CI build + test, then CD auto-deploys NixOS configs and K8s bootstrap manifests. Automate versioning with git-cliff. Ensure multi-host deploy, sops secret handling, and ArgoCD sync.",
+    "scope": [
+      ".forgejo/workflows/ci.yaml (redesign)",
+      "Automated bootstrap manifest build + apply",
+      "Multi-host deploy-rs automation",
+      "Secret management in CI (sops-nix integration)",
+      "Git-cliff automated versioning + changelog",
+      "ArgoCD sync policy for K8s apps"
+    ],
+    "depends_on": [1, 3]
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "current_phase": 1,
+  "current_step": null,
+  "phases": {
+    "1": { "status": "planned", "plans_complete": true, "steps_total": 6, "steps_done": 0 },
+    "2": { "status": "planning", "plans_complete": false, "steps_total": 5, "steps_done": 0 },
+    "3": { "status": "planning", "plans_complete": false, "steps_total": 7, "steps_done": 0 },
+    "4": { "status": "researching", "plans_complete": false, "steps_total": 0, "steps_done": 0 }
+  }
+}

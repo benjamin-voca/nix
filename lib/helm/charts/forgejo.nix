@@ -1,7 +1,7 @@
 { helmLib }:
 
 let
-  forgejoImage = "codeberg.org/forgejo/forgejo:14.0.3";
+  forgejoImage = "codeberg.org/forgejo/forgejo:15.0.0";
   compatChartName = "gi" + "tea";
   compatDataPath = "/data/${compatChartName}";
 in
@@ -24,7 +24,7 @@ rec {
       image = {
         registry = "codeberg.org";
         repository = "forgejo/forgejo";
-        tag = "14.0.3";
+        tag = "15.0.0";
         fullOverride = "";
         rootless = false;
         pullPolicy = "IfNotPresent";

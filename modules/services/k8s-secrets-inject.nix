@@ -290,6 +290,7 @@ in
               --from-literal=ELECTRIC_URL="http://orkestr-electric-proxy.orkestr.svc.cluster.local/v1/shape" \
               --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
               --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
+              --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected orkestr-app-secrets"
 
@@ -304,13 +305,13 @@ in
           fi
 
           # Harbor docker config for orkestr namespace
-          if [ -f /run/secrets/harbor-admin-password ]; then
-            HARBOR_PW=$(cat /run/secrets/harbor-admin-password)
+          if [ -f /run/secrets/harbor-registry-password ]; then
+            HARBOR_REG_PW=$(cat /run/secrets/harbor-registry-password)
             $kubectl create secret docker-registry harbor-registry \
               --namespace=orkestr \
-              --docker-server=harbor.quadtech.dev \
-              --docker-username=admin \
-              --docker-password="$HARBOR_PW" \
+              --docker-server=10.0.0.56:5000 \
+              --docker-username=harbor_registry_user \
+              --docker-password="$HARBOR_REG_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected harbor-registry (orkestr namespace)"
           fi
