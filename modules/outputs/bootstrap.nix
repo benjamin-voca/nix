@@ -470,6 +470,9 @@ PY
         cp ${harborChart} $out/11-harbor-chart.yaml
         cp ${monitoringChart} $out/12-monitoring-chart.yaml
 
+        # Copy Grafana chart (simple, cloudflare-tunnel friendly)
+        cp ${existingCharts.grafana} $out/12-grafana-chart.yaml
+
         # Strip last-applied-configuration annotations from CRDs to avoid the
         # metadata.annotations 256KiB limit when manifests were previously
         # bootstrapped with client-side apply.
@@ -613,6 +616,17 @@ spec:
   cluster:
     name: shared-pg
   owner: app
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: grafana
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: shared-pg
+  name: grafana
+  owner: edukurs
 EOF
 
         # Create rook-ceph namespace
@@ -1231,6 +1245,55 @@ metadata:
   name: monitoring
   labels:
     app.kubernetes.io/name: monitoring
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grafana
+  labels:
+    app.kubernetes.io/name: grafana
+EOF
+
+        # Create Grafana DB secret (credentials for CNPG shared-pg)
+        cat > $out/12-grafana-db-secret.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-db
+  namespace: grafana
+type: Opaque
+stringData:
+  GF_DATABASE_TYPE: postgres
+  GF_DATABASE_HOST: shared-pg-rw.cnpg-system.svc.cluster.local:5432
+  GF_DATABASE_NAME: grafana
+  GF_DATABASE_USER: edukurs
+  GF_DATABASE_PASSWORD: PLACEHOLDER
+  GF_SECURITY_ADMIN_PASSWORD: PLACEHOLDER
+EOF
+
+        # Create Grafana ingress (Cloudflare tunnel -> nginx -> Grafana service)
+        cat > $out/12a-grafana-ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: grafana
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: grafana.quadtech.dev
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 80
 EOF
 
         # Create ArgoCD Application for Minecraft
@@ -1378,6 +1441,12 @@ EOF
         cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/12-monitoring-chart.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12-grafana-db-secret.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12-grafana-chart.yaml >> $out/bootstrap.yaml
+        echo "---" >> $out/bootstrap.yaml
+        cat $out/12a-grafana-ingress.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml
         cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

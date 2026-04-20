@@ -33,7 +33,7 @@
       persistence = {
         enabled = true;
         size = "10Gi";
-        storageClassName = "local-path";
+        storageClassName = "ceph-block";
       };
 
       # Admin credentials (should be managed via secrets)
@@ -48,11 +48,8 @@
         };
 
         database = {
-          type = "postgres";
-          host = "grafana-postgresql:5432";
-          name = "grafana";
-          user = "grafana";
-          # Password from secret
+          # Configured via env vars from grafana-db secret
+          # GF_DATABASE_TYPE, GF_DATABASE_HOST, GF_DATABASE_NAME, GF_DATABASE_USER, GF_DATABASE_PASSWORD
         };
 
         analytics = {
@@ -75,23 +72,23 @@
         };
 
         security = {
-          # Should be set via secret
-          secret_key = "changeme";
-          admin_user = "admin";
-          admin_password = "changeme";
+          # Secret key and admin password should be set via env vars/secrets, not values
+          # GF_SECURITY_SECRET_KEY, GF_SECURITY_ADMIN_PASSWORD
+          assertNoLeakedSecrets = false;
         };
 
         snapshots = {
           external_enabled = true;
         };
 
-        dashboards = {
-          default_home_dashboard_path = "/var/lib/grafana/dashboards/default/home.json";
-        };
 
         "log" = {
           mode = "console";
           level = "info";
+        };
+
+        plugins = {
+          allow_loading_unsigned_plugins = "grafana-clickhouse-datasource";
         };
 
         metrics = {
@@ -152,19 +149,9 @@
       };
 
       # PostgreSQL for Grafana database
+      # Disable built-in postgresql — using CNPG shared-pg cluster instead
       postgresql = {
-        enabled = true;
-        auth = {
-          database = "grafana";
-          username = "grafana";
-          password = "changeme";
-        };
-        primary = {
-          persistence = {
-            enabled = true;
-            size = "5Gi";
-          };
-        };
+        enabled = false;
       };
 
       # Resource limits (reduced for single instance)
@@ -246,6 +233,9 @@
       env = {
         GF_INSTALL_PLUGINS = "grafana-clickhouse-datasource";
       };
+
+      # Inject DB credentials from the grafana-db secret
+      envFromSecret = "grafana-db";
     };
   };
 

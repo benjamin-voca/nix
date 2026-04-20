@@ -7,7 +7,7 @@ let
   forgejo = import ./forgejo.nix { inherit helmLib; };
   forgejoActions = import ./forgejo-actions.nix { inherit helmLib; };
   clickhouse = import ./clickhouse.nix { inherit helmLib; };
-  grafana = import ./grafana.nix { inherit helmLib; };
+  grafana = import ./grafana-simple.nix { inherit helmLib; };
   cloudnative-pg = import ./cloudnative-pg.nix { inherit helmLib; };
   verdaccio = import ./verdaccio.nix { inherit helmLib; };
   metallb = import ./metallb.nix { inherit helmLib; };
