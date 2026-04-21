@@ -1,0 +1,54 @@
+image:
+  repository: 10.0.0.56:5000/library/frappe-helpdesk
+  tag: v16-latest
+  pullPolicy: Always
+
+nginx:
+  image:
+    repository: 10.0.0.56:5000/library/frappe-helpdesk
+    tag: v16-latest
+    pullPolicy: Always
+
+persistence:
+  worker:
+    enabled: true
+    storageClass: ceph-block
+    accessMode: ReadWriteOnce
+    size: 20Gi
+
+mariadb:
+  enabled: true
+  auth:
+    rootPassword: "YN6So7dycz"
+  primary:
+    persistence:
+      enabled: true
+      storageClassName: ceph-block
+      size: 20Gi
+
+redis:
+  cache:
+    enabled: true
+  queue:
+    enabled: true
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+  hosts:
+    - host: helpdesk.quadtech.dev
+      paths:
+        - path: /
+
+erpnext:
+  adminPassword: "admin123"
+
+# Don't create default site - we'll bootstrap helpdesk manually
+jobs:
+  createSite:
+    enabled: false
+  migrate:
+    enabled: false

@@ -56,6 +56,23 @@ in
         "node-role.kubernetes.io/node" = "";
       };
     };
+    # CoreDNS: forward external queries to public DNS (not router)
+    addons.dns.corefile = ''
+      .:10053 {
+        errors
+        health :10054
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+          pods insecure
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :10055
+        forward . 8.8.8.8 1.1.1.1
+        cache 30
+        loop
+        reload
+        loadbalance
+      }
+    '';
   };
 
 

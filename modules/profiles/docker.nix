@@ -9,6 +9,7 @@
     daemon.settings = {
       insecure-registries = [
         "harbor.quadtech.dev"
+        "10.0.0.56:5000"
       ];
     };
   };
