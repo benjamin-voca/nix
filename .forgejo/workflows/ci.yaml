@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  nix-check:
+  # ── 1. Test: nix flake check (unit tests, formatting, kubeconform, conftest) ──
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: code.forgejo.org/actions/checkout@v4
@@ -46,7 +47,8 @@ jobs:
           nix build .#nixosConfigurations.frontline-01.config.system.build.toplevel
           nix build .#nixosConfigurations.frontline-02.config.system.build.toplevel
 
-  git-cliff-k8s:
+  # ── 2. Validate: build bootstrap manifests + diff against reference ──
+  validate-manifests:
     runs-on: ubuntu-latest
     steps:
       - uses: code.forgejo.org/actions/checkout@v4
@@ -71,20 +73,43 @@ jobs:
             echo "accept-flake-config = true"
           } >> "$HOME/.config/nix/nix.conf"
 
-      - name: Enforce k8s conventional scopes
-        run: ./scripts/check-k8s-git-cliff.sh
-
-      - name: Generate unreleased changelog preview
+      - name: Build bootstrap manifests
         run: |
-          nix run nixpkgs#git-cliff -- \
-            --config cliff.toml \
-            --workdir . \
-            --unreleased \
-            --output CHANGELOG_PREVIEW.md
+          nix build .#bootstrap.x86_64-linux
 
-      - name: Show changelog preview path
-        run: ls -l CHANGELOG_PREVIEW.md
+      - name: Validate manifests with kubeconform
+        run: |
+          nix shell nixpkgs#kubeconform -c \
+            kubeconform -summary -strict -ignore-missing-schemas -kubernetes-version 1.29.0 \
+            result/bootstrap.yaml
 
+      - name: Diff bootstrap against committed reference
+        run: |
+          if [ -f docs/reference-bootstrap.yaml ]; then
+            nix shell nixpkgs#difftastic -c \
+              diff --unified=5 docs/reference-bootstrap.yaml result/bootstrap.yaml || {
+                echo ""
+                echo "::warning::Bootstrap manifests differ from docs/reference-bootstrap.yaml"
+                echo "If this is intentional, update the reference:"
+                echo "  cp result/bootstrap.yaml docs/reference-bootstrap.yaml"
+                echo ""
+                # Don't fail the pipeline on diff — just warn.
+                # The diff is informational for PR review.
+              }
+          else
+            echo "No reference bootstrap found at docs/reference-bootstrap.yaml"
+            echo "Generate one with: cp result/bootstrap.yaml docs/reference-bootstrap.yaml"
+          fi
+
+      - name: Upload bootstrap artifacts
+        uses: code.forgejo.org/actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bootstrap-manifests
+          path: result/
+          retention-days: 7
+
+  # ── 3. Chart validation & changelog ──
   chart-validation:
     runs-on: ubuntu-latest
     steps:
@@ -122,8 +147,23 @@ jobs:
           test -f argocd-chart
           test -f forgejo-chart
 
+      - name: Enforce k8s conventional scopes
+        run: ./scripts/check-k8s-git-cliff.sh
+
+      - name: Generate unreleased changelog preview
+        run: |
+          nix run nixpkgs#git-cliff -- \
+            --config cliff.toml \
+            --workdir . \
+            --unreleased \
+            --output CHANGELOG_PREVIEW.md
+
+      - name: Show changelog preview path
+        run: ls -l CHANGELOG_PREVIEW.md
+
+  # ── 4. Publish Helm charts (main only, after all checks pass) ──
   publish-helm:
-    needs: [ nix-check, git-cliff-k8s, chart-validation ]
+    needs: [ test, validate-manifests, chart-validation ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -175,8 +215,9 @@ jobs:
       - name: Show index path
         run: ls -l dist/index.yaml
 
-  deploy-backbone-01:
-    needs: [ nix-check, git-cliff-k8s, chart-validation ]
+  # ── 5. CD: Deploy NixOS + Bootstrap + Trigger ArgoCD Sync ──
+  deploy:
+    needs: [ test, validate-manifests, chart-validation ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -202,5 +243,64 @@ jobs:
             echo "accept-flake-config = true"
           } >> "$HOME/.config/nix/nix.conf"
 
-      - name: Deploy backbone-01
+      # ── Step A: Build bootstrap manifests ──
+      - name: Build bootstrap manifests
+        run: nix build .#bootstrap.x86_64-linux
+
+      # ── Step B: Apply bootstrap to Kubernetes ──
+      - name: Apply bootstrap manifests
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_BASE64 }}
+        run: |
+          # Decode kubeconfig from base64 secret
+          echo "$KUBECONFIG_B64" | base64 -d > /tmp/kubeconfig
+          export KUBECONFIG=/tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+
+          # Apply all bootstrap manifests with server-side apply
+          nix shell nixpkgs#kubectl -c bash -c '
+            kubectl apply \
+              --server-side \
+              --field-manager=quadnix-ci \
+              --force-conflicts \
+              -f result/bootstrap.yaml
+          '
+
+      # ── Step C: Trigger ArgoCD sync for all Applications ──
+      - name: Trigger ArgoCD sync
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+          ARGOCD_TOKEN: ${{ secrets.ARGOCD_API_TOKEN }}
+        run: |
+          # ArgoCD server is reachable via cluster IP from the runner
+          ARGOCD_URL="http://10.0.0.171"
+
+          # Get all ArgoCD Application names
+          APPS=$(nix shell nixpkgs#kubectl -c kubectl get applications -n argocd -o jsonpath='{.items[*].metadata.name}')
+
+          if [ -z "$APPS" ]; then
+            echo "No ArgoCD Applications found, skipping sync"
+            exit 0
+          fi
+
+          echo "Triggering ArgoCD sync for: $APPS"
+
+          for APP in $APPS; do
+            echo "Syncing $APP..."
+            # Trigger sync via ArgoCD API
+            HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+              -X POST \
+              -H "Authorization: Bearer $ARGOCD_TOKEN" \
+              -H "Content-Type: application/json" \
+              "${ARGOCD_URL}/api/v1/applications/${APP}/sync")
+            
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "  ✓ $APP sync triggered (HTTP $HTTP_CODE)"
+            else
+              echo "  ✗ $APP sync failed (HTTP $HTTP_CODE)"
+            fi
+          done
+
+      # ── Step D: Deploy NixOS to backbone-01 ──
+      - name: Deploy backbone-01 via deploy-rs
         run: nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks
