@@ -21,6 +21,8 @@ jobs:
           if command -v nix >/dev/null 2>&1; then
             nix --version
           else
+            mkdir -p /etc/nix
+            echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
             nix --version
@@ -32,6 +34,7 @@ jobs:
           {
             echo "experimental-features = nix-command flakes"
             echo "accept-flake-config = true"
+            echo "build-users-group ="
           } >> "$HOME/.config/nix/nix.conf"
 
       - name: Check formatting
@@ -60,6 +63,8 @@ jobs:
           if command -v nix >/dev/null 2>&1; then
             nix --version
           else
+            mkdir -p /etc/nix
+            echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
             nix --version
@@ -71,6 +76,7 @@ jobs:
           {
             echo "experimental-features = nix-command flakes"
             echo "accept-flake-config = true"
+            echo "build-users-group ="
           } >> "$HOME/.config/nix/nix.conf"
 
       - name: Build bootstrap manifests
@@ -102,7 +108,7 @@ jobs:
           fi
 
       - name: Upload bootstrap artifacts
-        uses: code.forgejo.org/actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bootstrap-manifests
@@ -122,6 +128,8 @@ jobs:
           if command -v nix >/dev/null 2>&1; then
             nix --version
           else
+            mkdir -p /etc/nix
+            echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
             nix --version
@@ -133,6 +141,7 @@ jobs:
           {
             echo "experimental-features = nix-command flakes"
             echo "accept-flake-config = true"
+            echo "build-users-group ="
           } >> "$HOME/.config/nix/nix.conf"
 
       - name: Build Helm charts from flake outputs
@@ -176,6 +185,8 @@ jobs:
           if command -v nix >/dev/null 2>&1; then
             nix --version
           else
+            mkdir -p /etc/nix
+            echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
             nix --version
@@ -187,6 +198,7 @@ jobs:
           {
             echo "experimental-features = nix-command flakes"
             echo "accept-flake-config = true"
+            echo "build-users-group ="
           } >> "$HOME/.config/nix/nix.conf"
 
       - name: Build Helm charts
@@ -230,6 +242,8 @@ jobs:
           if command -v nix >/dev/null 2>&1; then
             nix --version
           else
+            mkdir -p /etc/nix
+            echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
             nix --version
@@ -241,6 +255,7 @@ jobs:
           {
             echo "experimental-features = nix-command flakes"
             echo "accept-flake-config = true"
+            echo "build-users-group ="
           } >> "$HOME/.config/nix/nix.conf"
 
       # ── Step A: Build bootstrap manifests ──
