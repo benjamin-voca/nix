@@ -25,6 +25,7 @@ jobs:
             echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
             nix --version
           fi
 
@@ -67,6 +68,7 @@ jobs:
             echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
             nix --version
           fi
 
@@ -132,6 +134,7 @@ jobs:
             echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
             nix --version
           fi
 
@@ -189,6 +192,7 @@ jobs:
             echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
             nix --version
           fi
 
@@ -246,6 +250,7 @@ jobs:
             echo "build-users-group =" > /etc/nix/nix.conf
             curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
             . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
             nix --version
           fi
 
