@@ -70,11 +70,11 @@ in {
       }
       // lib.optionalAttrs (system == "x86_64-linux") {
         vm-backbone-control-plane = import ../../tests/vm/backbone-control-plane.nix {
-          inherit inputs lib pkgs;
+          inherit lib pkgs;
         };
 
         vm-frontline-worker = import ../../tests/vm/frontline-worker.nix {
-          inherit inputs lib pkgs;
+          inherit lib pkgs;
         };
 
         vm-sops-decrypt = import ../../tests/vm/sops-decrypt.nix {
