@@ -163,10 +163,6 @@ in {
     };
   };
 
-  systemd.services.kube-scheduler = {
-    serviceConfig.ExecStart = "${pkgs.kubernetes}/bin/kube-scheduler --bind-address=127.0.0.1 --kubeconfig=/run/kubernetes/kube-scheduler.kubeconfig --leader-elect=true --secure-port=10251 --percentage-of-nodes-to-score=200";
-  };
-
   systemd.services.kube-addon-manager = {
     after = ["kube-apiserver.service" "network-online.target"];
     wants = ["kube-apiserver.service" "network-online.target"];
