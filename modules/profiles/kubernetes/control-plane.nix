@@ -49,8 +49,6 @@ in {
       "kubernetes.quadtech.dev"
     ];
     apiserver.extraOpts = "--allow-privileged=true";
-    # Global CPU overprovisioning: allow scheduling up to 200% CPU utilization
-    scheduler.extraOpts = "--percentage-of-nodes-to-score=200";
     # K8s 1.27+ rejects kubernetes.io/* labels via --node-labels flag.
     # Set role labels through the kubelet config file instead.
     kubelet.extraOpts = "--node-labels=node.kubernetes.io/instance-type=standard";
