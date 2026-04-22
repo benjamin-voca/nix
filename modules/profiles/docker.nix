@@ -1,7 +1,5 @@
-{ pkgs, ... }:
-
-{
-  environment.systemPackages = with pkgs; [ docker ];
+{pkgs, ...}: {
+  environment.systemPackages = with pkgs; [docker];
 
   virtualisation.docker = {
     enable = true;

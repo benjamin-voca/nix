@@ -1,9 +1,11 @@
-{ config, inputs, lib, ... }:
-
-let
-  deployLib = inputs.deploy-rs.lib.x86_64-linux;
-in
 {
+  config,
+  inputs,
+  lib,
+  ...
+}: let
+  deployLib = inputs.deploy-rs.lib.x86_64-linux;
+in {
   config.flake.deploy = {
     nodes = {
       "backbone-01" = {

@@ -1,9 +1,12 @@
-{ config, lib, pkgs, ... }:
-
-let
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
   cfg = config.services.quadnix.verdaccio-deploy;
   kubectl = "${pkgs.kubectl}/bin/kubectl";
-  
+
   deployScript = pkgs.writeShellApplication {
     name = "verdaccio-deploy";
     text = ''
@@ -11,18 +14,18 @@ let
        set -e
        # shellcheck disable=SC2034
        kubectl="${pkgs.kubectl}/bin/kubectl"
-      
+
       echo "Waiting for Kubernetes API..."
       until ${kubectl} cluster-info --request-timeout=10s >/dev/null 2>&1; do
         echo "Waiting for Kubernetes API..."
         sleep 5
       done
-      
+
       echo "Creating Verdaccio prerequisites..."
-      
+
       # Create namespace
       ${kubectl} create namespace verdaccio --dry-run=client -o yaml | ${kubectl} apply -f - || true
-      
+
       # Create config file
        CONFIG_FILE=$(mktemp)
        cat > "$CONFIG_FILE" << 'CONFIGEOF'
@@ -64,34 +67,34 @@ let
 
       listen: 0.0.0.0:4873
       CONFIGEOF
-      
+
        ${kubectl} create secret generic verdaccio-config \
          --from-file=config.yaml="$CONFIG_FILE" \
         --namespace=verdaccio \
         --dry-run=client -o yaml | ${kubectl} apply -f -
-      
+
        rm "$CONFIG_FILE"
-       
+
        # Create htpasswd file with admin user
        ADMIN_PASSWORD=$(cat /run/secrets/verdaccio-admin-password)
        ADMIN_HASH=$(${pkgs.apacheHttpd}/bin/htpasswd -nbB admin "$ADMIN_PASSWORD" 2>/dev/null | cut -d: -f2)
-       
+
        HTPASSWD_FILE=$(mktemp)
        echo "admin:$ADMIN_HASH" > "$HTPASSWD_FILE"
-       
+
        ${kubectl} create secret generic verdaccio-htpasswd \
          --from-file=htpasswd="$HTPASSWD_FILE" \
          --namespace=verdaccio \
          --dry-run=client -o yaml | ${kubectl} apply -f -
-       
+
        rm "$HTPASSWD_FILE"
-      
+
       echo "Deploying Verdaccio..."
-      
+
       # Add verdaccio helm repo
       ${pkgs.kubernetes-helm}/bin/helm repo add verdaccio https://charts.verdaccio.org --force-update 2>/dev/null || true
       ${pkgs.kubernetes-helm}/bin/helm repo update
-      
+
       # Deploy using helm
         ${pkgs.kubernetes-helm}/bin/helm upgrade --install verdaccio verdaccio/verdaccio \
           --namespace verdaccio \
@@ -115,7 +118,7 @@ let
           --set securityContext.runAsUser=10001 \
           --set securityContext.runAsGroup=10001 \
           --wait --timeout 5m || true
-      
+
       echo "Verdaccio deployed successfully!"
       echo "Admin username: admin"
       echo "Admin password: read from /run/secrets/verdaccio-admin-password"
@@ -131,8 +134,7 @@ let
       ${pkgs.kubernetes-helm}/bin/helm uninstall verdaccio -n verdaccio --ignore-not-found 2>/dev/null || true
     '';
   };
-in
-{
+in {
   options.services.quadnix.verdaccio-deploy = {
     enable = lib.mkEnableOption "Deploy Verdaccio npm registry to Kubernetes";
   };
@@ -147,9 +149,9 @@ in
 
     systemd.services.verdaccio-deploy = {
       description = "Deploy Verdaccio npm registry to Kubernetes";
-      after = [ "network-online.target" "kube-apiserver.service" ];
-      wants = [ "network-online.target" "kube-apiserver.service" ];
-      wantedBy = [ "multi-user.target" ];
+      after = ["network-online.target" "kube-apiserver.service"];
+      wants = ["network-online.target" "kube-apiserver.service"];
+      wantedBy = ["multi-user.target"];
       environment = {
         KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
       };

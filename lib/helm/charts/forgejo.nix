@@ -1,11 +1,8 @@
-{ helmLib }:
-
-let
+{helmLib}: let
   forgejoImage = "codeberg.org/forgejo/forgejo:15.0.0";
   compatChartName = "gi" + "tea";
   compatDataPath = "/data/${compatChartName}";
-in
-rec {
+in rec {
   # Forgejo configuration
   forgejo = helmLib.buildChart {
     name = "forgejo";
@@ -67,14 +64,18 @@ rec {
         annotations = {
           "nginx.ingress.kubernetes.io/proxy-body-size" = "512m";
         };
-        hosts = [{
-          host = "forge.quadtech.dev";
-          paths = [{
-            path = "/";
-            pathType = "Prefix";
-          }];
-        }];
-        tls = [ ];
+        hosts = [
+          {
+            host = "forge.quadtech.dev";
+            paths = [
+              {
+                path = "/";
+                pathType = "Prefix";
+              }
+            ];
+          }
+        ];
+        tls = [];
       };
 
       # Shared filesystem storage for future pod handoff.
@@ -84,7 +85,7 @@ rec {
         mount = true;
         size = "50Gi";
         storageClass = "ceph-filesystem-csi";
-        accessModes = [ "ReadWriteMany" ];
+        accessModes = ["ReadWriteMany"];
         claimName = "forgejo-shared-storage-ceph-csi";
       };
 
@@ -228,14 +229,14 @@ rec {
         runAsGroup = 0;
       };
 
-      containerSecurityContext = { };
+      containerSecurityContext = {};
 
       # SSH server needs host keys in /etc/ssh/ AND sshd_config_override in /data/ssh/
       # Keys are relative to GITEA_ROOT (/data/gitea), so stored at /data/gitea/forgejo/ssh/
       extraVolumes = [
         {
           name = "sshd-config";
-          emptyDir = { };
+          emptyDir = {};
         }
       ];
       extraVolumeMounts = [
@@ -249,52 +250,54 @@ rec {
         {
           name = "ssh-host-keys";
           image = forgejoImage;
-          command = [ "sh" "-c" ];
-          args = [''
-            set -euo pipefail
-            SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
-            echo "Checking for SSH host keys in $SSH_KEYS_DIR..."
-            mkdir -p "$SSH_KEYS_DIR"
-            mkdir -p /etc/ssh
-            
-            # Generate keys ONLY if they don't exist
-            if [ ! -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
-              echo "Generating new SSH host keys..."
-              ssh-keygen -t rsa -b 4096 -f "$SSH_KEYS_DIR/forgejo.rsa" -N "" -C "forgejo@quadtech.dev"
-              ssh-keygen -t ed25519 -f "$SSH_KEYS_DIR/forgejo.ed25519" -N "" -C "forgejo@quadtech.dev"
-              echo "SSH host keys generated"
-            else
-              echo "Using existing SSH host keys from persistent storage"
-            fi
-            
-            # Ensure correct permissions on persistent keys
-            chmod 600 "$SSH_KEYS_DIR/forgejo.rsa"
-            chmod 600 "$SSH_KEYS_DIR/forgejo.ed25519"
-            chmod 644 "$SSH_KEYS_DIR/forgejo.rsa.pub"
-            chmod 644 "$SSH_KEYS_DIR/forgejo.ed25519.pub"
-            
-            # Copy to /etc/ssh for current container and future restarts
-            cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key
-            cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub
-            cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key
-            cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub
-            chmod 600 /etc/ssh/ssh_host_*_key
-            chmod 644 /etc/ssh/ssh_host_*_key.pub
-            
-            # Create sshd_config_override that includes StrictModes disable AND key locations
-            mkdir -p /data/ssh
-            cat > /data/ssh/sshd_config_override << 'SSHD_EOF'
-StrictModes no
-HostKey /data/gitea/forgejo/ssh/forgejo.rsa
-HostKey /data/gitea/forgejo/ssh/forgejo.ed25519
-SSHD_EOF
-            chmod 644 /data/ssh/sshd_config_override
-            
-            echo "SSH setup complete"
-            ls -la /etc/ssh/
-            ls -la "$SSH_KEYS_DIR/"
-            ls -la /data/ssh/
-          ''];
+          command = ["sh" "-c"];
+          args = [
+            ''
+                          set -euo pipefail
+                          SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
+                          echo "Checking for SSH host keys in $SSH_KEYS_DIR..."
+                          mkdir -p "$SSH_KEYS_DIR"
+                          mkdir -p /etc/ssh
+
+                          # Generate keys ONLY if they don't exist
+                          if [ ! -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
+                            echo "Generating new SSH host keys..."
+                            ssh-keygen -t rsa -b 4096 -f "$SSH_KEYS_DIR/forgejo.rsa" -N "" -C "forgejo@quadtech.dev"
+                            ssh-keygen -t ed25519 -f "$SSH_KEYS_DIR/forgejo.ed25519" -N "" -C "forgejo@quadtech.dev"
+                            echo "SSH host keys generated"
+                          else
+                            echo "Using existing SSH host keys from persistent storage"
+                          fi
+
+                          # Ensure correct permissions on persistent keys
+                          chmod 600 "$SSH_KEYS_DIR/forgejo.rsa"
+                          chmod 600 "$SSH_KEYS_DIR/forgejo.ed25519"
+                          chmod 644 "$SSH_KEYS_DIR/forgejo.rsa.pub"
+                          chmod 644 "$SSH_KEYS_DIR/forgejo.ed25519.pub"
+
+                          # Copy to /etc/ssh for current container and future restarts
+                          cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key
+                          cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub
+                          cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key
+                          cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub
+                          chmod 600 /etc/ssh/ssh_host_*_key
+                          chmod 644 /etc/ssh/ssh_host_*_key.pub
+
+                          # Create sshd_config_override that includes StrictModes disable AND key locations
+                          mkdir -p /data/ssh
+                          cat > /data/ssh/sshd_config_override << 'SSHD_EOF'
+              StrictModes no
+              HostKey /data/gitea/forgejo/ssh/forgejo.rsa
+              HostKey /data/gitea/forgejo/ssh/forgejo.ed25519
+              SSHD_EOF
+                          chmod 644 /data/ssh/sshd_config_override
+
+                          echo "SSH setup complete"
+                          ls -la /etc/ssh/
+                          ls -la "$SSH_KEYS_DIR/"
+                          ls -la /data/ssh/
+            ''
+          ];
           volumeMounts = [
             {
               name = "data";
@@ -302,8 +305,14 @@ SSHD_EOF
             }
           ];
           resources = {
-            requests = { cpu = "10m"; memory = "16Mi"; };
-            limits = { cpu = "100m"; memory = "64Mi"; };
+            requests = {
+              cpu = "10m";
+              memory = "16Mi";
+            };
+            limits = {
+              cpu = "100m";
+              memory = "64Mi";
+            };
           };
           securityContext = {
             runAsUser = 0;
@@ -317,16 +326,18 @@ SSHD_EOF
         {
           name = "fix-app-ini-permissions";
           image = forgejoImage;
-          command = [ "sh" "-c" ];
-          args = [''
-            echo "Waiting for Forgejo to generate app.ini..."
-            while [ ! -f ${compatDataPath}/conf/app.ini ]; do sleep 2; done
-            sleep 2
-            mkdir -p /etc/forgejo
-            cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini
-            chown -R 1000:1000 /etc/forgejo
-            echo "Copied app.ini to /etc/forgejo"
-          ''];
+          command = ["sh" "-c"];
+          args = [
+            ''
+              echo "Waiting for Forgejo to generate app.ini..."
+              while [ ! -f ${compatDataPath}/conf/app.ini ]; do sleep 2; done
+              sleep 2
+              mkdir -p /etc/forgejo
+              cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini
+              chown -R 1000:1000 /etc/forgejo
+              echo "Copied app.ini to /etc/forgejo"
+            ''
+          ];
           volumeMounts = [
             {
               name = "data";
@@ -334,8 +345,14 @@ SSHD_EOF
             }
           ];
           resources = {
-            requests = { cpu = "10m"; memory = "16Mi"; };
-            limits = { cpu = "100m"; memory = "64Mi"; };
+            requests = {
+              cpu = "10m";
+              memory = "16Mi";
+            };
+            limits = {
+              cpu = "100m";
+              memory = "64Mi";
+            };
           };
           securityContext = {
             runAsUser = 0;
@@ -345,57 +362,59 @@ SSHD_EOF
         {
           name = "fix-permissions";
           image = forgejoImage;
-          command = [ "sh" "-c" ];
-          args = [''
-            set -euo pipefail
-            echo "Ensuring sshd_config_override exists in PVC..."
-            if [ ! -f /data/ssh/sshd_config_override ]; then
-              mkdir -p /data/ssh
-              cat > /data/ssh/sshd_config_override << 'SSHD_EOF'
-StrictModes no
-HostKey /data/gitea/forgejo/ssh/forgejo.rsa
-HostKey /data/gitea/forgejo/ssh/forgejo.ed25519
-SSHD_EOF
-              chmod 644 /data/ssh/sshd_config_override
-              echo "Created sshd_config_override"
-            fi
-            
-            echo "Fixing volume ownership..."
-            chown -R 1000:1000 /data
+          command = ["sh" "-c"];
+          args = [
+            ''
+                          set -euo pipefail
+                          echo "Ensuring sshd_config_override exists in PVC..."
+                          if [ ! -f /data/ssh/sshd_config_override ]; then
+                            mkdir -p /data/ssh
+                            cat > /data/ssh/sshd_config_override << 'SSHD_EOF'
+              StrictModes no
+              HostKey /data/gitea/forgejo/ssh/forgejo.rsa
+              HostKey /data/gitea/forgejo/ssh/forgejo.ed25519
+              SSHD_EOF
+                            chmod 644 /data/ssh/sshd_config_override
+                            echo "Created sshd_config_override"
+                          fi
 
-            # Keep SSH auth files in StrictModes-safe permissions
-            mkdir -p /data/git/.ssh
-            chmod 700 /data/git/.ssh
-            chmod 600 /data/git/.ssh/authorized_keys 2>/dev/null || true
-            chmod 600 /data/git/.ssh/environment 2>/dev/null || true
-            
-            # Ensure SSH keys have correct permissions
-            SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
-            if [ -d "$SSH_KEYS_DIR" ]; then
-              echo "Fixing SSH keys at $SSH_KEYS_DIR..."
-              chmod 600 "$SSH_KEYS_DIR"/*.rsa 2>/dev/null || true
-              chmod 600 "$SSH_KEYS_DIR"/*.ed25519 2>/dev/null || true
-              chmod 644 "$SSH_KEYS_DIR"/*.pub 2>/dev/null || true
-              ls -la "$SSH_KEYS_DIR/"
-            fi
-            
-            # Copy host keys to /etc/ssh for sshd to find them
-            if [ -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
-              cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key 2>/dev/null || true
-              cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub 2>/dev/null || true
-            fi
-            if [ -f "$SSH_KEYS_DIR/forgejo.ed25519" ]; then
-              cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key 2>/dev/null || true
-              cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null || true
-            fi
-            chmod 600 /etc/ssh/ssh_host_*_key 2>/dev/null || true
-            chmod 644 /etc/ssh/ssh_host_*_key.pub 2>/dev/null || true
-            
-            mkdir -p /etc/forgejo
-            cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini 2>/dev/null || true
-            chown -R 1000:1000 /etc/forgejo 2>/dev/null || true
-            echo "Done"
-          ''];
+                          echo "Fixing volume ownership..."
+                          chown -R 1000:1000 /data
+
+                          # Keep SSH auth files in StrictModes-safe permissions
+                          mkdir -p /data/git/.ssh
+                          chmod 700 /data/git/.ssh
+                          chmod 600 /data/git/.ssh/authorized_keys 2>/dev/null || true
+                          chmod 600 /data/git/.ssh/environment 2>/dev/null || true
+
+                          # Ensure SSH keys have correct permissions
+                          SSH_KEYS_DIR="${compatDataPath}/forgejo/ssh"
+                          if [ -d "$SSH_KEYS_DIR" ]; then
+                            echo "Fixing SSH keys at $SSH_KEYS_DIR..."
+                            chmod 600 "$SSH_KEYS_DIR"/*.rsa 2>/dev/null || true
+                            chmod 600 "$SSH_KEYS_DIR"/*.ed25519 2>/dev/null || true
+                            chmod 644 "$SSH_KEYS_DIR"/*.pub 2>/dev/null || true
+                            ls -la "$SSH_KEYS_DIR/"
+                          fi
+
+                          # Copy host keys to /etc/ssh for sshd to find them
+                          if [ -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
+                            cp "$SSH_KEYS_DIR/forgejo.rsa" /etc/ssh/ssh_host_rsa_key 2>/dev/null || true
+                            cp "$SSH_KEYS_DIR/forgejo.rsa.pub" /etc/ssh/ssh_host_rsa_key.pub 2>/dev/null || true
+                          fi
+                          if [ -f "$SSH_KEYS_DIR/forgejo.ed25519" ]; then
+                            cp "$SSH_KEYS_DIR/forgejo.ed25519" /etc/ssh/ssh_host_ed25519_key 2>/dev/null || true
+                            cp "$SSH_KEYS_DIR/forgejo.ed25519.pub" /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null || true
+                          fi
+                          chmod 600 /etc/ssh/ssh_host_*_key 2>/dev/null || true
+                          chmod 644 /etc/ssh/ssh_host_*_key.pub 2>/dev/null || true
+
+                          mkdir -p /etc/forgejo
+                          cp ${compatDataPath}/conf/app.ini /etc/forgejo/app.ini 2>/dev/null || true
+                          chown -R 1000:1000 /etc/forgejo 2>/dev/null || true
+                          echo "Done"
+            ''
+          ];
           volumeMounts = [
             {
               name = "data";
@@ -403,8 +422,14 @@ SSHD_EOF
             }
           ];
           resources = {
-            requests = { cpu = "10m"; memory = "16Mi"; };
-            limits = { cpu = "100m"; memory = "64Mi"; };
+            requests = {
+              cpu = "10m";
+              memory = "16Mi";
+            };
+            limits = {
+              cpu = "100m";
+              memory = "64Mi";
+            };
           };
           securityContext = {
             runAsUser = 0;
@@ -428,7 +453,7 @@ SSHD_EOF
                     {
                       key = "app.kubernetes.io/name";
                       operator = "In";
-                      values = [ "forgejo" ];
+                      values = ["forgejo"];
                     }
                   ];
                 };
@@ -440,5 +465,4 @@ SSHD_EOF
       };
     };
   };
-
 }

@@ -1,10 +1,7 @@
-{ helmLib }:
-
-let
+{helmLib}: let
   chartConfig = import ../../../charts/rook-release/rook-ceph/default.nix;
   chart = helmLib.kubelib.downloadHelmChart chartConfig;
-in
-{
+in {
   "rook-ceph" = helmLib.buildChart {
     name = "rook-ceph";
     inherit chart;

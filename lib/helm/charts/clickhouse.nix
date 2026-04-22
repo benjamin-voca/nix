@@ -1,6 +1,4 @@
-{ helmLib }:
-
-let
+{helmLib}: let
   chart = helmLib.kubelib.downloadHelmChart {
     repo = "https://charts.bitnami.com/bitnami";
     chart = "clickhouse";
@@ -13,8 +11,7 @@ let
     version = "0.23.0";
     chartHash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
   };
-in
-{
+in {
   # ClickHouse configuration
   clickhouse = helmLib.buildChart {
     name = "clickhouse";
@@ -59,17 +56,23 @@ in
         annotations = {
           "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
         };
-        hosts = [{
-          host = "clickhouse.quadtech.dev";
-          paths = [{
-            path = "/";
-            pathType = "Prefix";
-          }];
-        }];
-        tls = [{
-          secretName = "clickhouse-tls";
-          hosts = [ "clickhouse.quadtech.dev" ];
-        }];
+        hosts = [
+          {
+            host = "clickhouse.quadtech.dev";
+            paths = [
+              {
+                path = "/";
+                pathType = "Prefix";
+              }
+            ];
+          }
+        ];
+        tls = [
+          {
+            secretName = "clickhouse-tls";
+            hosts = ["clickhouse.quadtech.dev"];
+          }
+        ];
       };
 
       # ClickHouse configuration
@@ -94,7 +97,7 @@ in
           default = {
             password = "";
             networks = {
-              ip = [ "::/0" ];
+              ip = ["::/0"];
             };
             profile = "default";
             quota = "default";
@@ -103,7 +106,7 @@ in
           admin = {
             password = "changeme";
             networks = {
-              ip = [ "::/0" ];
+              ip = ["::/0"];
             };
             profile = "default";
             quota = "default";
@@ -211,19 +214,23 @@ in
       # Anti-affinity for spreading pods across nodes
       affinity = {
         podAntiAffinity = {
-          preferredDuringSchedulingIgnoredDuringExecution = [{
-            weight = 100;
-            podAffinityTerm = {
-              labelSelector = {
-                matchExpressions = [{
-                  key = "app";
-                  operator = "In";
-                  values = [ "clickhouse" ];
-                }];
+          preferredDuringSchedulingIgnoredDuringExecution = [
+            {
+              weight = 100;
+              podAffinityTerm = {
+                labelSelector = {
+                  matchExpressions = [
+                    {
+                      key = "app";
+                      operator = "In";
+                      values = ["clickhouse"];
+                    }
+                  ];
+                };
+                topologyKey = "kubernetes.io/hostname";
               };
-              topologyKey = "kubernetes.io/hostname";
-            };
-          }];
+            }
+          ];
         };
       };
 

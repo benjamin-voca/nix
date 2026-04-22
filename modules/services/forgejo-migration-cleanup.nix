@@ -1,9 +1,11 @@
-{ config, lib, pkgs, ... }:
-
-let
-  cfg = config.services.quadnix.forgejo-migration-cleanup;
-in
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
+  cfg = config.services.quadnix.forgejo-migration-cleanup;
+in {
   options.services.quadnix.forgejo-migration-cleanup = {
     enable = lib.mkEnableOption "Clean up legacy Gitea migration leftovers";
   };
@@ -47,9 +49,9 @@ in
 
     systemd.services.forgejo-migration-cleanup = {
       description = "Clean up legacy Gitea migration leftovers";
-      after = [ "network-online.target" "kube-apiserver.service" ];
-      wants = [ "network-online.target" "kube-apiserver.service" ];
-      wantedBy = [ "multi-user.target" ];
+      after = ["network-online.target" "kube-apiserver.service"];
+      wants = ["network-online.target" "kube-apiserver.service"];
+      wantedBy = ["multi-user.target"];
       environment.KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
       serviceConfig = {
         Type = "oneshot";

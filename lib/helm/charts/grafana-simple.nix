@@ -1,6 +1,4 @@
-{ helmLib }:
-
-{
+{helmLib}: {
   # Grafana - Single Instance Configuration for Cloudflare Tunnel
   grafana = helmLib.buildChart {
     name = "grafana";
@@ -81,7 +79,6 @@
           external_enabled = true;
         };
 
-
         "log" = {
           mode = "console";
           level = "info";
@@ -134,17 +131,19 @@
       dashboardProviders = {
         "dashboardproviders.yaml" = {
           apiVersion = 1;
-          providers = [{
-            name = "default";
-            orgId = 1;
-            folder = "";
-            type = "file";
-            disableDeletion = false;
-            editable = true;
-            options = {
-              path = "/var/lib/grafana/dashboards/default";
-            };
-          }];
+          providers = [
+            {
+              name = "default";
+              orgId = 1;
+              folder = "";
+              type = "file";
+              disableDeletion = false;
+              editable = true;
+              options = {
+                path = "/var/lib/grafana/dashboards/default";
+              };
+            }
+          ];
         };
       };
 
@@ -248,9 +247,9 @@
       # Loki configuration
       loki = {
         auth_enabled = false;
-        
+
         commonConfig = {
-          replication_factor = 1;  # Single instance
+          replication_factor = 1; # Single instance
         };
 
         storage = {
@@ -258,16 +257,18 @@
         };
 
         schemaConfig = {
-          configs = [{
-            from = "2024-01-01";
-            store = "tsdb";
-            object_store = "filesystem";
-            schema = "v12";
-            index = {
-              prefix = "index_";
-              period = "24h";
-            };
-          }];
+          configs = [
+            {
+              from = "2024-01-01";
+              store = "tsdb";
+              object_store = "filesystem";
+              schema = "v12";
+              index = {
+                prefix = "index_";
+                period = "24h";
+              };
+            }
+          ];
         };
       };
 
@@ -306,8 +307,8 @@
     values = {
       # Tempo configuration
       tempo = {
-        replicas = 1;  # Single instance
-        
+        replicas = 1; # Single instance
+
         storage = {
           trace = {
             backend = "local";

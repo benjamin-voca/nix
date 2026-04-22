@@ -1,9 +1,11 @@
-{ config, lib, pkgs, ... }:
-
-let
-  flannelInterface = "enp0s31f6";
-in
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
+  flannelInterface = "enp0s31f6";
+in {
   imports = [
     ../../shared/quad-common.nix
   ];
@@ -35,7 +37,7 @@ in
   ];
 
   services.kubernetes = {
-    roles = [ "master" "node" ];
+    roles = ["master" "node"];
     masterAddress = config.networking.fqdn;
     easyCerts = true;
     caFile = "/var/lib/kubernetes/secrets/ca.pem";
@@ -75,7 +77,6 @@ in
     '';
   };
 
-
   virtualisation.containerd = {
     enable = true;
     settings = {
@@ -102,8 +103,8 @@ in
   '';
 
   systemd.services.certmgr = {
-    after = [ "cfssl.service" "network-online.target" ];
-    wants = [ "cfssl.service" "network-online.target" ];
+    after = ["cfssl.service" "network-online.target"];
+    wants = ["cfssl.service" "network-online.target"];
     serviceConfig = {
       ExecStartPre = [
         "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 60); do ${pkgs.netcat}/bin/nc -z 127.0.0.1 8888 && exit 0; sleep 1; done; exit 1'"
@@ -112,19 +113,19 @@ in
   };
 
   systemd.services.etcd = {
-    after = [ "certmgr.service" ];
-    requires = [ "certmgr.service" ];
+    after = ["certmgr.service"];
+    requires = ["certmgr.service"];
   };
 
   systemd.services.kube-apiserver = {
-    after = [ "certmgr.service" "etcd.service" ];
-    requires = [ "certmgr.service" "etcd.service" ];
+    after = ["certmgr.service" "etcd.service"];
+    requires = ["certmgr.service" "etcd.service"];
   };
 
   systemd.services.flannel = {
-    after = [ "kube-apiserver.service" "etcd.service" "network-online.target" ];
-    wants = [ "kube-apiserver.service" "network-online.target" ];
-    requires = [ "kube-apiserver.service" "etcd.service" ];
+    after = ["kube-apiserver.service" "etcd.service" "network-online.target"];
+    wants = ["kube-apiserver.service" "network-online.target"];
+    requires = ["kube-apiserver.service" "etcd.service"];
     serviceConfig = {
       ExecStartPre = lib.mkBefore [
         "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 120); do ${pkgs.curl}/bin/curl -fsSk https://127.0.0.1:6443/healthz >/dev/null && exit 0; sleep 1; done; exit 1'"
@@ -136,9 +137,9 @@ in
   };
 
   systemd.services.kube-addon-manager = {
-    after = [ "kube-apiserver.service" "network-online.target" ];
-    wants = [ "kube-apiserver.service" "network-online.target" ];
-    requires = [ "kube-apiserver.service" ];
+    after = ["kube-apiserver.service" "network-online.target"];
+    wants = ["kube-apiserver.service" "network-online.target"];
+    requires = ["kube-apiserver.service"];
     serviceConfig.ExecStartPre = lib.mkBefore [
       "${pkgs.bash}/bin/sh -c 'for i in $(seq 1 90); do ${pkgs.curl}/bin/curl -fsSk https://127.0.0.1:6443/healthz >/dev/null && exit 0; sleep 1; done; exit 1'"
     ];

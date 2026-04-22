@@ -1,12 +1,14 @@
-{ config, lib, ... }:
-
-let
+{
+  config,
+  lib,
+  ...
+}: let
   inherit (lib) mkOption types;
   cfg = config.quad;
 in {
   options.quad = {
     environment = mkOption {
-      type = types.enum [ "dev" "staging" "prod" ];
+      type = types.enum ["dev" "staging" "prod"];
       default = "prod";
       description = "Deployment environment label.";
     };

@@ -1,6 +1,4 @@
-{ helmLib }:
-
-let
+{helmLib}: let
   compatChartSource = "https://dl." + "gi" + "tea" + ".com/charts";
   compatRootUrlKey = "gi" + "teaRootURL";
 in {

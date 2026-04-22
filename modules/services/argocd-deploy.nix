@@ -1,6 +1,10 @@
-{ config, lib, pkgs, inputs, ... }:
-
-let
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}: let
   cfg = config.services.quadnix.argocd-deploy;
   system = pkgs.stdenv.system;
   helmLib = import "${inputs.self}/lib/helm" {
@@ -63,8 +67,7 @@ let
       global.image.tag = "v2.9.3";
     };
   };
-in
-{
+in {
   options.services.quadnix.argocd-deploy = {
     enable = lib.mkEnableOption "Reconcile ArgoCD and seed GitOps credentials";
   };
@@ -74,125 +77,125 @@ in
       (pkgs.writeShellApplication {
         name = "argocd-deploy";
         text = ''
-          # shellcheck disable=SC2016
-          #!/bin/bash
-          set -e
-          export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
+                    # shellcheck disable=SC2016
+                    #!/bin/bash
+                    set -e
+                    export KUBECONFIG=/etc/kubernetes/cluster-admin.kubeconfig
 
-          kubectl="${pkgs.kubectl}/bin/kubectl"
+                    kubectl="${pkgs.kubectl}/bin/kubectl"
 
-          echo "Waiting for Kubernetes API..."
-          until $kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
-            echo "Waiting for Kubernetes API..."
-            sleep 5
-          done
+                    echo "Waiting for Kubernetes API..."
+                    until $kubectl cluster-info --request-timeout=10s >/dev/null 2>&1; do
+                      echo "Waiting for Kubernetes API..."
+                      sleep 5
+                    done
 
-          echo "Waiting for ingress-nginx controller to be ready..."
-          until $kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; do
-            echo "Waiting for ingress-nginx controller..."
-            sleep 5
-          done
+                    echo "Waiting for ingress-nginx controller to be ready..."
+                    until $kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q "Running"; do
+                      echo "Waiting for ingress-nginx controller..."
+                      sleep 5
+                    done
 
-          echo "Creating ArgoCD namespace..."
-          $kubectl create namespace argocd --dry-run=client -o yaml | $kubectl apply -f - || true
+                    echo "Creating ArgoCD namespace..."
+                    $kubectl create namespace argocd --dry-run=client -o yaml | $kubectl apply -f - || true
 
-          echo "Adding ArgoCD helm repo..."
-          ${pkgs.kubernetes-helm}/bin/helm repo add argoproj https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
-          ${pkgs.kubernetes-helm}/bin/helm repo update
+                    echo "Adding ArgoCD helm repo..."
+                    ${pkgs.kubernetes-helm}/bin/helm repo add argoproj https://argoproj.github.io/argo-helm --force-update 2>/dev/null || true
+                    ${pkgs.kubernetes-helm}/bin/helm repo update
 
-          # ArgoCD is also part of the bootstrap manifests; keep this as
-          # an idempotent safety net that reconciles core settings.
-          echo "Reconciling ArgoCD Helm release..."
-          PASSWORD=$(cat /run/secrets/argocd-admin-password)
-           ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
-             --namespace argocd \
-             --version 5.46.0 \
-             --set global.domain=argocd.quadtech.dev \
-             --set configs.cm.'server\.insecure'=true \
-             --set configs.cm.url=http://argocd.quadtech.dev \
-             --set configs.params.'server\.insecure'=true \
-             --set configs.secret.argocdServerAdminPassword="$PASSWORD" \
-             --set server.replicas=1 \
-             --set server.service.type=ClusterIP \
-             --set redis.enabled=true \
-             --set redis-ha.enabled=false \
-             --set controller.replicas=1 \
-             --set repoServer.replicas=1 \
-             --set applicationSet.enabled=true \
-             --set notifications.enabled=true \
-             --set global.image.tag=v2.9.3 \
-             --set server.ingress.enabled=false \
-              --wait --timeout 5m || true
+                    # ArgoCD is also part of the bootstrap manifests; keep this as
+                    # an idempotent safety net that reconciles core settings.
+                    echo "Reconciling ArgoCD Helm release..."
+                    PASSWORD=$(cat /run/secrets/argocd-admin-password)
+                     ${pkgs.kubernetes-helm}/bin/helm upgrade --install argocd argoproj/argo-cd \
+                       --namespace argocd \
+                       --version 5.46.0 \
+                       --set global.domain=argocd.quadtech.dev \
+                       --set configs.cm.'server\.insecure'=true \
+                       --set configs.cm.url=http://argocd.quadtech.dev \
+                       --set configs.params.'server\.insecure'=true \
+                       --set configs.secret.argocdServerAdminPassword="$PASSWORD" \
+                       --set server.replicas=1 \
+                       --set server.service.type=ClusterIP \
+                       --set redis.enabled=true \
+                       --set redis-ha.enabled=false \
+                       --set controller.replicas=1 \
+                       --set repoServer.replicas=1 \
+                       --set applicationSet.enabled=true \
+                       --set notifications.enabled=true \
+                       --set global.image.tag=v2.9.3 \
+                       --set server.ingress.enabled=false \
+                        --wait --timeout 5m || true
 
-          echo "Waiting for ingress-nginx admission webhook to be ready..."
-          for i in $(seq 1 30); do
-            if $kubectl get validatingwebhookconfigurations.admissionregistration.k8s.io ingress-nginx-admission -o jsonpath='{.webhooks[0].clientConfig.url}' 2>/dev/null | grep -q "admission"; then
-              echo "Ingress-nginx webhook is ready"
-              break
-            fi
-            echo "Waiting for ingress-nginx webhook... ($i/30)"
-            sleep 2
-          done
+                    echo "Waiting for ingress-nginx admission webhook to be ready..."
+                    for i in $(seq 1 30); do
+                      if $kubectl get validatingwebhookconfigurations.admissionregistration.k8s.io ingress-nginx-admission -o jsonpath='{.webhooks[0].clientConfig.url}' 2>/dev/null | grep -q "admission"; then
+                        echo "Ingress-nginx webhook is ready"
+                        break
+                      fi
+                      echo "Waiting for ingress-nginx webhook... ($i/30)"
+                      sleep 2
+                    done
 
-          echo "Creating ArgoCD ingress..."
-          if ! $kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: argocd-server
-  namespace: argocd
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "512m"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: argocd.quadtech.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
+                    echo "Creating ArgoCD ingress..."
+                    if ! $kubectl apply -f - <<EOF
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
             name: argocd-server
-            port:
-              number: 80
-EOF
-          then
-            echo "Warning: Failed to create ingress, skipping..."
-          fi
+            namespace: argocd
+            annotations:
+              nginx.ingress.kubernetes.io/proxy-body-size: "512m"
+          spec:
+            ingressClassName: nginx
+            rules:
+            - host: argocd.quadtech.dev
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: argocd-server
+                      port:
+                        number: 80
+          EOF
+                    then
+                      echo "Warning: Failed to create ingress, skipping..."
+                    fi
 
-          echo "Waiting for ArgoCD CRDs to be ready..."
-          for i in $(seq 1 30); do
-            if $kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
-              echo "ArgoCD CRDs are ready"
-              break
-            fi
-            echo "Waiting for ArgoCD CRDs... ($i/30)"
-            sleep 2
-          done
+                    echo "Waiting for ArgoCD CRDs to be ready..."
+                    for i in $(seq 1 30); do
+                      if $kubectl get crd applications.argoproj.io >/dev/null 2>&1; then
+                        echo "ArgoCD CRDs are ready"
+                        break
+                      fi
+                      echo "Waiting for ArgoCD CRDs... ($i/30)"
+                      sleep 2
+                    done
 
-          echo "Creating ArgoCD Forgejo credentials secret..."
-          if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
-            FORGEJO_USERNAME=$(cat /run/secrets/argocd-forgejo-username)
-            FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
-            $kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: forgejo-quadtech-repo-creds
-  namespace: argocd
-  labels:
-    argocd.argoproj.io/secret-type: repo-creds
-type: Opaque
-stringData:
-  url: https://forge.quadtech.dev/QuadCoreTech
-  username: "$FORGEJO_USERNAME"
-  password: "$FORGEJO_TOKEN"
-EOF
-          else
-            echo "Warning: Forgejo credentials not found in /run/secrets/, skipping..."
-            echo "Add argocd-forgejo-username and argocd-forgejo-token to secrets/backbone-01.yaml"
-          fi
+                    echo "Creating ArgoCD Forgejo credentials secret..."
+                    if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
+                      FORGEJO_USERNAME=$(cat /run/secrets/argocd-forgejo-username)
+                      FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
+                      $kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: forgejo-quadtech-repo-creds
+            namespace: argocd
+            labels:
+              argocd.argoproj.io/secret-type: repo-creds
+          type: Opaque
+          stringData:
+            url: https://forge.quadtech.dev/QuadCoreTech
+            username: "$FORGEJO_USERNAME"
+            password: "$FORGEJO_TOKEN"
+          EOF
+                    else
+                      echo "Warning: Forgejo credentials not found in /run/secrets/, skipping..."
+                      echo "Add argocd-forgejo-username and argocd-forgejo-token to secrets/backbone-01.yaml"
+                    fi
         '';
       })
       (pkgs.writeShellApplication {
@@ -220,9 +223,9 @@ EOF
 
     systemd.services.argocd-deploy = {
       description = "Deploy ArgoCD to Kubernetes";
-      after = [ "network-online.target" "kube-apiserver.service" ];
-      wants = [ "network-online.target" "kube-apiserver.service" ];
-      wantedBy = [ "multi-user.target" ];
+      after = ["network-online.target" "kube-apiserver.service"];
+      wants = ["network-online.target" "kube-apiserver.service"];
+      wantedBy = ["multi-user.target"];
       environment = {
         KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
       };

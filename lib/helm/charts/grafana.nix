@@ -1,6 +1,4 @@
-{ helmLib }:
-
-{
+{helmLib}: {
   # Grafana standalone configuration
   grafana = helmLib.buildChart {
     name = "grafana";
@@ -32,17 +30,23 @@
           "cert-manager.io/cluster-issuer" = "letsencrypt-prod";
           "nginx.ingress.kubernetes.io/proxy-body-size" = "50m";
         };
-        hosts = [{
-          host = "grafana.quadtech.dev";
-          paths = [{
-            path = "/";
-            pathType = "Prefix";
-          }];
-        }];
-        tls = [{
-          secretName = "grafana-tls";
-          hosts = [ "grafana.quadtech.dev" ];
-        }];
+        hosts = [
+          {
+            host = "grafana.quadtech.dev";
+            paths = [
+              {
+                path = "/";
+                pathType = "Prefix";
+              }
+            ];
+          }
+        ];
+        tls = [
+          {
+            secretName = "grafana-tls";
+            hosts = ["grafana.quadtech.dev"];
+          }
+        ];
       };
 
       # Persistence
@@ -153,17 +157,19 @@
       dashboardProviders = {
         "dashboardproviders.yaml" = {
           apiVersion = 1;
-          providers = [{
-            name = "default";
-            orgId = 1;
-            folder = "";
-            type = "file";
-            disableDeletion = false;
-            editable = true;
-            options = {
-              path = "/var/lib/grafana/dashboards/default";
-            };
-          }];
+          providers = [
+            {
+              name = "default";
+              orgId = 1;
+              folder = "";
+              type = "file";
+              disableDeletion = false;
+              editable = true;
+              options = {
+                path = "/var/lib/grafana/dashboards/default";
+              };
+            }
+          ];
         };
       };
 
@@ -271,19 +277,23 @@
       # Anti-affinity for HA
       affinity = {
         podAntiAffinity = {
-          preferredDuringSchedulingIgnoredDuringExecution = [{
-            weight = 100;
-            podAffinityTerm = {
-              labelSelector = {
-                matchExpressions = [{
-                  key = "app.kubernetes.io/name";
-                  operator = "In";
-                  values = [ "grafana" ];
-                }];
+          preferredDuringSchedulingIgnoredDuringExecution = [
+            {
+              weight = 100;
+              podAffinityTerm = {
+                labelSelector = {
+                  matchExpressions = [
+                    {
+                      key = "app.kubernetes.io/name";
+                      operator = "In";
+                      values = ["grafana"];
+                    }
+                  ];
+                };
+                topologyKey = "kubernetes.io/hostname";
               };
-              topologyKey = "kubernetes.io/hostname";
-            };
-          }];
+            }
+          ];
         };
       };
     };
@@ -298,7 +308,7 @@
       # Loki configuration
       loki = {
         auth_enabled = false;
-        
+
         commonConfig = {
           replication_factor = 2;
         };
@@ -308,16 +318,18 @@
         };
 
         schemaConfig = {
-          configs = [{
-            from = "2024-01-01";
-            store = "tsdb";
-            object_store = "filesystem";
-            schema = "v12";
-            index = {
-              prefix = "index_";
-              period = "24h";
-            };
-          }];
+          configs = [
+            {
+              from = "2024-01-01";
+              store = "tsdb";
+              object_store = "filesystem";
+              schema = "v12";
+              index = {
+                prefix = "index_";
+                period = "24h";
+              };
+            }
+          ];
         };
       };
 
@@ -377,7 +389,7 @@
       # Tempo configuration
       tempo = {
         replicas = 2;
-        
+
         storage = {
           trace = {
             backend = "local";

@@ -1,6 +1,4 @@
-{ helmLib }:
-
-{
+{helmLib}: {
   metallb = helmLib.buildChart {
     name = "metallb";
     chart = helmLib.charts.metallb;

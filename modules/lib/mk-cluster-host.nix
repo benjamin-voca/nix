@@ -1,24 +1,26 @@
-{ inputs, config, ... }:
-
-let
+{
+  inputs,
+  config,
+  ...
+}: let
   lib = inputs.nixpkgs.lib;
-  mkClusterHost =
-    { name
-    , system
-    , hardwareModule
-    , roleModule
-    , serviceModules ? [ ]
-    , extraModules ? [ ]
-    , taints ? [ ]
-    }:
+  mkClusterHost = {
+    name,
+    system,
+    hardwareModule,
+    roleModule,
+    serviceModules ? [],
+    extraModules ? [],
+    taints ? [],
+  }:
     inputs.nixpkgs.lib.nixosSystem {
       inherit system;
-      specialArgs = { inherit inputs; };
+      specialArgs = {inherit inputs;};
       modules =
         [
           inputs.sops-nix.nixosModules.sops
-          ({ ... }: { networking.hostName = name; })
-          ({ pkgs, ... }: {
+          ({...}: {networking.hostName = name;})
+          ({pkgs, ...}: {
             system.stateVersion = "26.05";
             programs.fish.enable = true;
             users.users.root.shell = pkgs.fish;
@@ -27,10 +29,10 @@ let
             systemd.services.dhcpcd.restartIfChanged = false;
             systemd.services.dhcpcd.reloadIfChanged = false;
             systemd.services.dhcpcd.stopIfChanged = false;
-            
+
             # Apply taints if any
             systemd.services.kubelet.serviceConfig = {
-Environment = [ "KUBELET_EXTRA_ARGS=--register-with-taints=${toString (lib.concatMapStringsSep "," (taint: "${taint.key}=${taint.value}:${taint.effect}") taints)}" ];
+              Environment = ["KUBELET_EXTRA_ARGS=--register-with-taints=${toString (lib.concatMapStringsSep "," (taint: "${taint.key}=${taint.value}:${taint.effect}") taints)}"];
             };
           })
           hardwareModule
@@ -39,7 +41,6 @@ Environment = [ "KUBELET_EXTRA_ARGS=--register-with-taints=${toString (lib.conca
         ++ serviceModules
         ++ extraModules;
     };
-in
-{
+in {
   config.quad.lib.mkClusterHost = mkClusterHost;
 }

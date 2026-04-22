@@ -1,6 +1,4 @@
-{ config, ... }:
-
-{
+{config, ...}: {
   quad.hosts.backbone-01 = config.quad.lib.mkClusterHost {
     name = "backbone-01";
     system = "x86_64-linux";
@@ -9,8 +7,16 @@
     extraModules = [
     ];
     taints = [
-      { key = "role"; value = "backbone"; effect = "NoSchedule"; }
-      { key = "infra"; value = "true"; effect = "NoSchedule"; }
+      {
+        key = "role";
+        value = "backbone";
+        effect = "NoSchedule";
+      }
+      {
+        key = "infra";
+        value = "true";
+        effect = "NoSchedule";
+      }
     ];
   };
 }

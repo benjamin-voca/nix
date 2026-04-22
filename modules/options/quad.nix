@@ -1,6 +1,4 @@
-{ lib, ... }:
-
-{
+{lib, ...}: {
   options.quad = {
     hosts = lib.mkOption {
       type = lib.types.attrsOf lib.types.raw;

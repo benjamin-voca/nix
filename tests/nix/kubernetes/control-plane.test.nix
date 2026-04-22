@@ -1,6 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
-
-let
+{pkgs ? import <nixpkgs> {}}: let
   lib = pkgs.lib;
   mockEnvironment = {
     options.environment = lib.mkOption {
@@ -39,7 +37,7 @@ let
     };
   };
   eval = lib.evalModules {
-    specialArgs = { inherit pkgs; };
+    specialArgs = {inherit pkgs;};
     modules = [
       mockEnvironment
       mockNetworking
@@ -56,5 +54,4 @@ let
     ];
   };
 in
-assert (eval.config.services.kubernetes.roles == [ "master" "node" ]);
-true
+  assert (eval.config.services.kubernetes.roles == ["master" "node"]); true

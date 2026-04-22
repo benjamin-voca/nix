@@ -1,7 +1,8 @@
-{ lib, pkgs }:
-
-let
-  render = import ./render.nix { inherit lib pkgs; };
+{
+  lib,
+  pkgs,
+}: let
+  render = import ./render.nix {inherit lib pkgs;};
 
   openclawConfigJson = builtins.toJSON {
     gateway = {
@@ -52,7 +53,7 @@ let
         }
       ];
     };
-    cron = { enabled = false; };
+    cron = {enabled = false;};
   };
 
   namespace = {
@@ -74,7 +75,7 @@ let
       namespace = "openclaw";
     };
     spec = {
-      accessModes = [ "ReadWriteOnce" ];
+      accessModes = ["ReadWriteOnce"];
       storageClassName = "ceph-filesystem-csi";
       resources = {
         requests = {
@@ -96,7 +97,7 @@ let
       "AGENTS.md" = ''
         ## OpenClaw Assistant
         You are a helpful AI assistant running in Kubernetes.
-        
+
         ## Discord behavior
         - In Discord guild channels, respond when mentioned with @OpenClaw.
         - When asked to summarize recent chat, summarize the latest 20 channel messages.
@@ -328,7 +329,7 @@ let
                 allowPrivilegeEscalation = false;
                 readOnlyRootFilesystem = true;
                 capabilities = {
-                  drop = [ "ALL" ];
+                  drop = ["ALL"];
                 };
               };
             }
@@ -348,7 +349,7 @@ let
             }
             {
               name = "tmp-volume";
-              emptyDir = { };
+              emptyDir = {};
             }
           ];
         };
@@ -425,7 +426,6 @@ let
     "17d-openclaw-service.yaml" = render.writeOne "17d-openclaw-service" service;
     "17e-openclaw-ingress.yaml" = render.writeOne "17e-openclaw-ingress" ingress;
   };
-in
-{
+in {
   inherit manifests;
 }

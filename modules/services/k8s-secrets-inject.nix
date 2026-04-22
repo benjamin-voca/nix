@@ -1,9 +1,11 @@
-{ config, lib, pkgs, ... }:
-
-let
-  cfg = config.services.quadnix.k8s-secrets-inject;
-in
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
+  cfg = config.services.quadnix.k8s-secrets-inject;
+in {
   options.services.quadnix.k8s-secrets-inject = {
     enable = lib.mkEnableOption "Inject SOPS secrets into Kubernetes";
   };
@@ -324,9 +326,9 @@ in
 
     systemd.services.k8s-secrets-inject = {
       description = "Inject SOPS secrets into Kubernetes";
-      after = [ "network-online.target" "kube-apiserver.service" ];
-      wants = [ "network-online.target" "kube-apiserver.service" ];
-      wantedBy = [ "multi-user.target" ];
+      after = ["network-online.target" "kube-apiserver.service"];
+      wants = ["network-online.target" "kube-apiserver.service"];
+      wantedBy = ["multi-user.target"];
       environment.KUBECONFIG = "/etc/kubernetes/cluster-admin.kubeconfig";
       serviceConfig = {
         Type = "oneshot";

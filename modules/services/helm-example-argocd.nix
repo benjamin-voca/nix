@@ -1,6 +1,10 @@
-{ config, lib, pkgs, inputs, ... }:
-
-let
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}: let
   cfg = config.services.quadnix.argocd;
   helmLib = inputs.self.helmLib.${pkgs.system};
   argocdChart = helmLib.buildChart {
@@ -15,16 +19,24 @@ let
           enabled = true;
           ingressClassName = cfg.ingress.className;
           hosts = cfg.ingress.hosts;
-          tls = lib.mkIf (cfg.ingress.tlsSecretName != null) [{
-            secretName = cfg.ingress.tlsSecretName;
-            hosts = cfg.ingress.hosts;
-          }];
+          tls = lib.mkIf (cfg.ingress.tlsSecretName != null) [
+            {
+              secretName = cfg.ingress.tlsSecretName;
+              hosts = cfg.ingress.hosts;
+            }
+          ];
         };
       };
 
       redis-ha.enabled = cfg.highAvailability;
-      controller.replicas = if cfg.highAvailability then 1 else 1;
-      repoServer.replicas = if cfg.highAvailability then cfg.replicas else 1;
+      controller.replicas =
+        if cfg.highAvailability
+        then 1
+        else 1;
+      repoServer.replicas =
+        if cfg.highAvailability
+        then cfg.replicas
+        else 1;
 
       global.image.tag = cfg.version;
     };
@@ -68,7 +80,7 @@ in {
 
       hosts = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = [ "argocd.example.com" ];
+        default = ["argocd.example.com"];
         description = "Hostnames for ArgoCD ingress";
       };
 

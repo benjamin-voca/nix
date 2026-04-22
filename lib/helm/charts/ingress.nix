@@ -1,6 +1,4 @@
-{ helmLib }:
-
-{
+{helmLib}: {
   # Ingress NGINX configuration
   ingress-nginx = helmLib.buildChart {
     name = "ingress-nginx";
@@ -38,7 +36,6 @@
             memory = "512Mi";
           };
         };
-
 
         # Pod disruption budget
         podDisruptionBudget = {

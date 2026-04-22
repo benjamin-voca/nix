@@ -1,6 +1,4 @@
-{ helmLib }:
-
-{
+{helmLib}: {
   cloudnative-pg = helmLib.buildChart {
     name = "cloudnative-pg";
     chart = helmLib.charts.cloudnative-pg.cloudnative-pg;

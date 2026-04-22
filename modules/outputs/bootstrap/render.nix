@@ -1,9 +1,9 @@
-{ lib, pkgs }:
-
-let
-  yaml = pkgs.formats.yaml { };
-in
 {
+  lib,
+  pkgs,
+}: let
+  yaml = pkgs.formats.yaml {};
+in {
   writeOne = name: manifest:
     yaml.generate "${name}.yaml" manifest;
 
@@ -13,7 +13,8 @@ in
         lib.imap1 (
           i: manifest:
             builtins.readFile (yaml.generate "${name}-${toString i}.yaml" manifest)
-        ) manifests
+        )
+        manifests
       )
     );
 }

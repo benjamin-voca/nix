@@ -1,6 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
-
-let
+{pkgs ? import <nixpkgs> {}}: let
   lib = pkgs.lib;
   mockEnvironment = {
     options.environment = lib.mkOption {
@@ -20,9 +18,8 @@ let
     ];
   };
 
-  envText = lib.attrByPath [ "environment" "etc" "quadnix/environment" "text" ] null eval.config;
-  versionsText = lib.attrByPath [ "environment" "etc" "quadnix/versions.json" "text" ] null eval.config;
+  envText = lib.attrByPath ["environment" "etc" "quadnix/environment" "text"] null eval.config;
+  versionsText = lib.attrByPath ["environment" "etc" "quadnix/versions.json" "text"] null eval.config;
 in
-assert envText == "staging";
-assert versionsText != null;
-true
+  assert envText == "staging";
+  assert versionsText != null; true

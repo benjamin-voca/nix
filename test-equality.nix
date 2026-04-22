@@ -4,10 +4,7 @@
 # Usage:
 #   - Generate reference: nix build .#bootstrap.x86_64-linux && cp result/bootstrap.yaml ./reference-bootstrap.yaml
 #   - Compare output:    diff result/bootstrap.yaml ./reference-bootstrap.yaml
-
-{ pkgs ? import <nixpkgs> {} }:
-
-let
+{pkgs ? import <nixpkgs> {}}: let
   inherit (pkgs) lib;
 
   # Test runner script
@@ -34,13 +31,11 @@ let
       echo ""
       exit 0
     fi
-    
+
     echo "Unknown mode: $MODE"
     echo "Run with no arguments for help"
     exit 1
   '';
-
-in
-{
+in {
   packages.testEquality = testScript;
 }

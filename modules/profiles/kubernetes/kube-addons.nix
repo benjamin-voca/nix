@@ -1,6 +1,4 @@
-{ pkgs, ... }:
-
-{
+{pkgs, ...}: {
   services.kubernetes = {
     addons = {
       metrics-server.enable = true;

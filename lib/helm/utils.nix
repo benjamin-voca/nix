@@ -1,6 +1,4 @@
-{ pkgs }:
-
-{
+{pkgs}: {
   # Merge multiple Helm values files
   mergeValues = values:
     pkgs.lib.foldl' pkgs.lib.recursiveUpdate {} values;
@@ -19,22 +17,34 @@
   };
 
   # Helper to create a values overlay for common settings
-  mkCommonValues = { namespace, replicas ? 1, resources ? {} }: {
+  mkCommonValues = {
+    namespace,
+    replicas ? 1,
+    resources ? {},
+  }: {
     inherit namespace replicas;
-    resources = pkgs.lib.recursiveUpdate {
-      requests = {
-        cpu = "100m";
-        memory = "128Mi";
-      };
-      limits = {
-        cpu = "1000m";
-        memory = "512Mi";
-      };
-    } resources;
+    resources =
+      pkgs.lib.recursiveUpdate {
+        requests = {
+          cpu = "100m";
+          memory = "128Mi";
+        };
+        limits = {
+          cpu = "1000m";
+          memory = "512Mi";
+        };
+      }
+      resources;
   };
 
   # Create an ArgoCD Application manifest for GitOps
-  mkArgoApplication = { name, namespace, repoURL, path, targetRevision ? "HEAD" }: {
+  mkArgoApplication = {
+    name,
+    namespace,
+    repoURL,
+    path,
+    targetRevision ? "HEAD",
+  }: {
     apiVersion = "argoproj.io/v1alpha1";
     kind = "Application";
     metadata = {
@@ -59,11 +69,10 @@
   };
 
   # Validate that required values are present
-  validateValues = requiredKeys: values:
-    let
-      missingKeys = pkgs.lib.filter (key: !(builtins.hasAttr key values)) requiredKeys;
-    in
-      if missingKeys == []
-      then values
-      else throw "Missing required values: ${builtins.toString missingKeys}";
+  validateValues = requiredKeys: values: let
+    missingKeys = pkgs.lib.filter (key: !(builtins.hasAttr key values)) requiredKeys;
+  in
+    if missingKeys == []
+    then values
+    else throw "Missing required values: ${builtins.toString missingKeys}";
 }

@@ -1,9 +1,15 @@
-{ lib, pkgs }:
-
+{
+  lib,
+  pkgs,
+}:
 pkgs.testers.nixosTest {
   name = "quadnix-vm-backbone-control-plane";
 
-  nodes.backbone = { pkgs, lib, ... }: {
+  nodes.backbone = {
+    pkgs,
+    lib,
+    ...
+  }: {
     imports = [
       ../../modules/profiles/base.nix
       ../../modules/profiles/server.nix

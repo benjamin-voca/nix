@@ -1,6 +1,4 @@
-{ config, ... }:
-
-{
+{config, ...}: {
   quad.hosts.backbone-02 = config.quad.lib.mkClusterHost {
     name = "backbone-02";
     system = "x86_64-linux";

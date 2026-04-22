@@ -1,14 +1,22 @@
-{ nixhelm, nix-kube-generators, pkgs, system }:
-
-let
+{
+  nixhelm,
+  nix-kube-generators,
+  pkgs,
+  system,
+}: let
   # Get the kubelib from nix-kube-generators
-  kubelib = nix-kube-generators.lib { inherit pkgs; };
-  
+  kubelib = nix-kube-generators.lib {inherit pkgs;};
+
   # Get charts from nixhelm
-  charts = nixhelm.charts { inherit pkgs; };
-  
+  charts = nixhelm.charts {inherit pkgs;};
+
   # Helper function to build a helm chart with values
-  buildChart = { name, chart, namespace, values ? {} }:
+  buildChart = {
+    name,
+    chart,
+    namespace,
+    values ? {},
+  }:
     kubelib.buildHelmChart {
       inherit name chart namespace;
       values = values;
@@ -20,12 +28,12 @@ let
       map (chartConfig: {
         name = chartConfig.name;
         value = buildChart chartConfig;
-      }) chartsConfig
+      })
+      chartsConfig
     );
-
 in {
   inherit kubelib charts buildChart buildCharts;
-  
+
   # Re-export useful functions
   inherit (kubelib) buildHelmChart;
 }

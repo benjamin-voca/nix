@@ -1,6 +1,9 @@
-{ config, lib, pkgs, ... }:
-
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}: {
   imports = [
     ../../shared/quad-common.nix
   ];
@@ -13,7 +16,7 @@
   ];
 
   services.kubernetes = {
-    roles = [ "node" ];
+    roles = ["node"];
     masterAddress = lib.mkDefault "backbone-01.local";
   };
 

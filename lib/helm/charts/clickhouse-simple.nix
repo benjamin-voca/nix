@@ -1,6 +1,4 @@
-{ helmLib }:
-
-let
+{helmLib}: let
   chart = helmLib.kubelib.downloadHelmChart {
     repo = "https://charts.bitnami.com/bitnami";
     chart = "clickhouse";
@@ -13,8 +11,7 @@ let
     version = "0.23.0";
     chartHash = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=";
   };
-in
-{
+in {
   # ClickHouse - Single Instance Configuration for Cloudflare Tunnel
   clickhouse = helmLib.buildChart {
     name = "clickhouse";
@@ -77,7 +74,7 @@ in
           default = {
             password = "";
             networks = {
-              ip = [ "::/0" ];
+              ip = ["::/0"];
             };
             profile = "default";
             quota = "default";
@@ -86,7 +83,7 @@ in
           admin = {
             password = "changeme";
             networks = {
-              ip = [ "::/0" ];
+              ip = ["::/0"];
             };
             profile = "default";
             quota = "default";

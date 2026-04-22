@@ -1,6 +1,4 @@
-{ helmLib }:
-
-{
+{helmLib}: {
   # Prometheus configuration using kube-prometheus-stack
   prometheus = helmLib.buildChart {
     name = "monitoring";
@@ -34,11 +32,13 @@
         ingress = {
           enabled = true;
           ingressClassName = "nginx";
-          hosts = [ "grafana.k8s.quadtech.dev" ];
-          tls = [{
-            secretName = "grafana-tls";
-            hosts = [ "grafana.k8s.quadtech.dev" ];
-          }];
+          hosts = ["grafana.k8s.quadtech.dev"];
+          tls = [
+            {
+              secretName = "grafana-tls";
+              hosts = ["grafana.k8s.quadtech.dev"];
+            }
+          ];
         };
         persistence = {
           enabled = false;

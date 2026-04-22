@@ -1,6 +1,4 @@
-{ lib, ... }:
-
-{
+{lib, ...}: {
   options.flake = lib.mkOption {
     type = lib.types.attrs;
     default = {};

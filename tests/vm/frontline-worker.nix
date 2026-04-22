@@ -1,5 +1,7 @@
-{ lib, pkgs }:
-
+{
+  lib,
+  pkgs,
+}:
 pkgs.testers.nixosTest {
   name = "quadnix-vm-frontline-worker";
 

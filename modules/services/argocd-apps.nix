@@ -1,6 +1,10 @@
-{ config, lib, pkgs, inputs, ... }:
-
-let
+{
+  config,
+  lib,
+  pkgs,
+  inputs,
+  ...
+}: let
   cfg = config.services.quadnix.argocdApps;
 in {
   options.services.quadnix.argocdApps = {
