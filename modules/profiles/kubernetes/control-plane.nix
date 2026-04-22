@@ -49,10 +49,37 @@ in {
       "kubernetes.quadtech.dev"
     ];
     apiserver.extraOpts = "--allow-privileged=true";
+    # Global CPU overprovisioning: allow scheduling up to 200% CPU utilization
+    scheduler.extraOpts = "--percentage-of-nodes-to-score=200";
     # K8s 1.27+ rejects kubernetes.io/* labels via --node-labels flag.
     # Set role labels through the kubelet config file instead.
     kubelet.extraOpts = "--node-labels=node.kubernetes.io/instance-type=standard";
     kubelet.extraConfig = {
+      evictionHard = {
+        "memory.available" = "1%";
+        "nodefs.available" = "1%";
+        "imagefs.available" = "1%";
+      };
+      evictionSoft = {
+        "memory.available" = "2%";
+        "nodefs.available" = "2%";
+        "imagefs.available" = "2%";
+      };
+      evictionSoftGracePeriod = {
+        "memory.available" = "2m";
+        "nodefs.available" = "2m";
+        "imagefs.available" = "2m";
+      };
+      evictionMinimumGracePeriod = "30s";
+      # Allow more CPU to be scheduled (overprovisioning)
+      systemReserved = {
+        cpu = "500m";
+        memory = "1Gi";
+      };
+      kubeReserved = {
+        cpu = "500m";
+        memory = "1Gi";
+      };
       nodeLabels = {
         "node-role.kubernetes.io/control-plane" = "";
         "node-role.kubernetes.io/node" = "";

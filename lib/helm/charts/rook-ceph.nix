@@ -13,11 +13,11 @@ in {
 
       csi = {
         enableRBDDriver = true;
-        enableCephfsDriver = false;
+        enableCephfsDriver = true;
         rookUseCsiOperator = false;
         enableNFSDriver = false;
         enableRBDSnapshotter = true;
-        enableCephfsSnapshotter = false;
+        enableCephfsSnapshotter = true;
         enableNFSSnapshotter = false;
         kubeletDirPath = "/var/lib/kubernetes";
         csiRBDPluginVolume = [
