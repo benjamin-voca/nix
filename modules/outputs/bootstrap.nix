@@ -237,6 +237,10 @@
           service = "http://127.0.0.1:30856";
         }
         {
+          hostname = "k8s.quadtech.dev";
+          service = "tcp://127.0.0.1:6443";
+        }
+        {
           hostname = "*.quadtech.dev";
           service = "http://127.0.0.1:30856";
         }
@@ -892,7 +896,7 @@
         spec:
           storage:
             storageClass: ceph-block
-            size: 10Gi
+            size: 20Gi
           instances: 3
         EOF
 

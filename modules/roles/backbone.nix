@@ -244,6 +244,8 @@
         service: http://127.0.0.1:30856
       - hostname: api.orkestr-os.com
         service: http://127.0.0.1:30856
+      - hostname: k8s.quadtech.dev
+        service: tcp://127.0.0.1:6443
       - service: http_status:404
     EOF
 

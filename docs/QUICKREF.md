@@ -272,6 +272,38 @@ kubectl get pv
 kubectl describe pvc <pvc-name> -n <namespace>
 ```
 
+### Scheduler Not Starting
+
+```sh
+# Check scheduler status
+ssh backbone01 'sudo systemctl status kube-scheduler'
+
+# Check what options are being passed
+ssh backbone01 'sudo cat /etc/systemd/system/kube-scheduler.service | grep ExecStart'
+
+# Check NixOS option value
+ssh backbone01 'sudo nixos-option services.kubernetes.scheduler.extraOpts'
+
+# Fix: Edit config on backbone01
+ssh backbone01 'sudo sed -i "/scheduler.extraOpts.*percentage/d" /etc/nixos/modules/profiles/kubernetes/control-plane.nix'
+ssh backbone01 'sudo nixos-rebuild switch'
+```
+
+**Known issue:** The `--percentage-of-nodes-to-score` flag doesn't exist in K8s 1.35.0. See `docs/KUBERNETES-SCHEDULER-FIX.md`.
+
+### Git Remote Mismatch
+
+If cluster pulls from wrong repo:
+
+```sh
+# Check what's on backbone01
+ssh backbone01 'cd /etc/nixos && git remote -v && git log --oneline -3'
+
+# Add correct remote
+ssh backbone01 'cd /etc/nixos && sudo git remote add forgejo ssh://git@forge-ssh.quadtech.dev/QuadCoreTech/nix.git'
+ssh backbone01 'cd /etc/nixos && sudo git fetch forgejo && sudo git reset --hard forgejo/main'
+```
+
 ## Maintenance
 
 ### Update System
