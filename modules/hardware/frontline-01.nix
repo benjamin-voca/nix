@@ -22,6 +22,9 @@
     [ { device = "/dev/disk/by-uuid/13e03de6-60d8-419b-944a-a9a05d00d875"; }
     ];
 
+  boot.loader.grub.enable = true;
+  boot.loader.grub.devices = ["/dev/nvme0n1"];
+
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
   # (the default) this is the recommended approach. When using systemd-networkd it's
   # still possible to use this option, but it's recommended to use it in conjunction
