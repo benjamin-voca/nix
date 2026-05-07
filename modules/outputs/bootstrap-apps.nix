@@ -18,9 +18,9 @@
 
   chartsFor = system: inputs.nixhelm.chartsDerivations.${system};
   composableFor = system: let
-+    pkgs = pkgsFor system;
-+  in
-+    import ../../lib/helm/composable.nix {inherit pkgs;};
+    pkgs = pkgsFor system;
+  in
+    import ../../lib/helm/composable.nix {inherit pkgs;};
 
   bootstrapAppsFor = system: let
     pkgs = pkgsFor system;
@@ -41,8 +41,8 @@
   in
     pkgs.runCommand "bootstrap-manifests-apps"
     {
-+      inherit system;
-+      preferLocalBuild = true;
+      inherit system;
+      preferLocalBuild = true;
     }
     ''
               set -euo pipefail
