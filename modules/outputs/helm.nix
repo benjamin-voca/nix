@@ -21,56 +21,15 @@
       name = "argocd";
       chart = helmLib.charts.argoproj.argo-cd;
       namespace = "argocd";
-      values = {
-        global = {
-          domain = "argocd.quadtech.dev";
-        };
-
-        configs = {
-          cm = {
-            "server.insecure" = true;
-            url = "https://argocd.quadtech.dev";
-          };
-          params = {
-            "server.insecure" = true;
-          };
-          secret = {
-            argocdServerAdminPassword = "PLACEHOLDER";
-          };
-        };
-
-        server = {
-          replicas = 1;
-          service = {
-            type = "ClusterIP";
-          };
-        };
-
-        redis = {
-          enabled = true;
-        };
-
-        redis-ha = {
-          enabled = false;
-        };
-
-        controller = {
-          replicas = 1;
-        };
-
-        repoServer = {
-          replicas = 1;
-        };
-
-        applicationSet = {
-          enabled = true;
-        };
-
-        notifications = {
-          enabled = true;
-        };
-
-        global.image.tag = "v2.9.3";
+      values = import ../../lib/argocd-values.nix {
+        domain = "argocd.quadtech.dev";
+        serverUrl = "https://argocd.quadtech.dev";
+        imageTag = "v2.9.3";
+        serverReplicas = 1;
+        controllerReplicas = 1;
+        repoServerReplicas = 1;
+        enableApplicationSet = true;
+        enableNotifications = true;
       };
     };
 in {

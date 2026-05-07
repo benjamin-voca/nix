@@ -48,7 +48,7 @@ Cachix binary caches are automatically configured - no manual setup needed!
 sudo nixos-rebuild switch --flake .#<hostname>
 ```
 
-Replace `<hostname>` with: `backbone-01`, `backbone-02`, `frontline-01`, or `frontline-02`.
+Replace `<hostname>` with: `backbone-01` or `frontline-01`.
 
 ## Binary Caches (Cachix)
 

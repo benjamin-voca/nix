@@ -12,8 +12,10 @@
     serviceModules ? [],
     extraModules ? [],
     taints ? [],
+    sshHost ? name,
+    remoteBuild ? false,
   }:
-    inputs.nixpkgs.lib.nixosSystem {
+    (inputs.nixpkgs.lib.nixosSystem {
       inherit system;
       specialArgs = {inherit inputs;};
       modules =
@@ -40,6 +42,12 @@
         ]
         ++ serviceModules
         ++ extraModules;
+    })
+    // {
+      _quad = {
+        inherit sshHost;
+        inherit remoteBuild;
+      };
     };
 in {
   config.quad.lib.mkClusterHost = mkClusterHost;

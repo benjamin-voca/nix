@@ -50,35 +50,21 @@ creation_rules:
           - *elion
 
   # Frontline-01 specific secrets
-  # - path_regex: secrets/frontline-01\.yaml$
-  #   key_groups:
-  #   - age:
-  #     - *frontline-01
-  #   - ssh:
-  #     - *benjamin
-  #     - *klajdi
-  #     - *erti
-  #     - *elion
-
-  # Frontline-02 specific secrets
-  # - path_regex: secrets/frontline-02\.yaml$
-  #   key_groups:
-  #   - age:
-  #     - *frontline-02
-  #   - ssh:
-  #     - *benjamin
-  #     - *klajdi
-  #     - *erti
-  #     - *elion
+  - path_regex: secrets/frontline-01\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+      - ssh:
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
 
   # Global secrets (all hosts can decrypt)
   - path_regex: secrets/global\.yaml$
     key_groups:
       - age:
           - *backbone-01
-          # - *backbone-02
-          # - *frontline-01
-          # - *frontline-02
       - ssh:
           - *benjamin
           - *klajdi

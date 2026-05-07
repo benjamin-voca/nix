@@ -7,44 +7,25 @@
   deployLib = inputs.deploy-rs.lib.x86_64-linux;
 in {
   config.flake.deploy = {
-    nodes = {
-      "backbone-01" = {
-        hostname = "backbone01";
-        profiles.system = {
-          user = "root";
-          path = deployLib.activate.nixos config.flake.nixosConfigurations.backbone-01;
-        };
-        sshUser = "root";
-        remoteBuild = true;
-      };
-
-      "backbone-02" = {
-        hostname = "192.168.1.11";
-        profiles.system = {
-          user = "root";
-          path = deployLib.activate.nixos config.flake.nixosConfigurations.backbone-02;
-        };
-        sshUser = "root";
-      };
-
-      "frontline-01" = {
-        hostname = "192.168.1.20";
-        profiles.system = {
-          user = "root";
-          path = deployLib.activate.nixos config.flake.nixosConfigurations.frontline-01;
-        };
-        sshUser = "root";
-      };
-
-      "frontline-02" = {
-        hostname = "192.168.1.21";
-        profiles.system = {
-          user = "root";
-          path = deployLib.activate.nixos config.flake.nixosConfigurations.frontline-02;
-        };
-        sshUser = "root";
-      };
-    };
+    nodes =
+      lib.mapAttrs (
+        name: host: {
+          hostname =
+            if host ? _quad && host._quad ? sshHost
+            then host._quad.sshHost
+            else name;
+          profiles.system = {
+            user = "root";
+            path = deployLib.activate.nixos host;
+          };
+          sshUser = "root";
+          remoteBuild =
+            if host ? _quad && host._quad ? remoteBuild
+            then host._quad.remoteBuild
+            else false;
+        }
+      )
+      config.flake.nixosConfigurations;
   };
 
   config.flake.apps = {

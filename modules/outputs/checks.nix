@@ -6,10 +6,7 @@
 }: let
   systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
   forAllSystems = lib.genAttrs systems;
-  repoSrc = builtins.path {
-    path = ../../.;
-    name = "quadnix-source";
-  };
+  repoSrc = inputs.nixpkgs.lib.cleanSource ../../.;
 
   nixModuleTests = {
     quad-mk-cluster-host = "tests/nix/quad/mk-cluster-host.test.nix";
@@ -23,6 +20,7 @@
     pkgs.runCommand "test-${name}"
     {
       nativeBuildInputs = [pkgs.nix];
+      HOME = "/tmp";
     }
     ''
       nix-instantiate --eval --strict "${repoSrc}/${relativeTestPath}" \

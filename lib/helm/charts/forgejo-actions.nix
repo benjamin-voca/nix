@@ -19,6 +19,27 @@ in {
 
       statefulset = {
         replicas = 3;
+        affinity = {
+          podAntiAffinity = {
+            preferredDuringSchedulingIgnoredDuringExecution = [
+              {
+                weight = 100;
+                podAffinityTerm = {
+                  labelSelector = {
+                    matchExpressions = [
+                      {
+                        key = "app.kubernetes.io/name";
+                        operator = "In";
+                        values = ["forgejo-actions"];
+                      }
+                    ];
+                  };
+                  topologyKey = "kubernetes.io/hostname";
+                };
+              }
+            ];
+          };
+        };
 
         actRunner = {
           config = {

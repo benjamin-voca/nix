@@ -1,4 +1,4 @@
-{lib, ...}: {
+{lib, pkgs, ...}: {
   imports = [
     ../profiles/base.nix
     ../profiles/server.nix
@@ -6,9 +6,35 @@
     ../profiles/kubernetes/worker.nix
   ];
 
-  systemd.services.docker-prune = {
-    script = "docker system prune -af";
-    startAt = lib.mkForce ["daily"];
-    wantedBy = ["multi-user.target"];
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    interfaces = ["enp3s0"];
+    publish = {
+      enable = true;
+      addresses = true;
+    };
   };
+
+  virtualisation.docker.autoPrune.enable = lib.mkForce false;
+
+  systemd.services.docker-prune =
+    lib.mkForce
+    {
+      path = [pkgs.docker];
+      script = "docker system prune -af";
+      startAt = "daily";
+      wantedBy = ["multi-user.target"];
+      serviceConfig.Type = "oneshot";
+    };
+
+  systemd.timers.docker-prune =
+    lib.mkForce
+    {
+      wantedBy = ["timers.target"];
+      timerConfig = {
+        OnCalendar = "daily";
+        Persistent = true;
+      };
+    };
 }

@@ -32,10 +32,21 @@
     name = "iqn.2026-04.dev.quadtech:${config.networking.hostName}";
   };
 
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    interfaces = ["enp0s31f6"];
+    publish = {
+      enable = true;
+      addresses = true;
+    };
+  };
+
   networking.firewall.allowedTCPPorts = [
     22
     443
     6443
+    8888
   ];
 
   networking.hosts."192.168.1.240" = [
@@ -216,35 +227,10 @@
 
         # Write cloudflared config - use 127.0.0.1 with NodePorts
         cat > /etc/cloudflared/config/config.yaml << 'EOF'
-    tunnel: b6bac523-be70-4625-8b67-fa78a9e1c7a5
-    credentials-file: /etc/cloudflared/creds/credentials.json
-    protocol: http2
-    metrics: 0.0.0.0:2003
-    no-autoupdate: true
-    ingress:
-      - hostname: backbone-01.quadtech.dev
-        service: ssh://127.0.0.1:22
-      - hostname: forge-ssh.quadtech.dev
-        service: tcp://127.0.0.1:32222
-      - hostname: forge.quadtech.dev
-        service: http://127.0.0.1:30856
-      - hostname: argocd.quadtech.dev
-        service: http://127.0.0.1:30856
-      - hostname: harbor.quadtech.dev
-        service: http://127.0.0.1:30856
-      - hostname: educourses-pd.com
-        service: http://127.0.0.1:30856
-      - hostname: www.educourses-pd.com
-        service: http://127.0.0.1:30856
-      - hostname: openclaw.quadtech.dev
-        service: http://127.0.0.1:30856
-      - hostname: grafana.k8s.quadtech.dev
-        service: http://127.0.0.1:30856
-      - hostname: app.orkestr-os.com
-        service: http://127.0.0.1:30856
-      - hostname: api.orkestr-os.com
-        service: http://127.0.0.1:30856
-      - service: http_status:404
+    ${builtins.toJSON (import ../../lib/cloudflared-config.nix {
+      tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
+      credentialsFile = "/etc/cloudflared/creds/credentials.json";
+    })}
     EOF
 
         # Copy credentials from SOPS secret
