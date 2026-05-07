@@ -44,9 +44,9 @@
 
   services.resolved = {
     enable = true;
-    extraConfig = ''
-      MulticastDNS=yes
-    '';
+    settings = {
+      MulticastDNS = "yes";
+    };
   };
 
   networking.firewall.allowedTCPPorts = [
