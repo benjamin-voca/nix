@@ -9,14 +9,10 @@
   services.avahi = {
     enable = true;
     nssmdns4 = true;
+    interfaces = ["enp3s0"];
     publish = {
       enable = true;
       addresses = true;
-    };
-    extraServiceSettings = {
-      server = {
-        allow-interfaces = "enp3s0";
-      };
     };
   };
 
