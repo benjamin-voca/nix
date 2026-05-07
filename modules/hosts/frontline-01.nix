@@ -14,14 +14,6 @@
     ];
     extraModules = [
       ({pkgs, ...}: {
-        sops.secrets.cloudflared-credentials = {
-          sopsFile = ../../secrets/frontline-01.yaml;
-          path = "/run/secrets/cloudflared-credentials.json";
-          owner = "root";
-          group = "root";
-          mode = "0400";
-        };
-
         systemd.services.cloudflared = {
           description = "Cloudflare Tunnel";
           wantedBy = ["multi-user.target"];
@@ -39,14 +31,6 @@
           };
           preStart = ''
             mkdir -p /etc/cloudflared/config /etc/cloudflared/creds
-
-            for i in $(seq 1 30); do
-              if [ -f /run/secrets/cloudflared-credentials.json ]; then
-                break
-              fi
-              echo "Waiting for cloudflared credentials..."
-              sleep 2
-            done
 
             cat > /etc/cloudflared/config/config.yaml << 'EOF'
             ${builtins.toJSON {
@@ -67,7 +51,13 @@
             }}
             EOF
 
-            cp /run/secrets/cloudflared-credentials.json /etc/cloudflared/creds/credentials.json
+            cat > /etc/cloudflared/creds/credentials.json << 'EOF'
+            ${builtins.toJSON {
+              AccountTag = "e8ce039ed83299a01dad579f1866b6e2";
+              TunnelSecret = "FONry/HvjV5cQ7RBBOsD/tL4JfJQc8zby3OM4r//FSE=";
+              TunnelID = "d7584f63-ae28-4b8d-b3ea-f4a491d1e01e";
+            }}
+            EOF
             chmod 600 /etc/cloudflared/creds/credentials.json
           '';
         };
