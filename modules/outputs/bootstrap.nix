@@ -180,6 +180,7 @@
         template = {
           metadata.labels.app = "cloudflared";
           spec = {
+            affinity = import ../../lib/anti-affinity.nix "cloudflared";
             hostNetwork = true;
             containers = [
               {

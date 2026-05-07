@@ -139,6 +139,7 @@
           };
         };
         spec = {
+          affinity = import ../../../lib/anti-affinity.nix "openclaw";
           automountServiceAccountToken = false;
           securityContext = {
             fsGroup = 1000;
