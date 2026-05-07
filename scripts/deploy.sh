@@ -55,32 +55,30 @@ check_prerequisites() {
 deploy_backbone() {
     info "Deploying backbone nodes..."
     
-    for node in backbone-01 backbone-02; do
+    for node in backbone-01; do
         info "Building configuration for $node..."
         nix build ".#nixosConfigurations.$node.config.system.build.toplevel" \
             || error "Failed to build $node configuration"
     done
     
     warning "Backbone NixOS configurations built successfully"
-    warning "To deploy, run on each backbone node:"
+    warning "To deploy, run on the backbone node:"
     echo "  sudo nixos-rebuild switch --flake .#backbone-01"
-    echo "  sudo nixos-rebuild switch --flake .#backbone-02"
 }
 
 # Deploy frontline nodes (NixOS configuration)
 deploy_frontline() {
     info "Deploying frontline nodes..."
     
-    for node in frontline-01 frontline-02; do
+    for node in frontline-01; do
         info "Building configuration for $node..."
         nix build ".#nixosConfigurations.$node.config.system.build.toplevel" \
             || error "Failed to build $node configuration"
     done
     
     warning "Frontline NixOS configurations built successfully"
-    warning "To deploy, run on each frontline node:"
+    warning "To deploy, run on the frontline node:"
     echo "  sudo nixos-rebuild switch --flake .#frontline-01"
-    echo "  sudo nixos-rebuild switch --flake .#frontline-02"
 }
 
 # Deploy Kubernetes infrastructure

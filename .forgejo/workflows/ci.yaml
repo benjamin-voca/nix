@@ -33,9 +33,7 @@ jobs:
       - name: Build all NixOS configurations
         run: |
           nix build .#nixosConfigurations.backbone-01.config.system.build.toplevel
-          nix build .#nixosConfigurations.backbone-02.config.system.build.toplevel
           nix build .#nixosConfigurations.frontline-01.config.system.build.toplevel
-          nix build .#nixosConfigurations.frontline-02.config.system.build.toplevel
 
   # ── 2. Validate: build bootstrap manifests + diff against reference ──
   validate-manifests:
