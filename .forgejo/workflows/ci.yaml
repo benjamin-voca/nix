@@ -17,32 +17,18 @@ jobs:
           fetch-depth: 0
 
       - name: Install Nix
-        run: |
-          if command -v nix >/dev/null 2>&1; then
-            nix --version
-          else
-            mkdir -p /etc/nix
-            echo "build-users-group =" > /etc/nix/nix.conf
-            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
-            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
-            nix --version
-          fi
+        uses: https://github.com/DeterminateSystems/nix-installer-action@v13
 
       - name: Configure Nix
-        run: |
-          mkdir -p "$HOME/.config/nix"
-          {
-            echo "experimental-features = nix-command flakes"
-            echo "accept-flake-config = true"
-            echo "build-users-group ="
-          } >> "$HOME/.config/nix/nix.conf"
+        uses: https://github.com/DeterminateSystems/magic-nix-cache-action@v7
+        with:
+          use-flakehub: false
 
       - name: Check formatting
         run: nix fmt -- --check .
 
       - name: Run all flake checks
-        run: nix flake check --all-systems --keep-going
+        run: nix flake check --keep-going
 
       - name: Build all NixOS configurations
         run: |
@@ -60,26 +46,12 @@ jobs:
           fetch-depth: 0
 
       - name: Install Nix
-        run: |
-          if command -v nix >/dev/null 2>&1; then
-            nix --version
-          else
-            mkdir -p /etc/nix
-            echo "build-users-group =" > /etc/nix/nix.conf
-            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
-            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
-            nix --version
-          fi
+        uses: https://github.com/DeterminateSystems/nix-installer-action@v13
 
       - name: Configure Nix
-        run: |
-          mkdir -p "$HOME/.config/nix"
-          {
-            echo "experimental-features = nix-command flakes"
-            echo "accept-flake-config = true"
-            echo "build-users-group ="
-          } >> "$HOME/.config/nix/nix.conf"
+        uses: https://github.com/DeterminateSystems/magic-nix-cache-action@v7
+        with:
+          use-flakehub: false
 
       - name: Build bootstrap manifests
         run: |
@@ -110,7 +82,7 @@ jobs:
           fi
 
       - name: Upload bootstrap artifacts
-        uses: christopherhx/gitea-upload-artifact@v4
+        uses: https://github.com/forgejo/upload-artifact@v4
         if: always()
         with:
           name: bootstrap-manifests
@@ -126,26 +98,12 @@ jobs:
           fetch-depth: 0
 
       - name: Install Nix
-        run: |
-          if command -v nix >/dev/null 2>&1; then
-            nix --version
-          else
-            mkdir -p /etc/nix
-            echo "build-users-group =" > /etc/nix/nix.conf
-            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
-            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
-            nix --version
-          fi
+        uses: https://github.com/DeterminateSystems/nix-installer-action@v13
 
       - name: Configure Nix
-        run: |
-          mkdir -p "$HOME/.config/nix"
-          {
-            echo "experimental-features = nix-command flakes"
-            echo "accept-flake-config = true"
-            echo "build-users-group ="
-          } >> "$HOME/.config/nix/nix.conf"
+        uses: https://github.com/DeterminateSystems/magic-nix-cache-action@v7
+        with:
+          use-flakehub: false
 
       - name: Build Helm charts from flake outputs
         run: |
@@ -184,26 +142,12 @@ jobs:
           fetch-depth: 0
 
       - name: Install Nix
-        run: |
-          if command -v nix >/dev/null 2>&1; then
-            nix --version
-          else
-            mkdir -p /etc/nix
-            echo "build-users-group =" > /etc/nix/nix.conf
-            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
-            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
-            nix --version
-          fi
+        uses: https://github.com/DeterminateSystems/nix-installer-action@v13
 
       - name: Configure Nix
-        run: |
-          mkdir -p "$HOME/.config/nix"
-          {
-            echo "experimental-features = nix-command flakes"
-            echo "accept-flake-config = true"
-            echo "build-users-group ="
-          } >> "$HOME/.config/nix/nix.conf"
+        uses: https://github.com/DeterminateSystems/magic-nix-cache-action@v7
+        with:
+          use-flakehub: false
 
       - name: Build Helm charts
         run: |
@@ -242,26 +186,12 @@ jobs:
           fetch-depth: 0
 
       - name: Install Nix
-        run: |
-          if command -v nix >/dev/null 2>&1; then
-            nix --version
-          else
-            mkdir -p /etc/nix
-            echo "build-users-group =" > /etc/nix/nix.conf
-            curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
-            . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-            echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
-            nix --version
-          fi
+        uses: https://github.com/DeterminateSystems/nix-installer-action@v13
 
       - name: Configure Nix
-        run: |
-          mkdir -p "$HOME/.config/nix"
-          {
-            echo "experimental-features = nix-command flakes"
-            echo "accept-flake-config = true"
-            echo "build-users-group ="
-          } >> "$HOME/.config/nix/nix.conf"
+        uses: https://github.com/DeterminateSystems/magic-nix-cache-action@v7
+        with:
+          use-flakehub: false
 
       # ── Step A: Build bootstrap manifests ──
       - name: Build bootstrap manifests

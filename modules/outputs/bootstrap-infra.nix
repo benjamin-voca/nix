@@ -7,10 +7,7 @@
   systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
   forAllSystems = lib.genAttrs systems;
 
-  # Helper to get pkgs for a system
   pkgsFor = system: inputs.nixpkgs.legacyPackages.${system};
-
-  # Helper to get helmLib for a system
   helmLibFor = system: let
     pkgs = pkgsFor system;
   in
@@ -19,43 +16,26 @@
       inherit pkgs system;
     };
 
-  # Get charts from nixhelm
   chartsFor = system: inputs.nixhelm.chartsDerivations.${system};
-
-  # Import composable library - for modular k8s manifest building
-  # This library provides reusable functions for:
-  # - Namespace creation (mkNamespace)
-  # - ArgoCD Application building (mkArgoHelmApp)
-  # - Cloudflared configuration (mkCloudflared*)
-  # - Gitea runner resources (mkGiteaRunner*)
-  # - MetalLB CRDs (mkMetallbCRDs)
-  # - Common resource presets
   composableFor = system: let
     pkgs = pkgsFor system;
   in
-    import ../../lib/helm/composable.nix {
-      inherit pkgs;
-    };
+    import ../../lib/helm/composable.nix {inherit pkgs;};
 
-  # Bootstrap output that merges forgejo, argocd, and cloudflare
-  bootstrapFor = system: let
+  bootstrapInfraFor = system: let
     pkgs = pkgsFor system;
     charts = chartsFor system;
     helmLib = helmLibFor system;
     kubelib = inputs.nix-kube-generators.lib {inherit pkgs;};
 
-    # Use the composable library for manifest building
     composable = composableFor system;
 
     openclawBootstrap = import ./bootstrap/openclaw.nix {
       inherit lib pkgs;
     };
 
-    # Import existing charts from lib/helm/charts
     existingCharts = import ../../lib/helm/charts {inherit helmLib;};
 
-    # MetalLB chart - use nixhelm's chart derivation directly
-    # Note: MetalLB 0.15+ uses CRDs for configuration instead of configInline
     metallbChart =
       pkgs.lib.pipe
       {
@@ -63,7 +43,6 @@
         chart = charts.metallb.metallb;
         namespace = "metallb";
         values = {
-          # Use the CRD-based configuration (L2Advertisement and IPAddressPool)
           controller = {
             resources = {
               requests = {
@@ -94,7 +73,6 @@
         kubelib.buildHelmChart
       ];
 
-    # Ingress-nginx chart with LoadBalancer (gets IP from MetalLB)
     ingressNginxChart =
       pkgs.lib.pipe
       {
@@ -113,15 +91,12 @@
         kubelib.buildHelmChart
       ];
 
-    # Rook/Ceph operator and cluster charts for storage
     rookCephChart = existingCharts."rook-ceph";
     rookCephClusterChart = existingCharts."rook-ceph-cluster";
 
-    # Harbor and monitoring charts rendered from repo-managed values
     harborChart = existingCharts.harbor;
     monitoringChart = existingCharts.prometheus;
 
-    # ArgoCD chart configuration
     argocdChart =
       pkgs.lib.pipe
       {
@@ -156,14 +131,12 @@
         kubelib.buildHelmChart
       ];
 
-    # Cloudflared config content as string
     cloudflaredConfigContent = builtins.toJSON (import ../../lib/cloudflared-config.nix {
       tunnelId = "b6bac523-be70-4625-8b67-fa78a9e1c7a5";
       credentialsFile = "/etc/cloudflared/creds/credentials.json";
       metrics = "0.0.0.0:2002";
     });
 
-    # Cloudflared deployment with config file
     cloudflaredManifest = pkgs.writeText "cloudflared.yaml" (builtins.toJSON {
       apiVersion = "apps/v1";
       kind = "Deployment";
@@ -235,7 +208,6 @@
       };
     });
 
-    # Create namespace for cloudflared
     cloudflaredNamespace = pkgs.writeText "cloudflared-namespace.yaml" (builtins.toJSON {
       apiVersion = "v1";
       kind = "Namespace";
@@ -247,12 +219,6 @@
       };
     });
 
-    # Note: cloudflared credentials are mounted via Kubernetes secret
-    # The secret 'cloudflared-credentials' should be created from sops-decrypted credentials
-
-    # NodePort service for direct SSH access on fixed port 2222
-    # Configure your router to forward port 2222 to the node's IP
-    # MetalLB CRDs for IP address pool configuration (MetalLB 0.15+ uses CRDs)
     metallbIPAddressPool = ''
       apiVersion: metallb.io/v1beta1
       kind: IPAddressPool
@@ -274,8 +240,6 @@
         - default
     '';
   in
-    # Combine all charts and manifests into a single bootstrap output
-    # Use runCommand with explicit system to avoid cross-compilation issues
     let
       cloudflaredDeployment = ''
         apiVersion: apps/v1
@@ -326,7 +290,7 @@
                   secretName: cloudflared-credentials
       '';
     in
-      pkgs.runCommand "bootstrap-manifests"
+      pkgs.runCommand "bootstrap-manifests-infra"
       {
         inherit system;
         preferLocalBuild = true;
@@ -336,18 +300,14 @@
 
                 mkdir -p $out
 
-                # Copy metallb chart first (needed for LoadBalancer)
                 cp ${metallbChart} $out/00-metallb.yaml
 
-                # Write MetalLB CRDs for IP pool
                 cat > $out/00-metallb-crds.yaml << 'METALLB_CRDS_EOF'
         ${metallbIPAddressPool}
         METALLB_CRDS_EOF
 
-                # Copy ingress-nginx chart (will get IP from MetalLB)
                 cp ${ingressNginxChart} $out/01-ingress-nginx.yaml
 
-                # Create argocd namespace and deploy ArgoCD chart
                 cat > $out/01a-argocd-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -359,13 +319,10 @@
 
                 cp ${argocdChart} $out/01b-argocd.yaml
 
-                # Copy Rook/Ceph operator and cluster charts
                 cp ${rookCephChart} $out/02-rook-ceph.yaml
                 cp ${rookCephClusterChart} $out/03-rook-ceph-cluster.yaml
                 chmod u+w $out/03-rook-ceph-cluster.yaml
 
-                # Drop immutable legacy ceph-filesystem StorageClass object from rendered chart
-                # and rely on the managed ceph-filesystem-csi StorageClass.
                 OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
         import os
         import pathlib
@@ -383,19 +340,13 @@
         path.write_text("\n---\n".join(filtered) + "\n")
         PY
 
-                # Copy CNPG operator chart
                 cp ${existingCharts.cloudnative-pg} $out/02a-cnpg-operator.yaml
 
-                # Copy Harbor and monitoring charts from declarative chart configs
                 cp ${harborChart} $out/11-harbor-chart.yaml
                 cp ${monitoringChart} $out/12-monitoring-chart.yaml
 
-                # Copy Grafana chart (simple, cloudflare-tunnel friendly)
                 cp ${existingCharts.grafana} $out/12-grafana-chart.yaml
 
-                # Strip last-applied-configuration annotations from CRDs to avoid the
-                # metadata.annotations 256KiB limit when manifests were previously
-                # bootstrapped with client-side apply.
                 OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
         import os
         from pathlib import Path
@@ -449,7 +400,6 @@
             if not path.exists():
                 continue
 
-            # Files copied into $out are read-only by default.
             path.chmod(0o644)
 
             docs = path.read_text().split("\n---\n")
@@ -462,7 +412,6 @@
             path.write_text("\n---\n".join(cleaned_docs) + "\n")
         PY
 
-                # Create CNPG cluster manifest for shared postgres
                 cat > $out/02b-cnpg-cluster.yaml << 'EOF'
         apiVersion: postgresql.cnpg.io/v1
         kind: Cluster
@@ -549,7 +498,6 @@
           owner: edukurs
         EOF
 
-                # Create rook-ceph namespace
                 cat > $out/02d-rook-ceph-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -559,7 +507,6 @@
             app.kubernetes.io/name: rook-ceph
         EOF
 
-                # Create Ceph RGW user used by CNPG backups
                 cat > $out/02e-ceph-rgw-cnpg-user.yaml << 'EOF'
         apiVersion: ceph.rook.io/v1
         kind: CephObjectStoreUser
@@ -571,7 +518,6 @@
           displayName: CNPG Backups
         EOF
 
-                # Create deterministic RGW bucket for CNPG backups
                 cat > $out/02f-ceph-rgw-cnpg-bucket-job.yaml << 'EOF'
         apiVersion: batch/v1
         kind: Job
@@ -612,7 +558,6 @@
                       echo "Bucket cnpg-backups created"
         EOF
 
-                # Create scheduled CNPG backup for edukurs cluster
                 cat > $out/02g-edukurs-cnpg-scheduled-backup.yaml << 'EOF'
         apiVersion: postgresql.cnpg.io/v1
         kind: ScheduledBackup
@@ -628,7 +573,6 @@
             name: edukurs-db-ceph
         EOF
 
-                # Create scheduled CNPG backup for forgejo cluster
                 cat > $out/02h-forgejo-cnpg-scheduled-backup.yaml << 'EOF'
         apiVersion: postgresql.cnpg.io/v1
         kind: ScheduledBackup
@@ -644,7 +588,6 @@
             name: forgejo-db
         EOF
 
-                # Create forgejo namespace
                 cat > $out/02i-forgejo-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -654,7 +597,6 @@
             app.kubernetes.io/name: forgejo
         EOF
 
-                # Create cnpg-system namespace for the CNPG operator
                 cat > $out/02c-cnpg-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -664,219 +606,6 @@
             app.kubernetes.io/name: cloudnative-pg
         EOF
 
-                # Create app namespaces
-                cat > $out/15-edukurs-namespace.yaml << 'EOF'
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          name: edukurs
-          labels:
-            app.kubernetes.io/name: edukurs
-        EOF
-
-                cat > $out/15-batllavatourist-namespace.yaml << 'EOF'
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          name: batllavatourist
-          labels:
-            app.kubernetes.io/name: batllavatourist
-        EOF
-
-                cat > $out/15-quadpacienti-namespace.yaml << 'EOF'
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          name: quadpacienti
-          labels:
-            app.kubernetes.io/name: quadpacienti
-        EOF
-
-                # Create ArgoCD Application for EduKurs (placeholder - needs Docker image built)
-                cat > $out/16-edukurs-argocd-app.yaml << 'EOF'
-        apiVersion: argoproj.io/v1alpha1
-        kind: Application
-        metadata:
-          name: edukurs
-          namespace: argocd
-          finalizers:
-            - resources-finalizer.argocd.argoproj.io
-        spec:
-          project: default
-          source:
-            repoURL: https://forge.quadtech.dev/QuadCoreTech/edukurs.git
-            path: k8s
-            targetRevision: main
-          destination:
-            server: https://kubernetes.default.svc
-            namespace: edukurs
-          syncPolicy:
-            automated:
-              prune: true
-              selfHeal: true
-        EOF
-
-                # Create ArgoCD Application for BatllavaTourist (placeholder - needs Docker image built)
-                cat > $out/16-batllavatourist-argocd-app.yaml << 'EOF'
-        apiVersion: argoproj.io/v1alpha1
-        kind: Application
-        metadata:
-          name: batllavatourist
-          namespace: argocd
-          finalizers:
-            - resources-finalizer.argocd.argoproj.io
-        spec:
-          project: default
-          source:
-            repoURL: https://forge.quadtech.dev/QuadCoreTech/batllavatourist.git
-            path: k8s
-            targetRevision: main
-          destination:
-            server: https://kubernetes.default.svc
-            namespace: batllavatourist
-          syncPolicy:
-            automated:
-              prune: true
-              selfHeal: true
-        EOF
-
-                # Create ArgoCD Application for QuadPacienti (placeholder - needs Docker image built)
-                cat > $out/16-quadpacienti-argocd-app.yaml << 'EOF'
-        apiVersion: argoproj.io/v1alpha1
-        kind: Application
-        metadata:
-          name: quadpacienti
-          namespace: argocd
-          finalizers:
-            - resources-finalizer.argocd.argoproj.io
-        spec:
-          project: default
-          source:
-            repoURL: https://forge.quadtech.dev/QuadCoreTech/quadpacienti.git
-            path: k8s
-            targetRevision: main
-          destination:
-            server: https://kubernetes.default.svc
-            namespace: quadpacienti
-          syncPolicy:
-            automated:
-              prune: true
-              selfHeal: true
-        EOF
-
-              # Copy forgejo chart from existing charts
-                cp ${existingCharts.forgejo} $out/03-forgejo.yaml
-                chmod u+w $out/03-forgejo.yaml
-
-                # Normalize Forgejo service targetPort for schema validation.
-                OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
-        import os
-        from pathlib import Path
-
-        path = Path(os.environ["OUT"]) / "03-forgejo.yaml"
-        docs = path.read_text().split("\n---\n")
-        updated_docs = []
-        for doc in docs:
-            if "kind: Service" in doc and "\n  name: forgejo-http\n" in doc:
-                doc = doc.replace("targetPort: \n", "targetPort: 3000\n")
-            updated_docs.append(doc)
-        path.write_text("\n---\n".join(updated_docs) + "\n")
-        PY
-
-                # Ensure Forgejo shared storage claim exists on Ceph
-                cat > $out/03a-forgejo-shared-storage-ceph-pvc.yaml << 'EOF'
-        apiVersion: v1
-        kind: PersistentVolumeClaim
-        metadata:
-          name: forgejo-shared-storage-ceph-csi
-          namespace: forgejo
-        spec:
-          accessModes:
-            - ReadWriteMany
-          storageClassName: ceph-filesystem-csi
-          resources:
-            requests:
-              storage: 50Gi
-        EOF
-
-                # Ensure Forgejo DB cluster is explicitly Ceph-backed
-                cat > $out/03b-forgejo-db-storageclass-patch.yaml << 'EOF'
-        apiVersion: postgresql.cnpg.io/v1
-        kind: Cluster
-        metadata:
-          name: forgejo-db
-          namespace: forgejo
-        spec:
-          storage:
-            storageClass: ceph-block
-            size: 20Gi
-          instances: 3
-        EOF
-
-                # Create forgejo runner token secret (base64 encoded - will be replaced with actual secret via SOPS or external secret operator)
-                cat > $out/04-forgejo-runner-secret.yaml << 'EOF'
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: forgejo-runner-token
-          namespace: forgejo
-        type: Opaque
-        stringData:
-          token: RUNNER_TOKEN_PLACEHOLDER
-        EOF
-
-                # Copy forgejo-actions chart from existing charts
-                cp ${existingCharts.forgejo-actions} $out/04-forgejo-actions.yaml
-                chmod u+w $out/04-forgejo-actions.yaml
-
-                # Inject missing StatefulSet serviceName required by Kubernetes schema.
-                OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
-        import os
-        from pathlib import Path
-
-        path = Path(os.environ["OUT"]) / "04-forgejo-actions.yaml"
-        docs = path.read_text().split("\n---\n")
-        updated_docs = []
-        for doc in docs:
-            if "kind: StatefulSet" in doc and "\n  name: forgejo-actions-act-runner\n" in doc and "serviceName:" not in doc:
-                doc = doc.replace(
-                    "\nspec:\n  replicas:",
-                    "\nspec:\n  serviceName: forgejo-actions-act-runner\n  replicas:",
-                    1,
-                )
-            updated_docs.append(doc)
-        path.write_text("\n---\n".join(updated_docs) + "\n")
-        PY
-
-                if [ ! -s "$out/04-forgejo-actions.yaml" ]; then
-                  echo "forgejo-actions chart render is empty; skipping" >&2
-                  rm -f "$out/04-forgejo-actions.yaml"
-                fi
-
-                # Create Forgejo repository credentials for ArgoCD
-                # NOTE: This is now applied via argocd-deploy service after deployment
-                # The service reads from /run/secrets/argocd-forgejo-username and /run/secrets/argocd-forgejo-token
-                # which are managed via SOPS in secrets/backbone-01.yaml
-
-                # Create ArgoCD Repository CR for Forgejo
-                cat > $out/04-argocd-forgejo-repo.yaml << 'EOF'
-        apiVersion: argoproj.io/v1alpha1
-        kind: Repository
-        metadata:
-          name: forgejo-quadtech
-          namespace: argocd
-        spec:
-          type: git
-          url: https://forge.quadtech.dev/QuadCoreTech
-          usernameSecret:
-            name: argocd-forgejo-creds
-            key: username
-          passwordSecret:
-            name: argocd-forgejo-creds
-            key: password
-        EOF
-
-                # Create cloudflared namespace inline
                 cat > $out/05-cloudflared-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -886,7 +615,6 @@
             app.kubernetes.io/name: cloudflared
         EOF
 
-                # Create cloudflared configmap inline
                 cat > $out/05-cloudflared-configmap.yaml << 'CONFIGMAP_EOF'
         apiVersion: v1
         kind: ConfigMap
@@ -898,12 +626,10 @@
         CONFIGMAP_EOF
                 echo '${cloudflaredConfigContent}' | sed 's/^/    /' >> $out/05-cloudflared-configmap.yaml
 
-                # Write cloudflared deployment inline
                 cat > $out/06-cloudflared-deployment.yaml << 'DEPLOYMENT_EOF'
         ${cloudflaredDeployment}
         DEPLOYMENT_EOF
 
-                # Create harbor namespace inline
                 cat > $out/09-harbor-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -913,7 +639,6 @@
             app.kubernetes.io/name: harbor
         EOF
 
-                # Ensure Harbor Ceph PVC claims exist
                 cat > $out/09a-harbor-pvcs-ceph.yaml << 'EOF'
         apiVersion: v1
         kind: PersistentVolumeClaim
@@ -981,7 +706,6 @@
               storage: 5Gi
         EOF
 
-                # Create verdaccio namespace inline
                 cat > $out/10-verdaccio-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -991,7 +715,6 @@
             app.kubernetes.io/name: verdaccio
         EOF
 
-                # Create minecraft namespace inline
                 cat > $out/11-minecraft-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -1001,7 +724,6 @@
             app.kubernetes.io/name: minecraft
         EOF
 
-                # Create Verdaccio PVC
                 cat > $out/10a-verdaccio-pvc.yaml << 'EOF'
         apiVersion: v1
         kind: PersistentVolumeClaim
@@ -1017,8 +739,6 @@
               storage: 10Gi
         EOF
 
-                # Create custom Ingress for Harbor
-                # /v2/ must go through harbor-core for token-based Docker auth
                 cat > $out/12-harbor-ingress.yaml << 'EOF'
         apiVersion: networking.k8s.io/v1
         kind: Ingress
@@ -1077,7 +797,6 @@
                       number: 80
         EOF
 
-                # Ensure ERPNext namespace exists before helpdesk redirect ingress
                 cat > $out/12aa-erpnext-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -1087,7 +806,6 @@
             app.kubernetes.io/name: erpnext
         EOF
 
-                # Redirect legacy Helpdesk path to Desk module route
                 cat > $out/12a-erpnext-helpdesk-redirect-ingress.yaml << 'EOF'
         apiVersion: networking.k8s.io/v1
         kind: Ingress
@@ -1119,45 +837,6 @@
                       number: 8080
         EOF
 
-                # Create ArgoCD Application for Verdaccio
-                cat > $out/13-verdaccio-argocd-app.yaml << 'EOF'
-        apiVersion: argoproj.io/v1alpha1
-        kind: Application
-        metadata:
-          name: verdaccio
-          namespace: argocd
-          finalizers:
-            - resources-finalizer.argocd.argoproj.io
-        spec:
-          project: default
-          source:
-            chart: verdaccio
-            repoURL: https://charts.verdaccio.org
-            targetRevision: 4.29.0
-            helm:
-              parameters:
-              - name: service.type
-                value: ClusterIP
-              - name: ingress.enabled
-                value: "true"
-              - name: ingress.className
-                value: nginx
-              - name: ingress.hosts[0]
-                value: verdaccio.quadtech.dev
-              - name: persistence.enabled
-                value: "true"
-              - name: persistence.existingClaim
-                value: verdaccio-data
-          destination:
-            server: https://kubernetes.default.svc
-            namespace: verdaccio
-          syncPolicy:
-            automated:
-              prune: true
-              selfHeal: true
-        EOF
-
-                # Create monitoring namespace
                 cat > $out/11-monitoring-namespace.yaml << 'EOF'
         apiVersion: v1
         kind: Namespace
@@ -1174,7 +853,6 @@
             app.kubernetes.io/name: grafana
         EOF
 
-                # Create Grafana DB secret (credentials for CNPG shared-pg)
                 cat > $out/12-grafana-db-secret.yaml << 'EOF'
         apiVersion: v1
         kind: Secret
@@ -1191,7 +869,6 @@
           GF_SECURITY_ADMIN_PASSWORD: PLACEHOLDER
         EOF
 
-                # Create Grafana ingress (Cloudflare tunnel -> nginx -> Grafana service)
                 cat > $out/12a-grafana-ingress.yaml << 'EOF'
         apiVersion: networking.k8s.io/v1
         kind: Ingress
@@ -1216,71 +893,6 @@
                       number: 80
         EOF
 
-                # Create ArgoCD Application for Minecraft
-                cat > $out/14-minecraft-argocd-app.yaml << 'EOF'
-        apiVersion: argoproj.io/v1alpha1
-        kind: Application
-        metadata:
-          name: minecraft
-          namespace: argocd
-          finalizers:
-            - resources-finalizer.argocd.argoproj.io
-        spec:
-          project: default
-          source:
-            chart: minecraft
-            repoURL: https://itzg.github.io/minecraft-server-charts
-            targetRevision: 5.1.1
-            helm:
-              valueFiles:
-              - values.yaml
-              values: |
-                minecraftServer:
-                  eula: "TRUE"
-                  version: "1.21.4"
-                  gamemode: survival
-                  difficulty: normal
-                  allow-flight: true
-                  enable-rcon: true
-                  rcon.password: "PLACEHOLDER"
-                  rcon.port: 25575
-                  query.enabled: true
-                  query.port: 25565
-                persistence:
-                  enabled: true
-                  storageClass: ceph-block
-                  size: 20Gi
-                service:
-                  type: LoadBalancer
-                  loadBalancerIP: 192.168.1.245
-                ingress:
-                  enabled: true
-                  ingressClassName: nginx
-                  annotations:
-                    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-                    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-                  hosts:
-                    - minecraft.quadtech.dev
-                  tls:
-                    - secretName: minecraft-tls
-                      hosts:
-                        - minecraft.quadtech.dev
-                resources:
-                  requests:
-                    cpu: 500m
-                    memory: 2Gi
-                  limits:
-                    cpu: 4000m
-                    memory: 6Gi
-          destination:
-            server: https://kubernetes.default.svc
-            namespace: minecraft
-          syncPolicy:
-            automated:
-              prune: true
-              selfHeal: true
-        EOF
-
                 cp ${openclawBootstrap.manifests."17-openclaw-namespace.yaml"} $out/17-openclaw-namespace.yaml
                 cp ${openclawBootstrap.manifests."17a-openclaw-pvc.yaml"} $out/17a-openclaw-pvc.yaml
                 cp ${openclawBootstrap.manifests."17b-openclaw-configmap.yaml"} $out/17b-openclaw-configmap.yaml
@@ -1288,74 +900,6 @@
                 cp ${openclawBootstrap.manifests."17d-openclaw-service.yaml"} $out/17d-openclaw-service.yaml
                 cp ${openclawBootstrap.manifests."17e-openclaw-ingress.yaml"} $out/17e-openclaw-ingress.yaml
 
-                # ── Orkestr namespace & CI RBAC ────────────────────────────────
-
-                # Orkestr namespace
-                cat > $out/18-orkestr-namespace.yaml << 'EOF'
-        apiVersion: v1
-        kind: Namespace
-        metadata:
-          name: orkestr
-          labels:
-            app.kubernetes.io/name: orkestr
-        EOF
-
-                # ServiceAccount for Gitea Actions CI pipelines
-                cat > $out/18a-orkestr-ci-rbac.yaml << 'EOF'
-        apiVersion: v1
-        kind: ServiceAccount
-        metadata:
-          name: gitea-ci
-          namespace: orkestr
-        ---
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: Role
-        metadata:
-          name: orkestr-ci-deployer
-          namespace: orkestr
-        rules:
-          - apiGroups: ["apps"]
-            resources: ["deployments"]
-            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-          - apiGroups: [""]
-            resources: ["services", "configmaps", "secrets", "pods"]
-            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-          - apiGroups: ["networking.k8s.io"]
-            resources: ["ingresses"]
-            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-          - apiGroups: ["postgresql.cnpg.io"]
-            resources: ["clusters", "databases"]
-            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-          - apiGroups: [""]
-            resources: ["persistentvolumeclaims"]
-            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-        ---
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: RoleBinding
-        metadata:
-          name: gitea-ci-deployer
-          namespace: orkestr
-        subjects:
-          - kind: ServiceAccount
-            name: gitea-ci
-            namespace: orkestr
-        roleRef:
-          kind: Role
-          name: orkestr-ci-deployer
-          apiGroup: rbac.authorization.k8s.io
-        ---
-        # Long-lived API token for CI kubeconfig
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: gitea-ci-token
-          namespace: orkestr
-          annotations:
-            kubernetes.io/service-account.name: gitea-ci
-        type: kubernetes.io/service-account-token
-        EOF
-
-                # Create combined file
                 cat $out/00-metallb.yaml > $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/00-metallb-crds.yaml >> $out/bootstrap.yaml
@@ -1388,19 +932,6 @@
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/02c-cnpg-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
-                cat $out/03-forgejo.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/03a-forgejo-shared-storage-ceph-pvc.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/03b-forgejo-db-storageclass-patch.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/04-forgejo-runner-secret.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                if [ -f "$out/04-forgejo-actions.yaml" ]; then
-                  cat $out/04-forgejo-actions.yaml >> $out/bootstrap.yaml
-                  echo "---" >> $out/bootstrap.yaml
-                fi
-                # ArgoCD Forgejo credentials now applied via argocd-deploy service (not in bootstrap)
                 cat $out/05-cloudflared-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/05-cloudflared-configmap.yaml >> $out/bootstrap.yaml
@@ -1423,8 +954,6 @@
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/12a-erpnext-helpdesk-redirect-ingress.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
-                cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
                 cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/12-monitoring-chart.yaml >> $out/bootstrap.yaml
@@ -1437,20 +966,6 @@
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
-                cat $out/14-minecraft-argocd-app.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/15-edukurs-namespace.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/15-batllavatourist-namespace.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/15-quadpacienti-namespace.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/16-edukurs-argocd-app.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/16-batllavatourist-argocd-app.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/16-quadpacienti-argocd-app.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
                 cat $out/17-openclaw-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/17a-openclaw-pvc.yaml >> $out/bootstrap.yaml
@@ -1462,11 +977,7 @@
                 cat $out/17d-openclaw-service.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/17e-openclaw-ingress.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/18-orkestr-namespace.yaml >> $out/bootstrap.yaml
-                echo "---" >> $out/bootstrap.yaml
-                cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       '';
 in {
-  config.flake.bootstrap = forAllSystems bootstrapFor;
+  config.flake.bootstrapInfra = forAllSystems bootstrapInfraFor;
 }
