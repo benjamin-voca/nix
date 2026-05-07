@@ -6,7 +6,14 @@
     ../profiles/kubernetes/worker.nix
   ];
 
-  networking.hosts."192.168.1.10" = ["backbone-01.local"];
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+    };
+  };
 
   virtualisation.docker.autoPrune.enable = lib.mkForce false;
 

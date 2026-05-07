@@ -32,6 +32,15 @@
     name = "iqn.2026-04.dev.quadtech:${config.networking.hostName}";
   };
 
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+    };
+  };
+
   networking.firewall.allowedTCPPorts = [
     22
     443
