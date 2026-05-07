@@ -10,7 +10,7 @@
 
   systemd.services.docker-prune = {
     script = "docker system prune -af";
-    startAt = "daily";
+    startAt = lib.mkForce "daily";
     wantedBy = ["multi-user.target"];
   };
 }
