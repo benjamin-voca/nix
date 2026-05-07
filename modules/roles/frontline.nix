@@ -18,9 +18,7 @@
 
   services.resolved = {
     enable = true;
-    settings = {
-      MulticastDNS = "yes";
-    };
+    settings.Resolve.MulticastDNS = "yes";
   };
 
   virtualisation.docker.autoPrune.enable = lib.mkForce false;

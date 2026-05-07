@@ -44,9 +44,7 @@
 
   services.resolved = {
     enable = true;
-    settings = {
-      MulticastDNS = "yes";
-    };
+    settings.Resolve.MulticastDNS = "yes";
   };
 
   networking.firewall.allowedTCPPorts = [
