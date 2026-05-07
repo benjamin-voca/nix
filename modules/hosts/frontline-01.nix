@@ -3,6 +3,7 @@
     name = "frontline-01";
     system = "x86_64-linux";
     sshHost = "frontline01";
+    remoteBuild = true;
     hardwareModule = ../hardware/frontline-01.nix;
     roleModule = ../roles/frontline.nix;
     taints = [
