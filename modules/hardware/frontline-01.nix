@@ -18,9 +18,7 @@
       fsType = "ext4";
     };
 
-  swapDevices =
-    [ { device = "/dev/disk/by-uuid/13e03de6-60d8-419b-944a-a9a05d00d875"; }
-    ];
+  swapDevices = [];
 
   boot.loader.grub.enable = true;
   boot.loader.grub.devices = ["/dev/nvme0n1"];
