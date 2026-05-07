@@ -39,6 +39,11 @@
       enable = true;
       addresses = true;
     };
+    extraServiceSettings = {
+      server = {
+        allow-interfaces = "enp0s31f6";
+      };
+    };
   };
 
   networking.firewall.allowedTCPPorts = [

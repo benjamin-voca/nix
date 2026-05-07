@@ -13,6 +13,11 @@
       enable = true;
       addresses = true;
     };
+    extraServiceSettings = {
+      server = {
+        allow-interfaces = "enp3s0";
+      };
+    };
   };
 
   virtualisation.docker.autoPrune.enable = lib.mkForce false;
