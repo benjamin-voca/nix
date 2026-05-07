@@ -2,7 +2,7 @@
   quad.hosts.frontline-03 = config.quad.lib.mkClusterHost {
     name = "frontline-03";
     system = "x86_64-linux";
-    sshHost = "192.168.1.15";
+    sshHost = "f1.quadtech.dev";
     hardwareModule = ../hardware/frontline-03.nix;
     roleModule = ../roles/frontline.nix;
     taints = [

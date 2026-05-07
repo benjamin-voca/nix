@@ -9,6 +9,10 @@
       service = "ssh://localhost:22";
     }
     {
+      hostname = "f1.quadtech.dev";
+      service = "ssh://192.168.1.15:22";
+    }
+    {
       hostname = "forge-ssh.quadtech.dev";
       service = "tcp://127.0.0.1:32222";
     }
