@@ -189,7 +189,7 @@
           containers = [
             {
               name = "gateway";
-              image = "ghcr.io/openclaw/openclaw:slim";
+              image = "ghcr.io/openclaw/openclaw:2026.5.5-slim";
               imagePullPolicy = "IfNotPresent";
               command = [
                 "node"
