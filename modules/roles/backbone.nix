@@ -42,6 +42,13 @@
     };
   };
 
+  services.resolved = {
+    enable = true;
+    extraConfig = ''
+      MulticastDNS=yes
+    '';
+  };
+
   networking.firewall.allowedTCPPorts = [
     22
     443

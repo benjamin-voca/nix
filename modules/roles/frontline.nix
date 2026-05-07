@@ -16,6 +16,13 @@
     };
   };
 
+  services.resolved = {
+    enable = true;
+    extraConfig = ''
+      MulticastDNS=yes
+    '';
+  };
+
   virtualisation.docker.autoPrune.enable = lib.mkForce false;
 
   systemd.services.docker-prune =
