@@ -1,4 +1,4 @@
-{lib, ...}: {
+{lib, pkgs, ...}: {
   imports = [
     ../profiles/base.nix
     ../profiles/server.nix
@@ -21,6 +21,7 @@
   systemd.services.docker-prune =
     lib.mkForce
     {
+      path = [pkgs.docker];
       script = "docker system prune -af";
       startAt = "daily";
       wantedBy = ["multi-user.target"];
