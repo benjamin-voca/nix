@@ -21,4 +21,6 @@
     masterAddress = lib.mkDefault "backbone-01.local";
   };
 
+  systemd.services.kubelet.environment.GODEBUG = "netdns=cgo";
+  systemd.services.kube-proxy.environment.GODEBUG = "netdns=cgo";
 }

@@ -122,7 +122,11 @@ in {
   systemd.services.kube-apiserver = {
     after = ["certmgr.service" "etcd.service"];
     requires = ["certmgr.service" "etcd.service"];
+    environment.GODEBUG = "netdns=cgo";
   };
+
+  systemd.services.kubelet.environment.GODEBUG = "netdns=cgo";
+  systemd.services.kube-proxy.environment.GODEBUG = "netdns=cgo";
 
   systemd.services.flannel = {
     after = ["kube-apiserver.service" "etcd.service" "network-online.target"];

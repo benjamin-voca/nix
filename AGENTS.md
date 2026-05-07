@@ -9,7 +9,10 @@
 - **Outputs**: `modules/outputs/*` (nixosConfigurations, deploy, helm)
 
 to run kubectl commands, prepend with `set -gx KUBECONFIG /etc/kubernetes/cluster-admin.kubeconfig` the commands that you will run inside of ssh host backbone01
-MAKE SURE ALL FIXES ARE DECLARATIVE DO NOT IMPLEMENT IMPERATIVE CHANGES WITHOUT PUTTING THEM INTO THIS REPO
+MAKE SURE ALL FIXES ARE DECLARATIVE DO NOT IMPLEMENT IMPERATIVE CHANGES WITHOUT PUTING THEM INTO THIS REPO
+- **kubectl**: works directly from the dev machine (macOS). Use `kubectl` locally, NOT via SSH.
+- **Build platform**: dev machine is `aarch64-darwin`. Always build with `.#<output>.aarch64-darwin` (e.g. `nix build .#bootstrapInfra.aarch64-darwin`). Hosts are `x86_64-linux` — use deploy-rs with `remoteBuild = true` for cross-compilation.
+- **No hardcoded IPs**: Avahi/mDNS resolves `.local` hostnames across the LAN. Do NOT add `networking.hosts` entries for cluster nodes.
 
 ## Versioning & Changelog (git-cliff)
 
