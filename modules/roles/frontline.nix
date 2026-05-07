@@ -6,6 +6,8 @@
     ../profiles/kubernetes/worker.nix
   ];
 
+  networking.hosts."192.168.1.10" = ["backbone-01.local"];
+
   virtualisation.docker.autoPrune.enable = lib.mkForce false;
 
   systemd.services.docker-prune =
