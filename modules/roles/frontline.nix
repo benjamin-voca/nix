@@ -8,9 +8,22 @@
 
   virtualisation.docker.autoPrune.enable = lib.mkForce false;
 
-  systemd.services.docker-prune = {
-    script = "docker system prune -af";
-    startAt = lib.mkForce "daily";
-    wantedBy = ["multi-user.target"];
-  };
+  systemd.services.docker-prune =
+    lib.mkForce
+    {
+      script = "docker system prune -af";
+      startAt = "daily";
+      wantedBy = ["multi-user.target"];
+      serviceConfig.Type = "oneshot";
+    };
+
+  systemd.timers.docker-prune =
+    lib.mkForce
+    {
+      wantedBy = ["timers.target"];
+      timerConfig = {
+        OnCalendar = "daily";
+        Persistent = true;
+      };
+    };
 }
