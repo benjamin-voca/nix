@@ -6,9 +6,11 @@
     ../profiles/kubernetes/worker.nix
   ];
 
+  virtualisation.docker.autoPrune.enable = lib.mkForce false;
+
   systemd.services.docker-prune = {
-    script = lib.mkForce "docker system prune -af";
-    startAt = lib.mkForce ["daily"];
+    script = "docker system prune -af";
+    startAt = "daily";
     wantedBy = ["multi-user.target"];
   };
 }
