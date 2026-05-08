@@ -5,7 +5,15 @@
   protocol ? "http2",
   ingress ? [
     {
+      hostname = "mainssh.quadtech.dev";
+      service = "ssh://localhost:22";
+    }
+    {
       hostname = "backbone-01.quadtech.dev";
+      service = "ssh://localhost:22";
+    }
+    {
+      hostname = "f1.quadtech.dev";
       service = "ssh://localhost:22";
     }
     {
