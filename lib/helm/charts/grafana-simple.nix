@@ -36,7 +36,7 @@
 
       # Admin credentials (should be managed via secrets)
       adminUser = "admin";
-      adminPassword = "changeme";
+      adminPassword = "QuadMakesHellaBread";
 
       # Grafana configuration
       "grafana.ini" = {
@@ -101,7 +101,7 @@
             {
               name = "Prometheus";
               type = "prometheus";
-              url = "http://prometheus-kube-prometheus-prometheus.monitoring:9090";
+              url = "http://prometheus-operated.monitoring:9090";
               access = "proxy";
               isDefault = true;
               editable = true;
@@ -121,6 +121,19 @@
               editable = true;
               jsonData = {
                 defaultDatabase = "default";
+              };
+            }
+            {
+              name = "Tempo";
+              type = "tempo";
+              url = "http://tempo.tempo:3100";
+              access = "proxy";
+              editable = true;
+              jsonData = {
+                httpMethod = "GET";
+                tracesToLogs = {
+                  datasourceUid = "Loki";
+                };
               };
             }
           ];

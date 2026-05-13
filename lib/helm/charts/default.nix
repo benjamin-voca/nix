@@ -12,6 +12,7 @@
   harbor = import ./harbor.nix {inherit helmLib;};
   rookCeph = import ./rook-ceph.nix {inherit helmLib;};
   rookCephCluster = import ./rook-ceph-cluster.nix {inherit helmLib;};
+  librechat = import ./librechat.nix {inherit helmLib;};
 in {
   # Re-export all charts
   inherit (argocd) argocd;
@@ -27,6 +28,7 @@ in {
   inherit (harbor) harbor;
   "rook-ceph" = rookCeph."rook-ceph";
   "rook-ceph-cluster" = rookCephCluster."rook-ceph-cluster";
+  inherit (librechat) librechat;
 
   # Convenience function to get all charts
   all = {
@@ -43,5 +45,6 @@ in {
     inherit (harbor) harbor;
     "rook-ceph" = rookCeph."rook-ceph";
     "rook-ceph-cluster" = rookCephCluster."rook-ceph-cluster";
+    inherit (librechat) librechat;
   };
 }

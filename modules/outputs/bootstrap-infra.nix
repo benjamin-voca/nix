@@ -866,8 +866,8 @@
           GF_DATABASE_HOST: shared-pg-rw.cnpg-system.svc.cluster.local:5432
           GF_DATABASE_NAME: grafana
           GF_DATABASE_USER: edukurs
-          GF_DATABASE_PASSWORD: PLACEHOLDER
-          GF_SECURITY_ADMIN_PASSWORD: PLACEHOLDER
+          GF_DATABASE_PASSWORD: edukurs-password
+          GF_SECURITY_ADMIN_PASSWORD: QuadMakesHellaBread
         EOF
 
                 cat > $out/12a-grafana-ingress.yaml << 'EOF'

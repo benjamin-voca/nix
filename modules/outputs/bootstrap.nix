@@ -51,6 +51,10 @@
       inherit lib pkgs;
     };
 
+    librechatBootstrap = import ./bootstrap/librechat.nix {
+      inherit lib pkgs;
+    };
+
     # Import existing charts from lib/helm/charts
     existingCharts = import ../../lib/helm/charts {inherit helmLib;};
 
@@ -1289,6 +1293,13 @@
                 cp ${openclawBootstrap.manifests."17d-openclaw-service.yaml"} $out/17d-openclaw-service.yaml
                 cp ${openclawBootstrap.manifests."17e-openclaw-ingress.yaml"} $out/17e-openclaw-ingress.yaml
 
+                # LibreChat
+                cp ${librechatBootstrap.manifests."19-librechat-namespace.yaml"} $out/19-librechat-namespace.yaml
+                cp ${librechatBootstrap.manifests."19a-librechat-configmap.yaml"} $out/19a-librechat-configmap.yaml
+                cp ${librechatBootstrap.manifests."19b-librechat-deployment.yaml"} $out/19b-librechat-deployment.yaml
+                cp ${librechatBootstrap.manifests."19c-librechat-service.yaml"} $out/19c-librechat-service.yaml
+                cp ${librechatBootstrap.manifests."19d-librechat-ingress.yaml"} $out/19d-librechat-ingress.yaml
+
                 # ── Orkestr namespace & CI RBAC ────────────────────────────────
 
                 # Orkestr namespace
@@ -1463,6 +1474,16 @@
                 cat $out/17d-openclaw-service.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/17e-openclaw-ingress.yaml >> $out/bootstrap.yaml
+                echo "---" >> $out/bootstrap.yaml
+                cat $out/19-librechat-namespace.yaml >> $out/bootstrap.yaml
+                echo "---" >> $out/bootstrap.yaml
+                cat $out/19a-librechat-configmap.yaml >> $out/bootstrap.yaml
+                echo "---" >> $out/bootstrap.yaml
+                cat $out/19b-librechat-deployment.yaml >> $out/bootstrap.yaml
+                echo "---" >> $out/bootstrap.yaml
+                cat $out/19c-librechat-service.yaml >> $out/bootstrap.yaml
+                echo "---" >> $out/bootstrap.yaml
+                cat $out/19d-librechat-ingress.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/18-orkestr-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml

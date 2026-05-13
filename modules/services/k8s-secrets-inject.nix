@@ -26,7 +26,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph orkestr; do
+          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph orkestr librechat; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -263,6 +263,22 @@ in {
             echo "Injected openclaw-secrets"
           fi
 
+          # LibreChat API keys
+          if [ -f /run/secrets/librechat-zhipu-api-key ]; then
+            LIBRECHAT_ZHIPU_KEY=$(cat /run/secrets/librechat-zhipu-api-key)
+            LC_ARGS="--from-literal=ZHIPU_API_KEY=$LIBRECHAT_ZHIPU_KEY"
+            if [ -f /run/secrets/librechat-minimax-api-key ]; then
+              LIBRECHAT_MINIMAX_KEY=$(cat /run/secrets/librechat-minimax-api-key)
+              LC_ARGS="$LC_ARGS --from-literal=MINIMAX_API_KEY=$LIBRECHAT_MINIMAX_KEY"
+            fi
+            # shellcheck disable=SC2086
+            $kubectl create secret generic librechat-api-keys \
+              --namespace=librechat \
+              $LC_ARGS \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected librechat-api-keys"
+          fi
+
           # Orkestr secrets
           if [ -f /run/secrets/orkestr-db-password ]; then
             ORKESTR_DB_PW=$(cat /run/secrets/orkestr-db-password)
@@ -280,27 +296,41 @@ in {
             ORKESTR_SKB=$(cat /run/secrets/orkestr-secret-key-base)
             ORKESTR_TSS=$(cat /run/secrets/orkestr-token-signing-secret)
             ORKESTR_ES=$(cat /run/secrets/orkestr-electric-secret)
-            ORKESTR_RESEND_ARGS=""
             if [ -f /run/secrets/orkestr-resend-api-key ]; then
               ORKESTR_RESEND_API_KEY=$(cat /run/secrets/orkestr-resend-api-key)
-              ORKESTR_RESEND_ARGS="--from-literal=RESEND_API_KEY=$ORKESTR_RESEND_API_KEY"
+              $kubectl create secret generic orkestr-app-secrets \
+                --namespace=orkestr \
+                --from-literal=DATABASE_URL="postgresql://orkestr:$ORKESTR_DB_PW@orkestr-db-rw.orkestr.svc.cluster.local:5432/orkestr?sslmode=disable" \
+                --from-literal=SECRET_KEY_BASE="$ORKESTR_SKB" \
+                --from-literal=TOKEN_SIGNING_SECRET="$ORKESTR_TSS" \
+                --from-literal=PHX_SERVER="true" \
+                --from-literal=PHX_HOST="app.orkestr-os.com" \
+                --from-literal=PORT="4000" \
+                --from-literal=ELECTRIC_SYNC_ENABLED="true" \
+                --from-literal=ELECTRIC_URL="http://orkestr-electric-proxy.orkestr.svc.cluster.local/v1/shape" \
+                --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
+                --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
+                --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
+                --from-literal=RESEND_API_KEY="$ORKESTR_RESEND_API_KEY" \
+                --dry-run=client -o yaml | $kubectl apply -f -
+              echo "Injected orkestr-app-secrets (with RESEND_API_KEY)"
+            else
+              $kubectl create secret generic orkestr-app-secrets \
+                --namespace=orkestr \
+                --from-literal=DATABASE_URL="postgresql://orkestr:$ORKESTR_DB_PW@orkestr-db-rw.orkestr.svc.cluster.local:5432/orkestr?sslmode=disable" \
+                --from-literal=SECRET_KEY_BASE="$ORKESTR_SKB" \
+                --from-literal=TOKEN_SIGNING_SECRET="$ORKESTR_TSS" \
+                --from-literal=PHX_SERVER="true" \
+                --from-literal=PHX_HOST="app.orkestr-os.com" \
+                --from-literal=PORT="4000" \
+                --from-literal=ELECTRIC_SYNC_ENABLED="true" \
+                --from-literal=ELECTRIC_URL="http://orkestr-electric-proxy.orkestr.svc.cluster.local/v1/shape" \
+                --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
+                --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
+                --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
+                --dry-run=client -o yaml | $kubectl apply -f -
+              echo "Injected orkestr-app-secrets"
             fi
-            $kubectl create secret generic orkestr-app-secrets \
-              --namespace=orkestr \
-              --from-literal=DATABASE_URL="postgresql://orkestr:$ORKESTR_DB_PW@orkestr-db-rw.orkestr.svc.cluster.local:5432/orkestr?sslmode=disable" \
-              --from-literal=SECRET_KEY_BASE="$ORKESTR_SKB" \
-              --from-literal=TOKEN_SIGNING_SECRET="$ORKESTR_TSS" \
-              --from-literal=PHX_SERVER="true" \
-              --from-literal=PHX_HOST="app.orkestr-os.com" \
-              --from-literal=PORT="4000" \
-              --from-literal=ELECTRIC_SYNC_ENABLED="true" \
-              --from-literal=ELECTRIC_URL="http://orkestr-electric-proxy.orkestr.svc.cluster.local/v1/shape" \
-              --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
-              --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
-              --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
-              $ORKESTR_RESEND_ARGS \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected orkestr-app-secrets"
 
             $kubectl create secret generic orkestr-electric-secrets \
               --namespace=orkestr \
