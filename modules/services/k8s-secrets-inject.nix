@@ -279,6 +279,16 @@ in {
             echo "Injected librechat-api-keys"
           fi
 
+          # LibreChat JWT secret
+          if [ -f /run/secrets/librechat-jwt-secret ]; then
+            LIBRECHAT_JWT_SECRET=$(cat /run/secrets/librechat-jwt-secret)
+            $kubectl create secret generic librechat-jwt-secret \
+              --namespace=librechat \
+              --from-literal=JWT_SECRET="$LIBRECHAT_JWT_SECRET" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected librechat-jwt-secret"
+          fi
+
           # Orkestr secrets
           if [ -f /run/secrets/orkestr-db-password ]; then
             ORKESTR_DB_PW=$(cat /run/secrets/orkestr-db-password)
