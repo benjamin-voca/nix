@@ -89,6 +89,10 @@
       service = "tcp://127.0.0.1:6443";
     }
     {
+      hostname = "chat.quadtech.dev";
+      service = "http://127.0.0.1:30856";
+    }
+    {
       hostname = "*.quadtech.dev";
       service = "http://127.0.0.1:30856";
     }

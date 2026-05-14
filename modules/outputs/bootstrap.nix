@@ -1296,9 +1296,10 @@
                 # LibreChat
                 cp ${librechatBootstrap.manifests."19-librechat-namespace.yaml"} $out/19-librechat-namespace.yaml
                 cp ${librechatBootstrap.manifests."19a-librechat-configmap.yaml"} $out/19a-librechat-configmap.yaml
-                cp ${librechatBootstrap.manifests."19b-librechat-deployment.yaml"} $out/19b-librechat-deployment.yaml
-                cp ${librechatBootstrap.manifests."19c-librechat-service.yaml"} $out/19c-librechat-service.yaml
-                cp ${librechatBootstrap.manifests."19d-librechat-ingress.yaml"} $out/19d-librechat-ingress.yaml
+                cp ${librechatBootstrap.manifests."19b-librechat-pvc.yaml"} $out/19b-librechat-pvc.yaml
+                cp ${librechatBootstrap.manifests."19c-librechat-deployment.yaml"} $out/19c-librechat-deployment.yaml
+                cp ${librechatBootstrap.manifests."19d-librechat-service.yaml"} $out/19d-librechat-service.yaml
+                cp ${librechatBootstrap.manifests."19e-librechat-ingress.yaml"} $out/19e-librechat-ingress.yaml
 
                 # ── Orkestr namespace & CI RBAC ────────────────────────────────
 
@@ -1479,11 +1480,13 @@
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/19a-librechat-configmap.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
-                cat $out/19b-librechat-deployment.yaml >> $out/bootstrap.yaml
+                cat $out/19b-librechat-pvc.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
-                cat $out/19c-librechat-service.yaml >> $out/bootstrap.yaml
+                cat $out/19c-librechat-deployment.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
-                cat $out/19d-librechat-ingress.yaml >> $out/bootstrap.yaml
+                cat $out/19d-librechat-service.yaml >> $out/bootstrap.yaml
+                echo "---" >> $out/bootstrap.yaml
+                cat $out/19e-librechat-ingress.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml
                 cat $out/18-orkestr-namespace.yaml >> $out/bootstrap.yaml
                 echo "---" >> $out/bootstrap.yaml

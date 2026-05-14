@@ -7,6 +7,12 @@
     hardwareModule = ../hardware/backbone-01.nix;
     roleModule = ../roles/backbone.nix;
     extraModules = [
+      ({lib, ...}: {
+        boot.loader.grub.enable = lib.mkForce false;
+        boot.loader.systemd-boot.enable = true;
+        boot.loader.efi.canTouchEfiVariables = true;
+        boot.loader.efi.efiSysMountPoint = "/boot";
+      })
     ];
     taints = [
       {

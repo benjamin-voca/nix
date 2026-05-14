@@ -9,7 +9,7 @@
     };
     namespace = "librechat";
     values = {
-      replicaCount = 2;
+      replicaCount = 1;
 
       image = {
         repository = "registry.librechat.ai/danny-avila/librechat-api";
@@ -46,12 +46,12 @@
 
       resources = {
         requests = {
-          cpu = "100m";
-          memory = "256Mi";
+          cpu = "25m";
+          memory = "64Mi";
         };
         limits = {
-          cpu = "1000m";
-          memory = "1Gi";
+          cpu = "200m";
+          memory = "256Mi";
         };
       };
 

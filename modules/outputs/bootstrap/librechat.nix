@@ -41,7 +41,7 @@
       };
     };
     spec = {
-      replicas = 2;
+      replicas = 1;
       selector = {
         matchLabels = {
           app = "librechat";
@@ -61,14 +61,65 @@
           };
         };
         spec = {
-          affinity = import ../../../lib/anti-affinity.nix "librechat";
           securityContext = {
-            fsGroup = 1000;
+            fsGroup = 999;
+            runAsUser = 999;
+            runAsGroup = 999;
             seccompProfile = {
               type = "RuntimeDefault";
             };
           };
+          tolerations = [
+            {
+              key = "node.kubernetes.io/not-ready";
+              operator = "Exists";
+              effect = "NoExecute";
+              tolerationSeconds = 300;
+            }
+            {
+              key = "node.kubernetes.io/unreachable";
+              operator = "Exists";
+              effect = "NoExecute";
+              tolerationSeconds = 300;
+            }
+          ];
           containers = [
+            {
+              name = "mongodb";
+              image = "mongo:7.0";
+              imagePullPolicy = "IfNotPresent";
+              ports = [
+                {
+                  name = "mongodb";
+                  containerPort = 27017;
+                  protocol = "TCP";
+                }
+              ];
+              volumeMounts = [
+                {
+                  name = "mongodb-data";
+                  mountPath = "/data/db";
+                }
+              ];
+              resources = {
+                requests = {
+                  memory = "64Mi";
+                  cpu = "10m";
+                };
+                limits = {
+                  memory = "256Mi";
+                  cpu = "200m";
+                };
+              };
+              securityContext = {
+                runAsNonRoot = true;
+                allowPrivilegeEscalation = false;
+                readOnlyRootFilesystem = false;
+                capabilities = {
+                  drop = ["ALL"];
+                };
+              };
+            }
             {
               name = "librechat";
               image = "registry.librechat.ai/danny-avila/librechat-api:latest";
@@ -81,6 +132,18 @@
                 }
               ];
               env = [
+                {
+                  name = "JWT_SECRET";
+                  value = "librechat-dev-secret-change-in-production";
+                }
+                {
+                  name = "MONGO_INITDB_DATABASE";
+                  value = "librechat";
+                }
+                {
+                  name = "MONGO_URI";
+                  value = "mongodb://127.0.0.1:27017/librechat";
+                }
                 {
                   name = "ZHIPU_API_KEY";
                   valueFrom = {
@@ -104,12 +167,12 @@
               ];
               resources = {
                 requests = {
-                  memory = "256Mi";
-                  cpu = "100m";
+                  memory = "32Mi";
+                  cpu = "5m";
                 };
                 limits = {
-                  memory = "1Gi";
-                  cpu = "1000m";
+                  memory = "512Mi";
+                  cpu = "200m";
                 };
               };
               livenessProbe = {
@@ -117,30 +180,36 @@
                   path = "/";
                   port = 3080;
                 };
-                initialDelaySeconds = 30;
-                periodSeconds = 10;
+                initialDelaySeconds = 60;
+                periodSeconds = 15;
                 timeoutSeconds = 5;
+                failureThreshold = 10;
               };
               readinessProbe = {
                 httpGet = {
                   path = "/";
                   port = 3080;
                 };
-                initialDelaySeconds = 10;
-                periodSeconds = 5;
+                initialDelaySeconds = 30;
+                periodSeconds = 10;
                 timeoutSeconds = 3;
+                failureThreshold = 10;
               };
               volumeMounts = [
                 {
                   name = "config";
-                  mountPath = "/app/client/librechat.yaml";
+                  mountPath = "/app/librechat.yaml";
                   subPath = "librechat.yaml";
+                }
+                {
+                  name = "logs";
+                  mountPath = "/app/api/logs";
                 }
               ];
               securityContext = {
-                runAsNonRoot = false;
+                runAsNonRoot = true;
                 allowPrivilegeEscalation = false;
-                readOnlyRootFilesystem = true;
+                readOnlyRootFilesystem = false;
                 capabilities = {
                   drop = ["ALL"];
                 };
@@ -152,6 +221,18 @@
               name = "config";
               configMap = {
                 name = "librechat-config";
+              };
+            }
+            {
+              name = "logs";
+              emptyDir = {
+                sizeLimit = "100Mi";
+              };
+            }
+            {
+              name = "mongodb-data";
+              persistentVolumeClaim = {
+                claimName = "librechat-mongodb-data";
               };
             }
           ];
@@ -218,12 +299,31 @@
     };
   };
 
+  pvc = {
+    apiVersion = "v1";
+    kind = "PersistentVolumeClaim";
+    metadata = {
+      name = "librechat-mongodb-data";
+      namespace = "librechat";
+    };
+    spec = {
+      storageClassName = "ceph-block";
+      accessModes = ["ReadWriteOnce"];
+      resources = {
+        requests = {
+          storage = "1Gi";
+        };
+      };
+    };
+  };
+
   manifests = {
     "19-librechat-namespace.yaml" = render.writeOne "19-librechat-namespace" namespace;
     "19a-librechat-configmap.yaml" = render.writeOne "19a-librechat-configmap" configMap;
-    "19b-librechat-deployment.yaml" = render.writeOne "19b-librechat-deployment" deployment;
-    "19c-librechat-service.yaml" = render.writeOne "19c-librechat-service" service;
-    "19d-librechat-ingress.yaml" = render.writeOne "19d-librechat-ingress" ingress;
+    "19b-librechat-pvc.yaml" = render.writeOne "19b-librechat-pvc" pvc;
+    "19c-librechat-deployment.yaml" = render.writeOne "19c-librechat-deployment" deployment;
+    "19d-librechat-service.yaml" = render.writeOne "19d-librechat-service" service;
+    "19e-librechat-ingress.yaml" = render.writeOne "19e-librechat-ingress" ingress;
   };
 in {
   inherit manifests;

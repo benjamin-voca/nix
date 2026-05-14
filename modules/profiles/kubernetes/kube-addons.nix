@@ -1,9 +1,5 @@
 {pkgs, ...}: {
-  services.kubernetes = {
-    addons = {
-      metrics-server.enable = true;
-    };
-  };
+  services.kubernetes = {};
 
   environment.systemPackages = with pkgs; [
     kubectl
