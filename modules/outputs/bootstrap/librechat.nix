@@ -175,12 +175,12 @@
               ];
               resources = {
                 requests = {
-                  memory = "32Mi";
-                  cpu = "5m";
+                  memory = "256Mi";
+                  cpu = "10m";
                 };
                 limits = {
-                  memory = "512Mi";
-                  cpu = "200m";
+                  memory = "2Gi";
+                  cpu = "500m";
                 };
               };
               livenessProbe = {
