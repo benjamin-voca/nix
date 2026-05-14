@@ -142,6 +142,15 @@
                   };
                 }
                 {
+                  name = "JWT_REFRESH_SECRET";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "librechat-jwt-secret";
+                      key = "JWT_SECRET";
+                    };
+                  };
+                }
+                {
                   name = "ALLOW_REGISTRATION";
                   value = "false";
                 }
