@@ -134,12 +134,7 @@
               env = [
                 {
                   name = "JWT_SECRET";
-                  valueFrom = {
-                    secretKeyRef = {
-                      name = "librechat-jwt-secret";
-                      key = "JWT_SECRET";
-                    };
-                  };
+                  value = "librechat-dev-secret-change-in-production";
                 }
                 {
                   name = "ALLOW_REGISTRATION";
