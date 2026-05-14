@@ -42,7 +42,7 @@ in {
     masterAddress = config.networking.fqdn;
     easyCerts = true;
     caFile = "/var/lib/kubernetes/secrets/ca.pem";
-    pki.cfsslAPIExtraSANs = [
+    apiserver.extraSANs = [
       config.networking.hostName
       config.networking.fqdn
       "localhost"
