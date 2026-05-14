@@ -6,6 +6,7 @@
   imports = [
     ../profiles/base.nix
     ../profiles/server.nix
+    ../profiles/tailscale.nix
     ../profiles/docker.nix
     ../profiles/sops.nix
     ../profiles/kubernetes/control-plane.nix
@@ -180,6 +181,13 @@
     librechat-minimax-api-key = {
       sopsFile = ../../secrets/${config.networking.hostName}.yaml;
       path = "/run/secrets/librechat-minimax-api-key";
+    };
+    tailscale-auth-key = {
+      sopsFile = ../../secrets/${config.networking.hostName}.yaml;
+      path = "/run/secrets/tailscale-auth-key";
+      owner = "root";
+      group = "root";
+      mode = "0400";
     };
   };
 
