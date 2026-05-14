@@ -10,6 +10,8 @@
       keyFile = "/etc/sops/age/keys.txt";
       generateKey = false;
     };
-    secrets = {};
+    secrets = {
+      librechat-jwt-secret = {};
+    };
   };
 }
