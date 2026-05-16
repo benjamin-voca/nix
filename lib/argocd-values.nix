@@ -48,6 +48,14 @@
 
   repoServer = {
     replicas = repoServerReplicas;
+    initContainers = [
+      {
+        name = "copyutil";
+        args = [
+          "/bin/cp /usr/local/bin/argocd /var/run/argocd/argocd && /bin/ln -sf /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server"
+        ];
+      }
+    ];
   };
 
   applicationSet = {

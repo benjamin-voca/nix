@@ -20,7 +20,7 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-      - ssh:
+        ssh:
           - *benjamin
           - *klajdi
           - *erti
@@ -43,7 +43,7 @@ creation_rules:
       - age:
           - *backbone-01
           # - *backbone-02
-      - ssh:
+        ssh:
           - *benjamin
           - *klajdi
           - *erti
@@ -54,7 +54,7 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-      - ssh:
+        ssh:
           - *benjamin
           - *klajdi
           - *erti
@@ -65,7 +65,7 @@ creation_rules:
     key_groups:
       - age:
           - *backbone-01
-      - ssh:
+        ssh:
           - *benjamin
           - *klajdi
           - *erti
