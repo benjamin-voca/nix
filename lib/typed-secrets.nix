@@ -6,10 +6,11 @@
 # Key format: hyphenated flat keys matching existing SOPS files
 #   e.g., "harbor-admin-password", "cloudflared-credentials"
 #
-{pkgs ? throw "pkgs required"}:
+{pkgs ? null, lib ? if pkgs != null then pkgs.lib else throw "lib or pkgs required"}:
 
 let
-  lib = pkgs.lib;
+  inherit (lib) strings escape;
+  foldl' = lib.foldl';
 in
 
 rec {
@@ -19,7 +20,7 @@ rec {
    * "cloudflared-credentials" → "cloudflared-credentials" (no-op if no dots)
    */
   toHyphenatedKey = field:
-    lib.strings.concatStringsSep "-" (lib.strings.splitString "." field);
+    strings.concatStringsSep "-" (strings.splitString "." field);
 
   /*
    * Check if a decrypted SOPS file contains a given key.
@@ -31,7 +32,7 @@ rec {
     # Match key anywhere in the file as a YAML key.
     # In Nix regex, . matches \n, so .* covers all lines.
     # We match "key:" to ensure it's a key definition, not a value.
-    pattern = ".*${lib.escapeRegex key}:.*";
+    pattern = ".*${lib.strings.escapeRegex key}:.*";
   in
     builtins.match pattern sopsFileContent != null;
 
@@ -42,7 +43,7 @@ rec {
    * Throws if not found in any layer.
    */
   resolveField = fieldsFiles: field: let
-    result = lib.foldl' (acc: fp:
+    result = foldl' (acc: fp:
       if acc != null then acc
       else if hasKey fp.content field then fp.path
       else null

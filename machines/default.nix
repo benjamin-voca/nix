@@ -136,6 +136,8 @@
         # ERPNext
         "erpnext-db-admin-password"
         "erpnext-admin-password"
+        # EduKurs (CNPG)
+        "cnpg-edukurs-password"
         # OpenClaw
         "openclaw-gateway-token"
         "openclaw-minimax-api-key"

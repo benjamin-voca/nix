@@ -66,3 +66,53 @@ creation_rules:
           - *klajdi
           - *erti
           - *elion
+
+  # --- Typed Secrets Layered Files ---
+
+  # Shared cluster-wide secrets
+  - path_regex: secrets/shared\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
+
+  # Role-specific secrets
+  - path_regex: secrets/roles/backbone\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
+
+  - path_regex: secrets/roles/worker\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
+
+  # Host-specific secrets
+  - path_regex: secrets/hosts/backbone-01\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
+
+  - path_regex: secrets/hosts/frontline-01\.yaml$
+    key_groups:
+      - age:
+          - *backbone-01
+          - *benjamin
+          - *klajdi
+          - *erti
+          - *elion
