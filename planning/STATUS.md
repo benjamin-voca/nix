@@ -18,36 +18,29 @@
 **Output:** `machines/default.nix` + `machines/consumer.nix`
 **Status:** ✅ Phase 1-3 all complete
 
-```
-nix build .#nixosConfigurations.backbone-01.config.system.build.toplevel ✅
-nix build .#nixosConfigurations.frontline-01.config.system.build.toplevel ✅
-nix eval .#machines.machines --apply 'x: builtins.attrNames x'  → ["backbone-01","frontline-01"] ✅
-```
-
 ---
 
-## Track 3: Typed Secrets 🔨 PHASE 1 DONE
+## Track 3: Typed Secrets ✅ PHASE 2 DONE
 
 **Goal:** Compile-time validation of SOPS secrets with layering.
 
-**Output:** `planning/typed-secrets-design.md`
-**Status:** 🔨 Phase 1 done. Phase 2 (actual secrets migration) pending.
+**Status:** ✅ Phase 2 complete — library wired, secrets migrated, manual sops.secrets removed.
 
-**Phase 1 delivered:**
-- `lib/typed-secrets.nix` — 6 functions: `toHyphenatedKey`, `hasKey`, `resolveField`, `readSopsContent`, `validateRequired`, `toSopsSecrets`
-- Layered directory structure:
-  - `secrets/shared.yaml` — cluster-wide (empty)
-  - `secrets/roles/backbone.yaml` — role layer (empty)
-  - `secrets/roles/worker.yaml` — role layer (empty)
-  - `secrets/hosts/backbone-01.yaml` — machine layer (empty)
-  - `secrets/hosts/frontline-01.yaml` — machine layer (empty)
-- `machines/default.nix` — added `secrets.files` and `requiredSecrets`
-  - backbone role: 27 required secrets
-  - worker role: 1 required secret
+**Phase 1 delivered:** Infrastructure + layered structure
+**Phase 2 delivered:**
+- `secrets/roles/backbone.yaml` — 36 encrypted secrets (copied from backbone-01.yaml)
+- `secrets/hosts/frontline-01.yaml` — cloudflared-credentials (copied from frontline-01.yaml)
+- `machines/consumer.nix` — auto-generates `sops.secrets` from `requiredSecrets` + layered files
+- `modules/roles/backbone.nix` — removed 27 manual `sops.secrets` entries
+- `.sops.yaml` — creation rules for all layered file paths
 
-**Layering model:** shared.yaml → role.yaml → host.yaml (later wins)
+**⚠️ Manual step required after deploy:**
+```bash
+sops updatekeys secrets/roles/backbone.yaml
+sops updatekeys secrets/hosts/frontline-01.yaml
+```
 
-**Phase 2:** Distribute actual secrets from `secrets/backbone-01.yaml` into layered files, wire into `machines/consumer.nix`, remove manual `sops.secrets` from roles.
+**Layering model:** shared.yaml → roles/backbone.yaml → hosts/backbone-01.yaml (later wins)
 
 ---
 
@@ -57,32 +50,32 @@ nix eval .#machines.machines --apply 'x: builtins.attrNames x'  → ["backbone-0
 
 ---
 
-## Open Items
-
-- [ ] Typed secrets Phase 2: migrate actual secrets into layered files
-- [ ] Typed secrets Phase 2: wire `lib/typed-secrets.nix` into `machines/consumer.nix`
-- [ ] Typed secrets Phase 2: remove manual `sops.secrets` from `modules/roles/backbone.nix`
-- [ ] Get static IP from ISP
-- [ ] Implement Headscale (after static IP)
-
----
-
 ## Architecture Summary
 
 ```
-machines/default.nix          # Machine registry + secrets.layers + requiredSecrets
-machines/consumer.nix         # Bridge (sops.secrets still manual in roles for now)
-lib/typed-secrets.nix         # Typed secrets library (ready, not wired in yet)
+machines/default.nix          # Machine registry + secrets.files + requiredSecrets
+machines/consumer.nix         # Bridge → auto-generates sops.secrets from layered files
+lib/typed-secrets.nix         # 6 functions: hasKey, resolveField, validateRequired, etc.
 
 secrets/
 ├── shared.yaml               # Cluster-wide (empty)
-├── roles/backbone.yaml      # Role layer (empty)
+├── roles/backbone.yaml      # 36 secrets for backbone role ✅ migrated
 ├── roles/worker.yaml        # Role layer (empty)
-├── hosts/backbone-01.yaml   # Machine layer (empty)
-├── hosts/frontline-01.yaml  # Machine layer (empty)
-├── backbone-01.yaml        # EXISTING — not migrated yet
-└── frontline-01.yaml        # EXISTING — not migrated yet
+├── hosts/backbone-01.yaml    # Machine layer (empty)
+├── hosts/frontline-01.yaml   # cloudflared-credentials ✅ migrated
+├── backbone-01.yaml.bak     # BACKUP — delete after verification
+└── frontline-01.yaml.bak     # BACKUP — delete after verification
 ```
+
+---
+
+## Open Items
+
+- [ ] Run `sops updatekeys` on migrated secrets files
+- [ ] Deploy and verify secrets work correctly
+- [ ] Delete `secrets/backbone-01.yaml.bak` and `secrets/frontline-01.yaml.bak` after verification
+- [ ] Get static IP from ISP
+- [ ] Implement Headscale (after static IP)
 
 ---
 
@@ -92,5 +85,6 @@ secrets/
 - ✅ Bootstrap refactor: 14 modules + byte-identical golden test
 - ✅ Bootstrap wiring: `config.flake.bootstrap` → refactored output
 - ✅ Machine DSL Phase 1-3: complete
-- 🔨 Typed secrets Phase 1: library + layered structure + registry updates
+- ✅ Typed secrets Phase 1: library + layered structure + registry updates
+- ✅ Typed secrets Phase 2: wire library into consumer, migrate secrets, remove manual sops.secrets
 - ⏸️ Headscale parked until static IP
