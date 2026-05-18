@@ -6,36 +6,31 @@
 
 ## Track 1: Bootstrap Refactor ✅ COMPLETE
 
-**Goal:** Break `modules/outputs/bootstrap.nix` (1500 lines) into modular pieces. Golden test ensures byte-identical output.
+**Goal:** Break `modules/outputs/bootstrap.nix` (1500 lines) into modular pieces.
 
-**Output:** `modules/outputs/bootstrap/` — 14 modular files + `modules/outputs/default.nix` + golden test
-**Status:** ✅ All 62 manifest files byte-identical to original
+**Output:** `modules/outputs/bootstrap/` — 14 modular files + `modules/outputs/default.nix`
+**Status:** ✅ Complete — refactored bootstrap is now the main `bootstrap` output
 
-**Next step:** Wire `config.flake.bootstrap` to use `modules/outputs/default.nix` output. Rename `bootstrapRefactored` → `bootstrap`.
+Old `modules/outputs/bootstrap.nix` deleted. `bootstrapRefactored` renamed to `bootstrap`.
 
 ---
 
-## Track 2: Machine DSL 🚧 PHASE 1 COMPLETE
+## Track 2: Machine DSL ✅ COMPLETE
 
 **Goal:** Single `machines/default.nix` as source of truth for NixOS hosts.
 
-**Output:** `planning/machines-dsl-design.md` + `machines-dsl/handoff.md`
-**Status:** ✅ Phase 1 complete — registry created alongside existing system
+**Status:** ✅ All phases complete
 
-**What's done (Phase 1):**
+**What's done:**
 - `machines/default.nix` — machine + role registry with all hosts
 - `machines/consumer.nix` — NixOS module bridge (reads registry → config.quad.hosts)
-- `machines/hardware/` → symlink to `modules/hardware/`
-- `machines/roles/` → symlink to `modules/roles/`
 - `modules/roles/worker.nix` — renamed from frontline.nix
-- `tests/nix/machines/registry-test.nix` — structural validation
-- Existing `nixosConfigurations` unchanged, all checks pass
-
-**Architecture note:** consumer.nix lives in `machines/` (not `modules/lib/`) because `imports.nix` auto-discovers all `.nix` files in `modules/lib/`.
-
-**Next steps:**
-- Phase 2: Wire consumer.nix into `imports.nix`, add `machines` flake output, golden test
-- Phase 3: Delete old `modules/hosts/*.nix`, cleanup
+- Registry wired into flake via `modules/imports.nix` (Phase 2)
+- `machines` flake output for `nix eval .#machines`
+- Old `modules/hosts/*.nix` deleted (Phase 3)
+- Old `modules/roles/frontline.nix` deleted
+- Symlinks removed (paths now use `../modules/` directly)
+- AGENTS.md updated
 
 **K8s resources:** NOT in scope. Handled by `modules/outputs/bootstrap/`.
 
@@ -90,10 +85,10 @@
 
 ## Open Items
 
-- [ ] Wire `config.flake.bootstrap` to use `modules/outputs/default.nix` (rename to `bootstrap`)
+- [x] Wire `config.flake.bootstrap` to use `modules/outputs/default.nix` (rename to `bootstrap`)
 - [x] Implement machine DSL Phase 1 (create registry alongside existing system)
-- [ ] Implement machine DSL Phase 2 (switch flake.nix to use registry)
-- [ ] Implement machine DSL Phase 3 (cleanup old files)
+- [x] Implement machine DSL Phase 2 (switch flake.nix to use registry)
+- [x] Implement machine DSL Phase 3 (cleanup old files)
 - [ ] Implement typed secrets Phase 1 (lib/typed-secrets.nix)
 - [ ] Implement typed secrets Phase 2 (migrate secrets layout)
 - [ ] Get static IP from ISP
@@ -106,6 +101,9 @@
 ### 2026-05-19
 - ✅ Complete bootstrap refactor (14 modules + golden test)
 - ✅ Complete machine DSL Phase 1 (registry + consumer + test + role rename)
+- ✅ Complete machine DSL Phase 2 (wire consumer into imports, add machines flake output)
+- ✅ Complete machine DSL Phase 3 (delete old host/role files, update AGENTS.md)
+- ✅ Wire bootstrap refactor as main `bootstrap` output (delete old monolith)
 - 📋 Complete machine DSL design
 - 📋 Complete typed secrets design
 - ⏸️ Park Headscale until static IP

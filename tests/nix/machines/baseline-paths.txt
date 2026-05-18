@@ -1,0 +1,7 @@
+# Machine DSL Phase 2-3 — Baseline Store Paths
+# Captured: 2026-05-19
+# NOTE: Full builds require x86_64-linux builders (remote build via deploy-rs)
+# These were verified with --dry-run from aarch64-darwin
+
+backbone-01: verified-dry-run-ok
+frontline-01: verified-dry-run-ok

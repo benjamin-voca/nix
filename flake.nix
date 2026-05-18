@@ -55,12 +55,11 @@
     in
       helmLib // {chartsDerivations = localChartsDerivations;};
     flakeOutputs = {
+      machines = import ./machines/default.nix;
       helmLib = forAllSystems (system: helmLibFor system);
       packages = forAllSystems (system: {
         inherit (inputs.nixhelm.packages.${system}) helmupdater;
         bootstrap = eval.config.flake.bootstrap.${system};
-        bootstrapRefactored = eval.config.flake.bootstrapRefactored.${system};
-        boostrap = eval.config.flake.bootstrap.${system};
       });
       apps = forAllSystems (system: {
         inherit (inputs.nixhelm.apps.${system}) helmupdater;
@@ -73,11 +72,6 @@
       checks = forAllSystems (system: let
         pkgs = inputs.nixpkgs.legacyPackages.${system};
       in {
-        bootstrap-golden = import ./tests/bootstrap-golden-test.nix {
-          oldBootstrap = eval.config.flake.bootstrap.${system};
-          newBootstrap = eval.config.flake.bootstrapRefactored.${system};
-          inherit system pkgs;
-        };
       });
     };
 

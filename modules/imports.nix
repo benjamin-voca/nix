@@ -18,5 +18,7 @@
 in
   filesIn ./options
   ++ filesIn ./outputs
-  ++ filesIn ./hosts
+  ++ [
+    ../machines/consumer.nix
+  ]
   ++ filesIn ./lib

@@ -404,5 +404,5 @@
       cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
     '';
 in {
-  config.flake.bootstrapRefactored = forAllSystems bootstrapFor;
+  config.flake.bootstrap = forAllSystems bootstrapFor;
 }

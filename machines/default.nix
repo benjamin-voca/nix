@@ -8,7 +8,7 @@
   machines = {
     backbone-01 = {
       system = "x86_64-linux";
-      hardware = ./hardware/backbone-01.nix;
+      hardware = ../modules/hardware/backbone-01.nix;
       role = "backbone";
       sshHost = "backbone01";
       remoteBuild = true;
@@ -28,7 +28,7 @@
 
     frontline-01 = {
       system = "x86_64-linux";
-      hardware = ./hardware/frontline-01.nix;
+      hardware = ../modules/hardware/frontline-01.nix;
       role = "worker";
       sshHost = "frontline01";
       remoteBuild = true;
@@ -92,12 +92,12 @@
 
   roles = {
     backbone = {
-      module = ./roles/backbone.nix;
+      module = ../modules/roles/backbone.nix;
       description = "Kubernetes control-plane + ArgoCD + Forgejo + Harbor";
     };
 
     worker = {
-      module = ./roles/worker.nix;
+      module = ../modules/roles/worker.nix;
       description = "Kubernetes worker node";
     };
   };

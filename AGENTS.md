@@ -1,12 +1,26 @@
 ## QuadNix Agent Notes
 
 - **Deploy (deploy-rs)**: `nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks`
-- **Host definitions**: live in `modules/hosts/*.nix` using `config.quad.lib.mkClusterHost`
-- **Core roles**: `modules/roles/backbone.nix`, `modules/roles/frontline.nix`
+- **Machine registry**: `machines/default.nix` — source of truth for all hosts and roles
+- **Machine consumer**: `machines/consumer.nix` — bridges registry into NixOS module system
+- **Core roles**: `modules/roles/backbone.nix`, `modules/roles/worker.nix`
 - **Profiles**: `modules/profiles/*` (base, server, docker, kubernetes)
 - **Services**: `modules/services/*`
 - **Shared options**: `modules/shared/*` (quad/k8s/forgejo)
-- **Outputs**: `modules/outputs/*` (nixosConfigurations, deploy, helm)
+- **Outputs**: `modules/outputs/*` (nixosConfigurations, deploy, helm, bootstrap)
+
+### Adding a new machine
+1. Add entry to `machines/default.nix` under `machines` attrset
+2. Create hardware module in `modules/hardware/<name>.nix`
+3. If new role, add to `roles` attrset and create `modules/roles/<role>.nix`
+4. Run `nix flake check` to verify
+
+### Evaluating the registry
+```bash
+nix eval .#machines.machines --apply 'x: builtins.attrNames x' --json
+nix eval .#machines.machines.backbone-01.role --json
+nix eval .#machines.roles --apply 'x: builtins.attrNames x' --json
+```
 
 to run kubectl commands, prepend with `set -gx KUBECONFIG /etc/kubernetes/cluster-admin.kubeconfig` the commands that you will run inside of ssh host backbone01
 MAKE SURE ALL FIXES ARE DECLARATIVE DO NOT IMPLEMENT IMPERATIVE CHANGES WITHOUT PUTING THEM INTO THIS REPO
@@ -32,7 +46,7 @@ Scopes: `backbone`, `frontline`, `argocd`, `harbor`, `erpnext`, `helm`, `flake`,
 Examples:
 ```
 feat(argocd): upgrade ArgoCD to v2.10
-fix(backbone): increase etcd startup timeout to 120s
+fix(backbone): increase etetcd startup timeout to 120s
 chore(flake): update nixpkgs to 2026-04-01
 feat(harbor): add Harbor registry via ArgoCD
 refactor(k8s): extract bootstrap manifests into modular Nix files
