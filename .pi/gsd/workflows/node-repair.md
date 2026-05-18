@@ -1,4 +1,4 @@
-<gsd-version v="2.1.1" />
+<gsd-version v="2.1.4" />
 
 <purpose>
 Autonomous repair operator for failed task verification. Invoked by execute-plan when a task fails its done-criteria. Proposes and attempts structured fixes before escalating to the user.

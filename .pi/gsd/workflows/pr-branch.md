@@ -1,4 +1,4 @@
-<gsd-version v="2.1.1" />
+<gsd-version v="2.1.4" />
 
 <purpose>
 Create a clean branch for pull requests by filtering out .planning/ commits.
