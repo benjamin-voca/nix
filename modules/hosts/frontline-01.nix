@@ -5,7 +5,7 @@
     sshHost = "frontline01";
     remoteBuild = true;
     hardwareModule = ../hardware/frontline-01.nix;
-    roleModule = ../roles/frontline.nix;
+    roleModule = ../roles/worker.nix;
     taints = [
       {
         key = "role";

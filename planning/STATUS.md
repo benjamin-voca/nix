@@ -8,32 +8,55 @@
 
 **Goal:** Break `modules/outputs/bootstrap.nix` (1500 lines) into modular pieces. Golden test ensures byte-identical output.
 
-**Output:** `bootstrap-refactor/` — 14 modules + golden test
+**Output:** `modules/outputs/bootstrap/` — 14 modular files + `modules/outputs/default.nix` + golden test
 **Status:** ✅ All 62 manifest files byte-identical to original
 
-**Next step:** Wire `config.flake.bootstrap` to use refactored output. Parent session to drive this.
+**Next step:** Wire `config.flake.bootstrap` to use `modules/outputs/default.nix` output. Rename `bootstrapRefactored` → `bootstrap`.
 
 ---
 
-## Track 2: Machine DSL 📋 DESIGN DONE
+## Track 2: Machine DSL 🚧 PHASE 1 COMPLETE
 
 **Goal:** Single `machines/default.nix` as source of truth for NixOS hosts.
 
-**Output:** `planning/machines-dsl-design.md`
-**Status:** 📋 Design complete. Implementation pending bootstrap-refactor Phase 1.
+**Output:** `planning/machines-dsl-design.md` + `machines-dsl/handoff.md`
+**Status:** ✅ Phase 1 complete — registry created alongside existing system
 
-**What's defined:**
-- Schema: `machines` attrset + `roles` attrset
-- Role as key reference (`role = "backbone"`)
-- Field reference (system, hardware, role, taints, extraModules, sshHost, remoteBuild)
-- Migration path: 3 phases
-- VPN defined in role module (not top-level DSL field)
+**What's done (Phase 1):**
+- `machines/default.nix` — machine + role registry with all hosts
+- `machines/consumer.nix` — NixOS module bridge (reads registry → config.quad.hosts)
+- `machines/hardware/` → symlink to `modules/hardware/`
+- `machines/roles/` → symlink to `modules/roles/`
+- `modules/roles/worker.nix` — renamed from frontline.nix
+- `tests/nix/machines/registry-test.nix` — structural validation
+- Existing `nixosConfigurations` unchanged, all checks pass
 
-**K8s resources:** NOT in scope. Handled by `bootstrap-refactor/`.
+**Architecture note:** consumer.nix lives in `machines/` (not `modules/lib/`) because `imports.nix` auto-discovers all `.nix` files in `modules/lib/`.
+
+**Next steps:**
+- Phase 2: Wire consumer.nix into `imports.nix`, add `machines` flake output, golden test
+- Phase 3: Delete old `modules/hosts/*.nix`, cleanup
+
+**K8s resources:** NOT in scope. Handled by `modules/outputs/bootstrap/`.
 
 ---
 
-## Track 3: Headscale ⏸️ PARKED
+## Track 3: Typed Secrets 📋 DESIGN DONE
+
+**Goal:** Compile-time validation of SOPS secrets with layering (shared → role → host overrides).
+
+**Output:** `planning/typed-secrets-design.md`
+**Status:** 📋 Design complete. Implementation deferred to machine DSL Phase 4.
+
+**Key features:**
+- Dot-notation field paths (`harbor.admin-password`)
+- Layered files: shared.yaml → role.yaml → host.yaml (later wins)
+- Compile-time error if required secret field missing
+- `lib/typed-secrets.nix` core library
+
+---
+
+## Track 4: Headscale ⏸️ PARKED
 
 **Goal:** Self-hosted VPN control plane to replace Tailscale SaaS.
 
@@ -48,8 +71,6 @@
 3. Point `vpn.quadtech.dev` at static IP
 4. Follow upgrade path in `planning/headscale-design.md`
 
-**WireGuard fallback:** Also parked. Native WireGuard on backbone-01 (UDP 51820) is simpler but also needs a public IP for the server endpoint. Covered in `headscale/handoff.md`.
-
 ---
 
 ## Resolved Decisions
@@ -62,15 +83,30 @@
 | Rename `frontline` → `worker`? | ✅ Yes |
 | Headscale now or later? | Later — park until static IP |
 | Cloudflare Tunnel removed? | ❌ No — stays for HTTP ingress |
+| Secret field format? | Dot-notation (`harbor.admin-password`) |
+| Secret layering? | shared.yaml → role.yaml → host.yaml |
 
 ---
 
 ## Open Items
 
-- [ ] Wire `config.flake.bootstrap` to use `bootstrap-refactor/default.nix`
-- [ ] Remove `bootstrapRefactored` from flake.nix packages (rename to `bootstrap`)
-- [ ] Implement machine DSL Phase 1 (create registry alongside existing system)
+- [ ] Wire `config.flake.bootstrap` to use `modules/outputs/default.nix` (rename to `bootstrap`)
+- [x] Implement machine DSL Phase 1 (create registry alongside existing system)
 - [ ] Implement machine DSL Phase 2 (switch flake.nix to use registry)
 - [ ] Implement machine DSL Phase 3 (cleanup old files)
+- [ ] Implement typed secrets Phase 1 (lib/typed-secrets.nix)
+- [ ] Implement typed secrets Phase 2 (migrate secrets layout)
 - [ ] Get static IP from ISP
 - [ ] Implement Headscale (after static IP)
+
+---
+
+## Changelog
+
+### 2026-05-19
+- ✅ Complete bootstrap refactor (14 modules + golden test)
+- ✅ Complete machine DSL Phase 1 (registry + consumer + test + role rename)
+- 📋 Complete machine DSL design
+- 📋 Complete typed secrets design
+- ⏸️ Park Headscale until static IP
+- 📋 Update planning/STATUS.md
