@@ -3,7 +3,10 @@
 # This is the source of truth for all machines in the cluster.
 # Machines reference roles by name; roles are NixOS modules.
 #
-# Phase 1: Created alongside existing system. Not wired into flake yet.
+# Secrets layering: shared.yaml → role.yaml → host.yaml (later wins)
+# Secret files are listed per-machine; requiredSecrets per-role.
+# Typed secrets infrastructure is ready but NOT wired into consumer yet.
+# Actual secrets remain in secrets/backbone-01.yaml and secrets/frontline-01.yaml.
 {
   machines = {
     backbone-01 = {
@@ -16,6 +19,13 @@
         { key = "role"; value = "backbone"; effect = "NoSchedule"; }
         { key = "infra"; value = "true"; effect = "NoSchedule"; }
       ];
+      secrets = {
+        files = [
+          ../secrets/shared.yaml
+          ../secrets/roles/backbone.yaml
+          ../secrets/hosts/backbone-01.yaml
+        ];
+      };
       extraModules = [
         ({ lib, ... }: {
           boot.loader.grub.enable = lib.mkForce false;
@@ -35,6 +45,13 @@
       taints = [
         { key = "role"; value = "frontline"; effect = "NoSchedule"; }
       ];
+      secrets = {
+        files = [
+          ../secrets/shared.yaml
+          ../secrets/roles/worker.yaml
+          ../secrets/hosts/frontline-01.yaml
+        ];
+      };
       extraModules = [
         ({ pkgs, ... }: {
           # cloudflared tunnel for SSH (machine-specific)
@@ -94,11 +111,55 @@
     backbone = {
       module = ../modules/roles/backbone.nix;
       description = "Kubernetes control-plane + ArgoCD + Forgejo + Harbor";
+      requiredSecrets = [
+        # Cloudflared tunnel
+        "cloudflared-credentials"
+        # Forgejo
+        "forgejo-db-password"
+        "forgejo-admin-password"
+        "forgejo-runner-token"
+        "forgejo-agent-token"
+        # ArgoCD
+        "argocd-admin-password"
+        "argocd-forgejo-username"
+        "argocd-forgejo-token"
+        # Harbor
+        "harbor-admin-password"
+        "harbor-registry-password"
+        # Ceph S3
+        "ceph-rgw-s3-access-key"
+        "ceph-rgw-s3-secret-key"
+        # Minecraft
+        "minecraft-rcon-password"
+        # Verdaccio
+        "verdaccio-admin-password"
+        # ERPNext
+        "erpnext-db-admin-password"
+        "erpnext-admin-password"
+        # OpenClaw
+        "openclaw-gateway-token"
+        "openclaw-minimax-api-key"
+        "openclaw-discord-id"
+        # Orkestr
+        "orkestr-db-password"
+        "orkestr-secret-key-base"
+        "orkestr-token-signing-secret"
+        "orkestr-electric-secret"
+        # LibreChat
+        "librechat-zhipu-api-key"
+        "librechat-minimax-api-key"
+        "librechat-jwt-secret"
+        # Tailscale
+        "tailscale-auth-key"
+      ];
     };
 
     worker = {
       module = ../modules/roles/worker.nix;
       description = "Kubernetes worker node";
+      requiredSecrets = [
+        "cloudflared-credentials"
+      ];
     };
   };
 }

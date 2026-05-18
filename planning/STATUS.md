@@ -50,18 +50,33 @@ modules/                   # Old host/role files deleted
 
 ---
 
-## Track 3: Typed Secrets 📋 DESIGN DONE
+## Track 3: Typed Secrets 🔨 IN PROGRESS
 
 **Goal:** Compile-time validation of SOPS secrets with layering (shared → role → host overrides).
 
-**Output:** `planning/typed-secrets-design.md`
-**Status:** 📋 Design complete. Implementation deferred.
+**Output:** `lib/typed-secrets.nix` + layered secrets directory structure
+**Status:** 🔨 Phase 1 infrastructure complete. Layered files empty — actual migration is Phase 2.
+
+**Completed:**
+- ✅ `lib/typed-secrets.nix` — core library with `toHyphenatedKey`, `hasKey`, `resolveField`, `readSopsContent`, `validateRequired`, `toSopsSecrets`
+- ✅ Layered directory structure: `secrets/shared.yaml`, `secrets/roles/`, `secrets/hosts/`
+- ✅ `machines/default.nix` updated with `secrets.files` per machine and `requiredSecrets` per role
+- ✅ All evaluations pass (`nix eval .#machines`, `nix flake check`)
+
+**Remaining (Phase 2 of typed secrets):**
+- [ ] Migrate actual secrets from `secrets/backbone-01.yaml` into layered files
+- [ ] Wire `lib/typed-secrets.nix` into `machines/consumer.nix` to auto-generate `sops.secrets`
+- [ ] Remove manual `sops.secrets` from `modules/roles/backbone.nix`
 
 **Key features:**
-- Dot-notation field paths (`harbor.admin-password`)
+- Hyphenated flat keys matching existing SOPS files (e.g., `harbor-admin-password`)
 - Layered files: shared.yaml → role.yaml → host.yaml (later wins)
 - Compile-time error if required secret field missing
 - `lib/typed-secrets.nix` core library
+
+**Role requiredSecrets:**
+- `backbone`: 27 secrets (cloudflared, forgejo, argocd, harbor, ceph, minecraft, verdaccio, erpnext, openclaw, orkestr, librechat, tailscale)
+- `worker`: 1 secret (cloudflared-credentials)
 
 ---
 
@@ -86,8 +101,9 @@ modules/                   # Old host/role files deleted
 
 ## Open Items
 
-- [ ] Implement typed secrets Phase 1 (`lib/typed-secrets.nix`)
-- [ ] Migrate secrets layout to layered (shared/roles/hosts)
+- [x] Implement typed secrets Phase 1 (`lib/typed-secrets.nix`)
+- [ ] Migrate secrets layout to layered (shared/roles/hosts) — Phase 2
+- [ ] Wire typed-secrets into consumer.nix — Phase 2
 - [ ] Get static IP from ISP
 - [ ] Implement Headscale (after static IP)
 
@@ -116,5 +132,13 @@ No more: modules/hosts/*.nix, modules/roles/frontline.nix
 - ✅ Machine DSL Phase 1: registry + consumer + tests
 - ✅ Machine DSL Phase 2-3: wire consumer into imports, delete old files
 - ✅ All nixosConfigurations build and flake check passes
-- 📋 Typed secrets design done
+- 🔨 Typed secrets Phase 1: core library + layered structure + registry
 - ⏸️ Headscale parked until static IP
+
+### 2026-05-19 (typed-secrets phase 1)
+- ✅ `lib/typed-secrets.nix` — core library (6 functions)
+- ✅ Layered secrets directory: `secrets/{shared,roles/,hosts/}` (empty YAML files)
+- ✅ Registry: `secrets.files` per machine, `requiredSecrets` per role
+- ✅ Backbone role: 27 requiredSecrets, Worker role: 1 requiredSecret
+- ✅ `nix eval .#machines` and `nix flake check` pass
+- 🔜 Phase 2: migrate actual secrets + wire into consumer
