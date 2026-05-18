@@ -4,14 +4,14 @@
 
 ---
 
-## Track 1: Bootstrap Refactor ✅ COMPLETE
+## Track 1: Bootstrap Refactor ✅ COMPLETE + WIRING DONE
 
 **Goal:** Break `modules/outputs/bootstrap.nix` (1500 lines) into modular pieces.
 
 **Output:** `modules/outputs/bootstrap/` — 14 modular files + `modules/outputs/default.nix`
-**Status:** ✅ Complete — refactored bootstrap is now the main `bootstrap` output
+**Status:** ✅ All 62 manifest files byte-identical to original
 
-Old `modules/outputs/bootstrap.nix` deleted. `bootstrapRefactored` renamed to `bootstrap`.
+**Wired:** ✅ `config.flake.bootstrap` now points to refactored `modules/outputs/default.nix`. Old `bootstrap.nix` deleted.
 
 ---
 
@@ -19,20 +19,34 @@ Old `modules/outputs/bootstrap.nix` deleted. `bootstrapRefactored` renamed to `b
 
 **Goal:** Single `machines/default.nix` as source of truth for NixOS hosts.
 
-**Status:** ✅ All phases complete
+**Output:** `machines/default.nix` + `machines/consumer.nix`
+**Status:** ✅ Phase 1-3 all complete:
 
-**What's done:**
-- `machines/default.nix` — machine + role registry with all hosts
-- `machines/consumer.nix` — NixOS module bridge (reads registry → config.quad.hosts)
-- `modules/roles/worker.nix` — renamed from frontline.nix
-- Registry wired into flake via `modules/imports.nix` (Phase 2)
-- `machines` flake output for `nix eval .#machines`
-- Old `modules/hosts/*.nix` deleted (Phase 3)
-- Old `modules/roles/frontline.nix` deleted
-- Symlinks removed (paths now use `../modules/` directly)
-- AGENTS.md updated
+- ✅ Phase 1: Create registry alongside existing system
+- ✅ Phase 2: Wire `machines/consumer.nix` into `modules/imports.nix`, delete old host files
+- ✅ Phase 3: Cleanup old files (`modules/hosts/*.nix`, `modules/roles/frontline.nix`)
+- ✅ Phase 4: `nix eval .#machines` works (machines + roles attrsets)
 
-**K8s resources:** NOT in scope. Handled by `modules/outputs/bootstrap/`.
+**Validation:**
+```
+nix build .#nixosConfigurations.backbone-01.config.system.build.toplevel ✅
+nix build .#nixosConfigurations.frontline-01.config.system.build.toplevel ✅
+nix eval .#machines.machines.backbone-01.role → "backbone" ✅
+nix eval .#machines.machines.frontline-01.role → "worker" ✅
+nix flake check ✅
+```
+
+**Directory structure:**
+```
+machines/
+├── default.nix           # Machine registry (source of truth)
+└── consumer.nix         # NixOS module bridge → config.quad.hosts
+
+modules/                   # Old host/role files deleted
+├── hosts/                 # DELETED
+├── roles/frontline.nix   # DELETED (renamed to worker.nix)
+└── ...
+```
 
 ---
 
@@ -41,7 +55,7 @@ Old `modules/outputs/bootstrap.nix` deleted. `bootstrapRefactored` renamed to `b
 **Goal:** Compile-time validation of SOPS secrets with layering (shared → role → host overrides).
 
 **Output:** `planning/typed-secrets-design.md`
-**Status:** 📋 Design complete. Implementation deferred to machine DSL Phase 4.
+**Status:** 📋 Design complete. Implementation deferred.
 
 **Key features:**
 - Dot-notation field paths (`harbor.admin-password`)
@@ -53,18 +67,7 @@ Old `modules/outputs/bootstrap.nix` deleted. `bootstrapRefactored` renamed to `b
 
 ## Track 4: Headscale ⏸️ PARKED
 
-**Goal:** Self-hosted VPN control plane to replace Tailscale SaaS.
-
-**Output:** `planning/headscale-design.md` + `headscale/handoff.md` (detailed research)
-**Status:** ⏸️ PARKING until static IP is available
-
-**Reason:** Headscale's embedded DERP relay needs a public IP + port 443. No static IP = no self-hosted relay. Tailscale is fine for now.
-
-**When to implement:**
-1. Acquire static IP from ISP
-2. Open ports 443 (HTTPS for DERP) + 3478/UDP (STUN)
-3. Point `vpn.quadtech.dev` at static IP
-4. Follow upgrade path in `planning/headscale-design.md`
+**Status:** ⏸️ PARKING until static IP is available.
 
 ---
 
@@ -73,38 +76,45 @@ Old `modules/outputs/bootstrap.nix` deleted. `bootstrapRefactored` renamed to `b
 | Decision | Outcome |
 |----------|---------|
 | K8s resources at machine level? | ❌ No — cluster-wide only |
-| `index.nix` vs `default.nix`? | `default.nix` — Nix convention |
-| Role as key reference? | ✅ Yes |
-| Rename `frontline` → `worker`? | ✅ Yes |
+| Symlinks in machines/? | ❌ Removed — direct paths to modules/ |
+| Role rename `frontline` → `worker`? | ✅ Yes |
+| Old host files deleted? | ✅ Yes — registry is sole source of truth |
+| `index.nix` vs `default.nix`? | `default.nix` |
 | Headscale now or later? | Later — park until static IP |
-| Cloudflare Tunnel removed? | ❌ No — stays for HTTP ingress |
-| Secret field format? | Dot-notation (`harbor.admin-password`) |
-| Secret layering? | shared.yaml → role.yaml → host.yaml |
 
 ---
 
 ## Open Items
 
-- [x] Wire `config.flake.bootstrap` to use `modules/outputs/default.nix` (rename to `bootstrap`)
-- [x] Implement machine DSL Phase 1 (create registry alongside existing system)
-- [x] Implement machine DSL Phase 2 (switch flake.nix to use registry)
-- [x] Implement machine DSL Phase 3 (cleanup old files)
-- [ ] Implement typed secrets Phase 1 (lib/typed-secrets.nix)
-- [ ] Implement typed secrets Phase 2 (migrate secrets layout)
+- [ ] Implement typed secrets Phase 1 (`lib/typed-secrets.nix`)
+- [ ] Migrate secrets layout to layered (shared/roles/hosts)
 - [ ] Get static IP from ISP
 - [ ] Implement Headscale (after static IP)
+
+---
+
+## Architecture Summary (post-Phases 2-3)
+
+```
+flake.nix
+├── nixosConfigurations.backbone-01    ← machines/default.nix → consumer.nix
+├── nixosConfigurations.frontline-01   ← machines/default.nix → consumer.nix
+├── packages.bootstrap                  ← modules/outputs/default.nix
+└── machines                           ← machines/default.nix (direct eval)
+
+Source of truth: machines/default.nix
+No more: modules/hosts/*.nix, modules/roles/frontline.nix
+```
 
 ---
 
 ## Changelog
 
 ### 2026-05-19
-- ✅ Complete bootstrap refactor (14 modules + golden test)
-- ✅ Complete machine DSL Phase 1 (registry + consumer + test + role rename)
-- ✅ Complete machine DSL Phase 2 (wire consumer into imports, add machines flake output)
-- ✅ Complete machine DSL Phase 3 (delete old host/role files, update AGENTS.md)
-- ✅ Wire bootstrap refactor as main `bootstrap` output (delete old monolith)
-- 📋 Complete machine DSL design
-- 📋 Complete typed secrets design
-- ⏸️ Park Headscale until static IP
-- 📋 Update planning/STATUS.md
+- ✅ Bootstrap refactor: 14 modules + byte-identical golden test
+- ✅ Bootstrap wiring: `config.flake.bootstrap` → refactored output
+- ✅ Machine DSL Phase 1: registry + consumer + tests
+- ✅ Machine DSL Phase 2-3: wire consumer into imports, delete old files
+- ✅ All nixosConfigurations build and flake check passes
+- 📋 Typed secrets design done
+- ⏸️ Headscale parked until static IP
