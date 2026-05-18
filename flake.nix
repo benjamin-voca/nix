@@ -59,6 +59,7 @@
       packages = forAllSystems (system: {
         inherit (inputs.nixhelm.packages.${system}) helmupdater;
         bootstrap = eval.config.flake.bootstrap.${system};
+        bootstrapRefactored = eval.config.flake.bootstrapRefactored.${system};
         boostrap = eval.config.flake.bootstrap.${system};
       });
       apps = forAllSystems (system: {
@@ -69,6 +70,15 @@
         transformer = inputs.haumea.lib.transformers.liftDefault;
       };
       chartsDerivations = forAllSystems (system: helmLibFor system).chartsDerivations;
+      checks = forAllSystems (system: let
+        pkgs = inputs.nixpkgs.legacyPackages.${system};
+      in {
+        bootstrap-golden = import ./tests/bootstrap-golden-test.nix {
+          oldBootstrap = eval.config.flake.bootstrap.${system};
+          newBootstrap = eval.config.flake.bootstrapRefactored.${system};
+          inherit system pkgs;
+        };
+      });
     };
 
     eval = lib.evalModules {
