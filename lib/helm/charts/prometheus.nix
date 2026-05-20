@@ -32,11 +32,14 @@
         ingress = {
           enabled = true;
           ingressClassName = "nginx";
-          hosts = ["grafana.k8s.quadtech.dev"];
+          annotations = {
+            "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
+          };
+          hosts = ["grafana.quadtech.dev"];
           tls = [
             {
               secretName = "grafana-tls";
-              hosts = ["grafana.k8s.quadtech.dev"];
+              hosts = ["grafana.quadtech.dev"];
             }
           ];
         };
