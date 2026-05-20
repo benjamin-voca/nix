@@ -264,7 +264,7 @@
         auth_enabled = false;
 
         commonConfig = {
-          replication_factor = 1; # Single instance
+          replication_factor = 1;
         };
 
         storage = {
@@ -285,24 +285,41 @@
             }
           ];
         };
+
+        limitsConfig = {
+          allow_structured_metadata = false;
+          volume_enabled = false;
+        };
       };
 
       # Single binary deployment (simplest)
       deploymentMode = "SingleBinary";
 
-      # Single binary configuration
       singleBinary = {
-        replicas = 1;
         persistence = {
           enabled = true;
           size = "50Gi";
         };
       };
 
+      # Disable all scalable components
+      backend = { replicas = 0; };
+      read = { replicas = 0; };
+      write = { replicas = 0; };
+      ingester = { replicas = 0; };
+      querier = { replicas = 0; };
+      queryFrontend = { replicas = 0; };
+      queryScheduler = { replicas = 0; };
+      distributor = { replicas = 0; };
+      compactor = { replicas = 0; };
+      indexGateway = { replicas = 0; };
+      bloomCompactor = { replicas = 0; };
+      bloomGateway = { replicas = 0; };
+
       # Monitoring
       monitoring = {
         selfMonitoring = {
-          enabled = true;
+          enabled = false;
           grafanaAgent = {
             installOperator = false;
           };
@@ -311,6 +328,16 @@
           enabled = true;
         };
       };
+
+      # Disable gateway
+      gateway = { enabled = false; };
+
+      # Disable enterprise features
+      enterprise = { enabled = false; };
+
+      # Disable memcached caches (too heavy for single-node)
+      chunksCache = { enabled = false; };
+      resultsCache = { enabled = false; };
     };
   };
 
