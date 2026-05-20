@@ -127,7 +127,7 @@
             {
               name = "Tempo";
               type = "tempo";
-              url = "http://tempo.tempo:3100";
+              url = "http://tempo.tempo:3200";
               access = "proxy";
               editable = true;
               uid = "tempo";

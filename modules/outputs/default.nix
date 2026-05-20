@@ -48,6 +48,7 @@
     cloudflaredMod = import ./bootstrap/cloudflared.nix {inherit pkgs lib;};
     harborMod = import ./bootstrap/harbor.nix {inherit pkgs lib existingCharts;};
     monitoringMod = import ./bootstrap/monitoring.nix {inherit pkgs lib existingCharts;};
+    tempoMod = import ./bootstrap/tempo.nix {inherit lib existingCharts;};
     verdaccioMod = import ./bootstrap/verdaccio.nix {inherit pkgs lib;};
     minecraftMod = import ./bootstrap/minecraft.nix {inherit pkgs lib;};
     erpnextMod = import ./bootstrap/erpnext.nix {inherit pkgs lib;};
@@ -69,6 +70,7 @@
       // cloudflaredMod.chartFiles
       // harborMod.chartFiles
       // monitoringMod.chartFiles
+      // tempoMod.chartFiles
       // verdaccioMod.chartFiles
       // minecraftMod.chartFiles
       // erpnextMod.chartFiles
@@ -86,6 +88,7 @@
       // cloudflaredMod.inlineFiles
       // harborMod.inlineFiles
       // monitoringMod.inlineFiles
+      // tempoMod.inlineFiles
       // verdaccioMod.inlineFiles
       // minecraftMod.inlineFiles
       // erpnextMod.inlineFiles
@@ -362,6 +365,10 @@
       cat $out/12c-promtail-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12d-orkestr-dashboard.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/11a-tempo-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/12e-tempo-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
