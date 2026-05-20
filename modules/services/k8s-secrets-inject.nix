@@ -338,7 +338,7 @@ in {
                 --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
                 --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
                 --from-literal=RESEND_API_KEY="$ORKESTR_RESEND_API_KEY" \
-                --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || echo '')" \
+                --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || echo '''')" \
                 --from-literal=LLM_MODEL="google:gemini-3.1-flash-lite-preview" \
                 --dry-run=client -o yaml | $kubectl apply -f -
               echo "Injected orkestr-app-secrets (with RESEND_API_KEY)"
@@ -356,7 +356,7 @@ in {
                 --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
                 --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
                 --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
-                --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || echo '')" \
+                --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || echo '''')" \
                 --from-literal=LLM_MODEL="google:gemini-3.1-flash-lite-preview" \
                 --dry-run=client -o yaml | $kubectl apply -f -
               echo "Injected orkestr-app-secrets"
