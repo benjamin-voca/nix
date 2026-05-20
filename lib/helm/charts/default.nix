@@ -6,6 +6,7 @@
   forgejoActions = import ./forgejo-actions.nix {inherit helmLib;};
   clickhouse = import ./clickhouse.nix {inherit helmLib;};
   grafana = import ./grafana-simple.nix {inherit helmLib;};
+  promtail = import ./promtail.nix {inherit helmLib;};
   cloudnative-pg = import ./cloudnative-pg.nix {inherit helmLib;};
   verdaccio = import ./verdaccio.nix {inherit helmLib;};
   metallb = import ./metallb.nix {inherit helmLib;};
@@ -22,6 +23,7 @@ in {
   "forgejo-actions" = forgejoActions."forgejo-actions";
   inherit (clickhouse) clickhouse clickhouse-operator;
   inherit (grafana) grafana loki tempo;
+  inherit (promtail) promtail;
   inherit (cloudnative-pg) cloudnative-pg;
   inherit (verdaccio) verdaccio;
   inherit (metallb) metallb;
@@ -39,6 +41,7 @@ in {
     "forgejo-actions" = forgejoActions."forgejo-actions";
     inherit (clickhouse) clickhouse clickhouse-operator;
     inherit (grafana) grafana loki tempo;
+    inherit (promtail) promtail;
     inherit (cloudnative-pg) cloudnative-pg;
     inherit (verdaccio) verdaccio;
     inherit (metallb) metallb;

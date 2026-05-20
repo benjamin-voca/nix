@@ -90,6 +90,22 @@ in {
             echo "Injected shared-pg-app secret"
           fi
 
+          # Grafana database/admin secret
+          if [ -f /run/secrets/cnpg-edukurs-password ] && [ -f /run/secrets/grafana-admin-password ]; then
+            CNPG_PW=$(cat /run/secrets/cnpg-edukurs-password)
+            GRAFANA_ADMIN_PW=$(cat /run/secrets/grafana-admin-password)
+            $kubectl create secret generic grafana-db \
+              --namespace=grafana \
+              --from-literal=GF_DATABASE_TYPE=postgres \
+              --from-literal=GF_DATABASE_HOST=shared-pg-rw.cnpg-system.svc.cluster.local:5432 \
+              --from-literal=GF_DATABASE_NAME=grafana \
+              --from-literal=GF_DATABASE_USER=edukurs \
+              --from-literal=GF_DATABASE_PASSWORD="$CNPG_PW" \
+              --from-literal=GF_SECURITY_ADMIN_PASSWORD="$GRAFANA_ADMIN_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected grafana-db secret"
+          fi
+
           # Forgejo database bootstrap secret (CNPG initdb)
           if [ -f /run/secrets/forgejo-db-password ]; then
             FORGEJO_DB_PW=$(cat /run/secrets/forgejo-db-password)
@@ -322,6 +338,8 @@ in {
                 --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
                 --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
                 --from-literal=RESEND_API_KEY="$ORKESTR_RESEND_API_KEY" \
+                --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || echo '')" \
+                --from-literal=LLM_MODEL="google:gemini-3.1-flash-lite-preview" \
                 --dry-run=client -o yaml | $kubectl apply -f -
               echo "Injected orkestr-app-secrets (with RESEND_API_KEY)"
             else
@@ -338,6 +356,8 @@ in {
                 --from-literal=ELECTRIC_SECRET="$ORKESTR_ES" \
                 --from-literal=ELECTRIC_UPSTREAM_TIMEOUT="70000" \
                 --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
+                --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || echo '')" \
+                --from-literal=LLM_MODEL="google:gemini-3.1-flash-lite-preview" \
                 --dry-run=client -o yaml | $kubectl apply -f -
               echo "Injected orkestr-app-secrets"
             fi

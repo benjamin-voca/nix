@@ -138,6 +138,8 @@
         "erpnext-admin-password"
         # EduKurs (CNPG)
         "cnpg-edukurs-password"
+        # Grafana
+        "grafana-admin-password"
         # OpenClaw
         "openclaw-gateway-token"
         "openclaw-minimax-api-key"

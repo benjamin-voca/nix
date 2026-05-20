@@ -353,11 +353,15 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/12-monitoring-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/12-grafana-db-secret.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
       cat $out/12-grafana-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12a-grafana-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/12b-loki-chart.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/12c-promtail-chart.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/12d-orkestr-dashboard.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml

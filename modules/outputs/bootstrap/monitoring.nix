@@ -22,22 +22,126 @@
       name: grafana
       labels:
         app.kubernetes.io/name: grafana
+    ---
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: loki
+      labels:
+        app.kubernetes.io/name: loki
   '';
 
-  grafanaDbSecret = ''
+  orkestrGrafanaDashboard = ''
     apiVersion: v1
-    kind: Secret
+    kind: ConfigMap
     metadata:
-      name: grafana-db
+      name: grafana-dashboard-orkestr-k8s
       namespace: grafana
-    type: Opaque
-    stringData:
-      GF_DATABASE_TYPE: postgres
-      GF_DATABASE_HOST: shared-pg-rw.cnpg-system.svc.cluster.local:5432
-      GF_DATABASE_NAME: grafana
-      GF_DATABASE_USER: edukurs
-      GF_DATABASE_PASSWORD: PLACEHOLDER
-      GF_SECURITY_ADMIN_PASSWORD: PLACEHOLDER
+      labels:
+        grafana_dashboard: "1"
+    data:
+      orkestr-k8s.json: |-
+        {
+          "title": "Orkestr K8s Overview",
+          "uid": "orkestr-k8s-overview",
+          "schemaVersion": 38,
+          "version": 1,
+          "refresh": "30s",
+          "timezone": "browser",
+          "tags": ["orkestr", "kubernetes"],
+          "templating": {
+            "list": [
+              {
+                "name": "namespace",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(kube_pod_info, namespace)",
+                "current": {"text": "orkestr", "value": "orkestr"}
+              },
+              {
+                "name": "pod",
+                "type": "query",
+                "datasource": "Prometheus",
+                "query": "label_values(kube_pod_info{namespace=\"$namespace\"}, pod)",
+                "includeAll": true,
+                "multi": true
+              }
+            ]
+          },
+          "panels": [
+            {
+              "type": "timeseries",
+              "title": "Pod CPU (cores)",
+              "datasource": "Prometheus",
+              "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+              "targets": [
+                {
+                  "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"$pod\", container!=\"\", image!=\"\"}[5m])) by (pod)",
+                  "legendFormat": "{{pod}}"
+                }
+              ]
+            },
+            {
+              "type": "timeseries",
+              "title": "Pod Memory (MiB)",
+              "datasource": "Prometheus",
+              "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+              "targets": [
+                {
+                  "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"$pod\", container!=\"\", image!=\"\"}) by (pod) / 1024 / 1024",
+                  "legendFormat": "{{pod}}"
+                }
+              ]
+            },
+            {
+              "type": "stat",
+              "title": "Pod Restarts (last 24h)",
+              "datasource": "Prometheus",
+              "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8},
+              "targets": [
+                {
+                  "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\", pod=~\"$pod\"}[24h]))",
+                  "legendFormat": "restarts"
+                }
+              ]
+            },
+            {
+              "type": "stat",
+              "title": "Ready Pods",
+              "datasource": "Prometheus",
+              "gridPos": {"h": 6, "w": 8, "x": 8, "y": 8},
+              "targets": [
+                {
+                  "expr": "sum(kube_pod_status_ready{namespace=\"$namespace\", condition=\"true\", pod=~\"$pod\"})",
+                  "legendFormat": "ready"
+                }
+              ]
+            },
+            {
+              "type": "stat",
+              "title": "Running Pods",
+              "datasource": "Prometheus",
+              "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8},
+              "targets": [
+                {
+                  "expr": "sum(kube_pod_status_phase{namespace=\"$namespace\", phase=\"Running\", pod=~\"$pod\"})",
+                  "legendFormat": "running"
+                }
+              ]
+            },
+            {
+              "type": "logs",
+              "title": "Orkestr Logs",
+              "datasource": "Loki",
+              "gridPos": {"h": 12, "w": 24, "x": 0, "y": 14},
+              "targets": [
+                {
+                  "expr": "{namespace=\"$namespace\"}"
+                }
+              ]
+            }
+          ]
+        }
   '';
 
   grafanaIngress = ''
@@ -67,12 +171,14 @@ in {
   chartFiles = {
     "12-monitoring-chart.yaml" = monitoringChart;
     "12-grafana-chart.yaml" = grafanaChart;
+    "12b-loki-chart.yaml" = existingCharts.loki;
+    "12c-promtail-chart.yaml" = existingCharts.promtail;
   };
 
   inlineFiles = {
     "11-monitoring-namespace.yaml" = monitoringNamespace;
-    "12-grafana-db-secret.yaml" = grafanaDbSecret;
     "12a-grafana-ingress.yaml" = grafanaIngress;
+    "12d-orkestr-dashboard.yaml" = orkestrGrafanaDashboard;
   };
 
   # Monitoring chart needs annotation stripping
@@ -81,8 +187,10 @@ in {
   order = [
     "11-monitoring-namespace.yaml"
     "12-monitoring-chart.yaml"
-    "12-grafana-db-secret.yaml"
     "12-grafana-chart.yaml"
     "12a-grafana-ingress.yaml"
+    "12b-loki-chart.yaml"
+    "12c-promtail-chart.yaml"
+    "12d-orkestr-dashboard.yaml"
   ];
 }

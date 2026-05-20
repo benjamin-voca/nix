@@ -112,6 +112,7 @@
               url = "http://loki.loki:3100";
               access = "proxy";
               editable = true;
+              uid = "loki";
             }
             {
               name = "ClickHouse";
@@ -129,10 +130,11 @@
               url = "http://tempo.tempo:3100";
               access = "proxy";
               editable = true;
+              uid = "tempo";
               jsonData = {
                 httpMethod = "GET";
                 tracesToLogs = {
-                  datasourceUid = "Loki";
+                  datasourceUid = "loki";
                 };
               };
             }
