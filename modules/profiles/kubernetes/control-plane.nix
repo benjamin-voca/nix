@@ -48,8 +48,9 @@ in {
       "localhost"
       "127.0.0.1"
       "kubernetes.quadtech.dev"
-      # Tailscale - access via https://100.x.x.x:6443 (static Tailscale IP) or https://backbone-01.tail-scale.ts.net:6443 (MagicDNS)
+      # Tailscale - access via https://100.x.x.x:6443 (static Tailscale IP) or https://backbone-01.tailf26317.ts.net:6443 (MagicDNS)
       "100.100.145.110"
+      "${config.networking.hostName}.tailf26317.ts.net"
       "${config.networking.hostName}.tail-scale.ts.net"
     ];
     apiserver.extraOpts = "--allow-privileged=true";
