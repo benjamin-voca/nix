@@ -37,25 +37,27 @@ in {
             echo "Injected argocd admin password"
           fi
 
-          # ArgoCD Forgejo credentials
+          # ArgoCD Forgejo credentials (covers both case variants)
           if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
             FORGEJO_USER=$(cat /run/secrets/argocd-forgejo-username)
             FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
-            $kubectl apply -f - <<EOF
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: forgejo-quadtech-repo-creds
-          namespace: argocd
-          labels:
-            argocd.argoproj.io/secret-type: repo-creds
-        type: Opaque
-        stringData:
-          url: https://forge.quadtech.dev/QuadCoreTech
-          username: "$FORGEJO_USER"
-          password: "$FORGEJO_TOKEN"
-        EOF
-            echo "Injected forgejo-quadtech-repo-creds"
+            for URL_VARIANT in "QuadCoreTech" "quadcoretech"; do
+              $kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: forgejo-quadtech-repo-creds-$URL_VARIANT
+            namespace: argocd
+            labels:
+              argocd.argoproj.io/secret-type: repo-creds
+          type: Opaque
+          stringData:
+            url: https://forge.quadtech.dev/$URL_VARIANT
+            username: "$FORGEJO_USER"
+            password: "$FORGEJO_TOKEN"
+          EOF
+            done
+            echo "Injected forgejo repo creds"
           fi
 
           # Harbor admin password
