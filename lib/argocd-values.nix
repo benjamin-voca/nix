@@ -32,6 +32,16 @@
     service = {
       type = "ClusterIP";
     };
+    metrics = {
+      enabled = true;
+      service = {
+        type = "ClusterIP";
+        port = 8082;
+      };
+      serviceMonitor = {
+        enabled = false;   # ServiceMonitor created in bootstrap instead
+      };
+    };
   };
 
   redis = {
@@ -48,14 +58,6 @@
 
   repoServer = {
     replicas = repoServerReplicas;
-    initContainers = [
-      {
-        name = "copyutil";
-        args = [
-          "/bin/cp /usr/local/bin/argocd /var/run/argocd/argocd && /bin/ln -sf /var/run/argocd/argocd /var/run/argocd/argocd-cmp-server"
-        ];
-      }
-    ];
   };
 
   applicationSet = {

@@ -80,11 +80,12 @@ in {
                        --set redis-ha.enabled=false \
                        --set controller.replicas=1 \
                        --set repoServer.replicas=1 \
+                       --set-json 'repoServer.initContainers=[]' \
                        --set applicationSet.enabled=true \
                        --set notifications.enabled=true \
                        --set global.image.tag=v2.9.3 \
                        --set server.ingress.enabled=false \
-                        --wait --timeout 5m || true
+                        --wait --timeout 10m || true
 
                     echo "Waiting for ingress-nginx admission webhook to be ready..."
                     for i in $(seq 1 30); do
