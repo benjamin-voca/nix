@@ -41,7 +41,9 @@ in {
           if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
             FORGEJO_USER=$(cat /run/secrets/argocd-forgejo-username)
             FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
-            for URL_VARIANT in "QuadCoreTech" "quadcoretech"; do
+            for URL_VARIANT in "quadtech" "quadcoretech"; do
+              ORG_NAME="$URL_VARIANT"
+              [ "$URL_VARIANT" = "quadtech" ] && ORG_NAME="QuadCoreTech"
               $kubectl apply -f - <<EOF
           apiVersion: v1
           kind: Secret
@@ -52,7 +54,7 @@ in {
               argocd.argoproj.io/secret-type: repo-creds
           type: Opaque
           stringData:
-            url: https://forge.quadtech.dev/$URL_VARIANT
+            url: https://forge.quadtech.dev/$ORG_NAME
             username: "$FORGEJO_USER"
             password: "$FORGEJO_TOKEN"
           EOF
