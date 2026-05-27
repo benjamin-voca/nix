@@ -11,7 +11,6 @@ in {
     enable = lib.mkEnableOption "ArgoCD Applications for GitOps";
 
     harbor = lib.mkEnableOption "Harbor registry via ArgoCD";
-    verdaccio = lib.mkEnableOption "Verdaccio NPM registry via ArgoCD";
   };
 
   config = lib.mkIf cfg.enable {

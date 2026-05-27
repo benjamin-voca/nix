@@ -26,9 +26,28 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph orkestr librechat; do
+          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph orkestr librechat argocd; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
+
+          # ArgoCD admin password (bcrypt hash from sops)
+          if [ -f /run/secrets/argocd-admin-password ]; then
+            ARGOCD_ADMIN_PW=$(cat /run/secrets/argocd-admin-password)
+            $kubectl patch secret argocd-secret -n argocd -p "{\"stringData\":{\"admin.password\":\"$ARGOCD_ADMIN_PW\"}}" 2>/dev/null || true
+            echo "Injected argocd admin password"
+          fi
+
+          # ArgoCD Forgejo credentials
+          if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
+            FORGEJO_USER=$(cat /run/secrets/argocd-forgejo-username)
+            FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
+            $kubectl create secret generic argocd-forgejo-creds \
+              --namespace=argocd \
+              --from-literal=username="$FORGEJO_USER" \
+              --from-literal=password="$FORGEJO_TOKEN" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected argocd-forgejo-creds"
+          fi
 
           # Harbor admin password
           if [ -f /run/secrets/harbor-admin-password ]; then
@@ -322,6 +341,7 @@ in {
             ORKESTR_SKB=$(cat /run/secrets/orkestr-secret-key-base)
             ORKESTR_TSS=$(cat /run/secrets/orkestr-token-signing-secret)
             ORKESTR_ES=$(cat /run/secrets/orkestr-electric-secret)
+            ORKESTR_DNS_CQ="$(cat /run/secrets/orkestr-dns-cluster-query 2>/dev/null || true)"
             if [ -f /run/secrets/orkestr-resend-api-key ]; then
               ORKESTR_RESEND_API_KEY=$(cat /run/secrets/orkestr-resend-api-key)
               $kubectl create secret generic orkestr-app-secrets \
@@ -340,6 +360,7 @@ in {
                 --from-literal=RESEND_API_KEY="$ORKESTR_RESEND_API_KEY" \
                 --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || true)" \
                 --from-literal=LLM_MODEL="google:gemini-3.1-flash-lite-preview" \
+                ''${ORKESTR_DNS_CQ:+--from-literal=DNS_CLUSTER_QUERY="$ORKESTR_DNS_CQ"} \
                 --dry-run=client -o yaml | $kubectl apply -f -
               echo "Injected orkestr-app-secrets (with RESEND_API_KEY)"
             else
@@ -358,6 +379,7 @@ in {
                 --from-literal=OTEL_EXPORTER_OTLP_ENDPOINT="http://tempo.tempo.svc.cluster.local:4318" \
                 --from-literal=GOOGLE_API_KEY="$(cat /run/secrets/orkestr-gemini-api-key 2>/dev/null || true)" \
                 --from-literal=LLM_MODEL="google:gemini-3.1-flash-lite-preview" \
+                ''${ORKESTR_DNS_CQ:+--from-literal=DNS_CLUSTER_QUERY="$ORKESTR_DNS_CQ"} \
                 --dry-run=client -o yaml | $kubectl apply -f -
               echo "Injected orkestr-app-secrets"
             fi

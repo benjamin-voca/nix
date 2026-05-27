@@ -5,14 +5,13 @@
 # Module structure:
 #   bootstrap/metallb.nix        - MetalLB chart + CRDs
 #   bootstrap/ingress-nginx.nix  - Ingress controller
-#   bootstrap/argocd.nix         - ArgoCD namespace + chart + forgejo repo
+#   bootstrap/argocd.nix         - ArgoCD namespace + chart + forgejo repo + ingress
 #   bootstrap/rook-ceph.nix      - Rook-Ceph operator + cluster + RGW + backups
 #   bootstrap/cnpg.nix           - CloudNativePG operator + cluster
 #   bootstrap/forgejo.nix        - Forgejo chart + actions + namespace + PVCs
 #   bootstrap/cloudflared.nix    - Cloudflared namespace + configmap + deployment
 #   bootstrap/harbor.nix         - Harbor chart + namespace + PVCs + ingress
 #   bootstrap/monitoring.nix     - Prometheus + Grafana charts
-#   bootstrap/verdaccio.nix      - Verdaccio namespace + PVC + ArgoCD app
 #   bootstrap/minecraft.nix      - Minecraft namespace + ArgoCD app
 #   bootstrap/erpnext.nix        - ERPNext namespace + helpdesk redirect
 #   bootstrap/app-namespaces.nix - EduKurs/BatllavaTourist/QuadPacienti ns + apps
@@ -49,12 +48,12 @@
     harborMod = import ./bootstrap/harbor.nix {inherit pkgs lib existingCharts;};
     monitoringMod = import ./bootstrap/monitoring.nix {inherit pkgs lib existingCharts;};
     tempoMod = import ./bootstrap/tempo.nix {inherit lib existingCharts;};
-    verdaccioMod = import ./bootstrap/verdaccio.nix {inherit pkgs lib;};
     minecraftMod = import ./bootstrap/minecraft.nix {inherit pkgs lib;};
     erpnextMod = import ./bootstrap/erpnext.nix {inherit pkgs lib;};
     appNamespacesMod = import ./bootstrap/app-namespaces.nix {inherit pkgs lib;};
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
-
+    # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
+    
     # Existing sub-modules (openclaw, librechat)
     openclawBootstrap = import ./bootstrap/openclaw.nix {inherit lib pkgs;};
     librechatBootstrap = import ./bootstrap/librechat.nix {inherit lib pkgs;};
@@ -71,11 +70,10 @@
       // harborMod.chartFiles
       // monitoringMod.chartFiles
       // tempoMod.chartFiles
-      // verdaccioMod.chartFiles
-      // minecraftMod.chartFiles
-      // erpnextMod.chartFiles
       // appNamespacesMod.chartFiles
       // orkestrMod.chartFiles;
+      # // doraMod.chartFiles;
+
 
     # Collect all inline files from all modules, converted to Nix store paths
     allInlineFiles = {}
@@ -89,11 +87,12 @@
       // harborMod.inlineFiles
       // monitoringMod.inlineFiles
       // tempoMod.inlineFiles
-      // verdaccioMod.inlineFiles
       // minecraftMod.inlineFiles
       // erpnextMod.inlineFiles
       // appNamespacesMod.inlineFiles
       // orkestrMod.inlineFiles;
+      # // doraMod.inlineFiles;
+
 
     # Convert inline file strings to Nix store paths
     inlineFileDerivations = lib.mapAttrs (name: content: pkgs.writeText (lib.strings.sanitizeDerivationName name) content) allInlineFiles;
@@ -293,6 +292,8 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/01b-argocd.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
+      cat $out/01c-argocd-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
       cat $out/02d-rook-ceph-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/02-rook-ceph.yaml >> $out/bootstrap.yaml
@@ -338,10 +339,6 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/09a-harbor-pvcs-ceph.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/10-verdaccio-namespace.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/10a-verdaccio-pvc.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
       cat $out/11-harbor-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12-harbor-ingress.yaml >> $out/bootstrap.yaml
@@ -349,8 +346,6 @@
       cat $out/12aa-erpnext-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12a-erpnext-helpdesk-redirect-ingress.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/13-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
@@ -412,7 +407,21 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/18-orkestr-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
+      # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20a-dora-namespace.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20b-dora-exporter-configmap.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20c-dora-exporter-deployment.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20d-dora-exporter-service.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20e-dora-exporter-servicemonitor.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20f-argocd-servicemonitor.yaml >> $out/bootstrap.yaml
+      # echo "---" >> $out/bootstrap.yaml
+      # cat $out/20g-dora-dashboard-configmap.yaml >> $out/bootstrap.yaml
     '';
 in {
   config.flake.bootstrap = forAllSystems bootstrapFor;

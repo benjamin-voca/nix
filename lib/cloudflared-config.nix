@@ -45,10 +45,6 @@
       service = "http://127.0.0.1:30856";
     }
     {
-      hostname = "verdaccio.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
       hostname = "minecraft.quadtech.dev";
       service = "tcp://127.0.0.1:25565";
     }

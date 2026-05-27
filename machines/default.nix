@@ -131,8 +131,6 @@
         "ceph-rgw-s3-secret-key"
         # Minecraft
         "minecraft-rcon-password"
-        # Verdaccio
-        "verdaccio-admin-password"
         # ERPNext
         "erpnext-db-admin-password"
         "erpnext-admin-password"
@@ -149,6 +147,7 @@
         "orkestr-secret-key-base"
         "orkestr-token-signing-secret"
         "orkestr-electric-secret"
+        "orkestr-dns-cluster-query"
         # LibreChat
         "librechat-zhipu-api-key"
         "librechat-minimax-api-key"

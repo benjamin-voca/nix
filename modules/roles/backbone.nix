@@ -12,19 +12,15 @@
     ../profiles/kubernetes/control-plane.nix
     ../profiles/kubernetes/allow-master-workloads.nix
     ../profiles/kubernetes/kube-addons.nix
-    ../services/argocd-deploy.nix
     ../services/helm-charts.nix
-    ../services/verdaccio-deploy.nix
     ../services/argocd-apps.nix
     ../services/k8s-secrets-inject.nix
-    ../services/forgejo-migration-cleanup.nix
   ];
 
   environment.systemPackages = with pkgs; [
     git
     nfs-utils
     openiscsi
-    apacheHttpd # For htpasswd utility
     openssl
     procps # For pkill command used by cloudflared scripts
   ];
@@ -64,25 +60,12 @@
   # via the typed-secrets library. Secrets are read from layered files:
   # secrets/shared.yaml → secrets/roles/backbone.yaml → secrets/hosts/backbone-01.yaml
 
-  services.quadnix.argocd-deploy = {
-    enable = true;
-  };
-
-  services.quadnix.verdaccio-deploy = {
-    enable = false;
-  };
-
   services.quadnix.argocdApps = {
     enable = true;
     harbor = true;
-    verdaccio = false;
   };
 
   services.quadnix.k8s-secrets-inject = {
-    enable = true;
-  };
-
-  services.quadnix.forgejo-migration-cleanup = {
     enable = true;
   };
 

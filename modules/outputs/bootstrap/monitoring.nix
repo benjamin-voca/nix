@@ -1,5 +1,5 @@
 # Monitoring bootstrap module
-# Prometheus + Grafana charts, namespaces, secrets, ingress
+# Prometheus + Grafana charts, namespaces, secrets, ingress + DORA scrape configs
 {
   pkgs,
   lib,
@@ -29,6 +29,46 @@
       name: loki
       labels:
         app.kubernetes.io/name: loki
+  '';
+
+  # ── Prometheus scrape configs for ArgoCD and DORA exporter ──────────────────
+  # ArgoCD server exposes a /metrics endpoint on port 8082 (argocd-server-metrics).
+  # The DORA exporter exposes /metrics on port 8080 in the dora namespace.
+  # These static scrape targets are added via prometheus.additionalScrapeConfigs
+  # in the kube-prometheus-stack values.
+  doraScrapeConfigMap = ''
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: prometheus-dora-scrape-config
+      namespace: monitoring
+      labels:
+        app.kubernetes.io/name: prometheus
+    data:
+      dora-scrape.yaml: |
+        # Additional Prometheus scrape configs for DORA metrics
+        # ArgoCD server exposes metrics at :8082/metrics
+        - job_name: argocd
+          scrape_interval: 60s
+          scrape_timeout: 30s
+          static_configs:
+            - targets:
+                - argocd-server.argocd:8082
+          relabel_configs:
+            - source_labels: [__address__]
+              target_label: instance
+        # DORA exporter at dora-exporter.dora:8080/metrics
+        - job_name: dora-exporter
+          scrape_interval: 60s
+          scrape_timeout: 30s
+          static_configs:
+            - targets:
+                - dora-exporter.dora:8080
+          relabel_configs:
+            - source_labels: [__address__]
+              regex: dora-exporter\..+:8080
+              replacement: dora
+              target_label: app
   '';
 
   orkestrGrafanaDashboard = ''
@@ -176,9 +216,9 @@ in {
   };
 
   inlineFiles = {
-    "11-monitoring-namespace.yaml" = monitoringNamespace;
-    "12a-grafana-ingress.yaml" = grafanaIngress;
-    "12d-orkestr-dashboard.yaml" = orkestrGrafanaDashboard;
+    "11-monitoring-namespace.yaml"         = monitoringNamespace;
+    "12a-grafana-ingress.yaml"             = grafanaIngress;
+    "12d-orkestr-dashboard.yaml"           = orkestrGrafanaDashboard;
   };
 
   # Monitoring chart needs annotation stripping

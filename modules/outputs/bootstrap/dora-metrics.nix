@@ -414,7 +414,7 @@
       version = 1;
       refresh = "5m";
       timezone = "browser";
-      tags = ["dora", "orkestr", "delivery"];
+      tags = ["dora" "orkestr" "delivery"];
       templating.list = [
         {
           name = "app";
@@ -613,10 +613,10 @@
 
             | Metric | Value | Elite | High | Medium | Low |
             |--------|-------|-------|------|--------|-----|
-            | Deployment Frequency | ''${__data.fields["Deployment Frequency (median hours)"] || "—"}'' per day | On-demand | Daily–weekly | Weekly–monthly | Monthly–semi-annually |
-            | Lead Time | ''${__data.fields["Lead Time (median hours)"] || "—"}'' hours | < 1 hour | 1 day – 1 week | 1 week – 1 month | > 1 month |
-            | Change Failure Rate | ''${__data.fields["Change Failure Rate"] || "—"}'' | < 5% | 5–10% | 10–15% | > 15% |
-            | MTTR | ''${__data.fields["MTTR (median hours)"] || "—"}'' hours | < 1 hour | < 1 day | 1 day – 1 week | > 1 week |
+            | Deployment Frequency | ''${__data.fields["Deployment Frequency (median hours)"] || "-"}'' per day | On-demand | Daily-weekly | Weekly-monthly | Monthly-semi-annually |
+            | Lead Time | ''${__data.fields["Lead Time (median hours)"] || "-"}'' hours | < 1 hour | 1 day - 1 week | 1 week - 1 month | > 1 month |
+            | Change Failure Rate | ''${__data.fields["Change Failure Rate"] || "-"}'' | < 5% | 5-10% | 10-15% | > 15% |
+            | MTTR | ''${__data.fields["MTTR (median hours)"] || "-"}'' hours | < 1 hour | < 1 day | 1 day - 1 week | > 1 week |
           '';
         }
       ];

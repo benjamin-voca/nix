@@ -109,16 +109,6 @@
       };
 
       # Build Verdaccio chart
-      verdaccioChart = buildHelmChart {
-        chartName = "verdaccio";
-        chartVersion = "4.29.0"; # Update this when upgrading
-        src = pkgs.fetchFromGitHub {
-          owner = "verdaccio";
-          repo = "charts";
-          rev = "v${chartVersion}";
-          hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # Update this hash
-        };
-      };
     in {
       packages.default = argocdChart;
 
@@ -129,7 +119,6 @@
       packages.loki = lokiChart;
       packages.tempo = tempoChart;
       packages.clickhouse = clickhouseChart;
-      packages.verdaccio = verdaccioChart;
 
       # Hydra jobs for CI
       hydraJobs = {
@@ -139,7 +128,6 @@
         loki = lokiChart;
         tempo = tempoChart;
         clickhouse = clickhouseChart;
-        verdaccio = verdaccioChart;
       };
     });
 }
