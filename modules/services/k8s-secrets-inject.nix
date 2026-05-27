@@ -41,12 +41,21 @@ in {
           if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
             FORGEJO_USER=$(cat /run/secrets/argocd-forgejo-username)
             FORGEJO_TOKEN=$(cat /run/secrets/argocd-forgejo-token)
-            $kubectl create secret generic argocd-forgejo-creds \
-              --namespace=argocd \
-              --from-literal=username="$FORGEJO_USER" \
-              --from-literal=password="$FORGEJO_TOKEN" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected argocd-forgejo-creds"
+            $kubectl apply -f - <<EOF
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: forgejo-quadtech-repo-creds
+          namespace: argocd
+          labels:
+            argocd.argoproj.io/secret-type: repo-creds
+        type: Opaque
+        stringData:
+          url: https://forge.quadtech.dev/QuadCoreTech
+          username: "$FORGEJO_USER"
+          password: "$FORGEJO_TOKEN"
+        EOF
+            echo "Injected forgejo-quadtech-repo-creds"
           fi
 
           # Harbor admin password

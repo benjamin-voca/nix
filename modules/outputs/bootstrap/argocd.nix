@@ -47,19 +47,6 @@
         app.kubernetes.io/name: argocd
   '';
 
-  argocdForgejoRepo = ''
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: forgejo-quadtech-repo-creds
-      namespace: argocd
-      labels:
-        argocd.argoproj.io/secret-type: repo-creds
-    type: Opaque
-    stringData:
-      url: https://forge.quadtech.dev/QuadCoreTech
-      username: PLACEHOLDER
-      password: PLACEHOLDER
   '';
 
   argocdIngress = ''
@@ -91,7 +78,6 @@ in {
 
   inlineFiles = {
     "01a-argocd-namespace.yaml" = argocdNamespace;
-    "04-argocd-forgejo-repo.yaml" = argocdForgejoRepo;
     "01c-argocd-ingress.yaml" = argocdIngress;
   };
 
