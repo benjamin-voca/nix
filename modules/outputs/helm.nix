@@ -24,7 +24,6 @@
       values = import ../../lib/argocd-values.nix {
         domain = "argocd.quadtech.dev";
         serverUrl = "https://argocd.quadtech.dev";
-        imageTag = "v2.9.3";
         serverReplicas = 1;
         controllerReplicas = 1;
         repoServerReplicas = 1;

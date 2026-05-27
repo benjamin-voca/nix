@@ -44,7 +44,7 @@
       # Build ArgoCD chart from upstream
       argocdChart = buildHelmChart {
         chartName = "argo-cd";
-        chartVersion = "6.7.2"; # Update this when upgrading
+        chartVersion = "9.5.15"; # Update this when upgrading
         src = helm-charts.legacyPackages.${system}.argocd;
       };
 

@@ -1,6 +1,5 @@
 {
   domain ? "argocd.quadtech.dev",
-  imageTag ? "v2.9.3",
   serverUrl ? "http://${domain}",
   serverReplicas ? 1,
   controllerReplicas ? 1,
@@ -11,7 +10,6 @@
 {
   global = {
     domain = domain;
-    image.tag = imageTag;
   };
 
   configs = {

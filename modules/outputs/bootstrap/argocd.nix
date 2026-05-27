@@ -16,7 +16,6 @@
         (import ../../../lib/argocd-values.nix {
           domain = "argocd.quadtech.dev";
           serverUrl = "http://argocd.quadtech.dev";
-          imageTag = "v2.9.3";
           serverReplicas = 1;
           controllerReplicas = 1;
           repoServerReplicas = 1;
@@ -49,20 +48,18 @@
   '';
 
   argocdForgejoRepo = ''
-    apiVersion: argoproj.io/v1alpha1
-    kind: Repository
+    apiVersion: v1
+    kind: Secret
     metadata:
-      name: forgejo-quadtech
+      name: forgejo-quadtech-repo-creds
       namespace: argocd
-    spec:
-      type: git
+      labels:
+        argocd.argoproj.io/secret-type: repo-creds
+    type: Opaque
+    stringData:
       url: https://forge.quadtech.dev/QuadCoreTech
-      usernameSecret:
-        name: argocd-forgejo-creds
-        key: username
-      passwordSecret:
-        name: argocd-forgejo-creds
-        key: password
+      username: PLACEHOLDER
+      password: PLACEHOLDER
   '';
 
   argocdIngress = ''
