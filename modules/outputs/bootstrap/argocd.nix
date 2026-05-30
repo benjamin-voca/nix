@@ -47,8 +47,6 @@
         app.kubernetes.io/name: argocd
   '';
 
-  '';
-
   argocdIngress = ''
     apiVersion: networking.k8s.io/v1
     kind: Ingress

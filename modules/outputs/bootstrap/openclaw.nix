@@ -156,9 +156,13 @@
                 "sh"
                 "-c"
                 ''
-                  cp /config/openclaw.json /home/node/.openclaw/openclaw.json
+                  if [ ! -f /home/node/.openclaw/openclaw.json ]; then
+                    cp /config/openclaw.json /home/node/.openclaw/openclaw.json
+                  fi
                   mkdir -p /home/node/.openclaw/workspace
-                  cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
+                  if [ ! -f /home/node/.openclaw/workspace/AGENTS.md ]; then
+                    cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
+                  fi
                 ''
               ];
               securityContext = {
@@ -190,7 +194,7 @@
           containers = [
             {
               name = "gateway";
-              image = "ghcr.io/openclaw/openclaw:2026.5.5-slim";
+              image = "ghcr.io/openclaw/openclaw:2026.5.27";
               imagePullPolicy = "IfNotPresent";
               command = [
                 "node"
@@ -319,6 +323,10 @@
                   mountPath = "/home/node/.openclaw";
                 }
                 {
+                  name = "npm-cache";
+                  mountPath = "/home/node/.npm";
+                }
+                {
                   name = "tmp-volume";
                   mountPath = "/tmp";
                 }
@@ -347,6 +355,10 @@
               configMap = {
                 name = "openclaw-config";
               };
+            }
+            {
+              name = "npm-cache";
+              emptyDir = {};
             }
             {
               name = "tmp-volume";

@@ -142,6 +142,8 @@
         "openclaw-gateway-token"
         "openclaw-minimax-api-key"
         "openclaw-discord-id"
+        "openclaw-server-id"
+        "openclaw-beni-discord-id"
         # Orkestr
         "orkestr-db-password"
         "orkestr-secret-key-base"
