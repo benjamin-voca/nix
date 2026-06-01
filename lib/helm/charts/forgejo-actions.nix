@@ -55,6 +55,7 @@ in {
               ];
             };
             container = {
+              network = "host";
               options = "--dns 8.8.8.8 --dns 1.1.1.1";
             };
           };
