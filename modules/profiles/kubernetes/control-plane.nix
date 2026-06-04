@@ -5,6 +5,20 @@
   ...
 }: let
   flannelInterface = "enp0s31f6";
+
+  # certmgr v3.0.3 (current nixpkgs) ignores the `before:` renewal threshold and
+  # re-persists every cert on every renewInterval cycle, which triggers
+  # `systemctl restart kube-apiserver / controller-manager / scheduler / kubelet /
+  # addon-manager / kube-proxy / flannel` each time. With the upstream default
+  # of 30m + 720h cfssl expiry this caused continuous control-plane thrash
+  # (see MEMORY.md "certmgr control-plane thrash incident".
+  #
+  # Mitigation here: check certs daily instead of every 30 minutes, and sign
+  # 1-year certs so the spurious renewals don't matter.
+  # TODO: replace certmgr entirely with a one-shot generator + manual rotation,
+  # or upgrade to a fixed certmgr release.
+  certExpiry = "8760h"; # 1 year
+  certCheckInterval = "24h";
 in {
   imports = [
     ../../shared/quad-common.nix
@@ -108,6 +122,33 @@ in {
   };
 
 
+  # Override the upstream kubernetes module's cfssl config to sign 1-year
+  # certs instead of the upstream 30-day default. Combined with the certmgr
+  # `renewInterval` increase below, this makes the spurious renewals harmless.
+  services.cfssl.configFile = lib.mkForce (toString (
+    pkgs.writeText "cfssl-config.json" (
+      builtins.toJSON {
+        signing = {
+          profiles = {
+            default = {
+              usages = ["digital signature" "key encipherment" "server auth" "client auth"];
+              auth_key = "default";
+              expiry = certExpiry;
+            };
+          };
+        };
+        auth_keys = {
+          default = {
+            type = "standard";
+            key = "file:${config.services.cfssl.dataDir}/apitoken.secret";
+          };
+        };
+      }
+    )
+  ));
+
+  services.certmgr.renewInterval = certCheckInterval;
+
   systemd.services.certmgr = {
     after = ["cfssl.service" "network-online.target"];
     wants = ["cfssl.service" "network-online.target"];
@@ -118,14 +159,18 @@ in {
     };
   };
 
+  # Don't `requires=` certmgr: a certmgr restart must not cascade into
+  # tearing down etcd / apiserver. `wants=` is enough — if certmgr isn't up,
+  # the cert files on disk still let these services start.
   systemd.services.etcd = {
-    after = ["certmgr.service"];
-    requires = ["certmgr.service"];
+    after = ["cfssl.service" "certmgr.service" "network-online.target"];
+    wants = ["cfssl.service" "certmgr.service"];
   };
 
   systemd.services.kube-apiserver = {
-    after = ["certmgr.service" "etcd.service"];
-    requires = ["certmgr.service" "etcd.service"];
+    after = ["cfssl.service" "certmgr.service" "etcd.service"];
+    wants = ["cfssl.service" "certmgr.service"];
+    requires = ["etcd.service"];
     environment.GODEBUG = "netdns=cgo";
   };
 
