@@ -150,6 +150,7 @@
         "orkestr-token-signing-secret"
         "orkestr-electric-secret"
         "orkestr-dns-cluster-query"
+        "orkestr-openrouter-api-key"
         # LibreChat
         "librechat-zhipu-api-key"
         "librechat-minimax-api-key"
