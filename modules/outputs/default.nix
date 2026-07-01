@@ -324,6 +324,8 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/04-forgejo-runner-secret.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
+      cat $out/04a-forgejo-runner-daemon-config.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
       if [ -f "$out/04-forgejo-actions.yaml" ]; then
         cat $out/04-forgejo-actions.yaml >> $out/bootstrap.yaml
         echo "---" >> $out/bootstrap.yaml

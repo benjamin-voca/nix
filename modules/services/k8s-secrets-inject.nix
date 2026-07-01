@@ -110,6 +110,24 @@ in {
             echo "Injected harbor-registry (quadpacienti namespace)"
           fi
 
+          # Harbor pull secret for the forgejo-actions runner.
+          # The runner's Docker-in-Docker sidecar pulls private job images
+          # (e.g. library/orkestr-ci) via the Go docker SDK in the act-runner
+          # container, which reads /root/.docker/config.json for credentials.
+          # 10.0.0.56:5000 is the HTTP endpoint the dind daemon is configured to
+          # trust (insecure-registry). Without this, pulls fail with
+          # "no basic auth credentials" because the `library` project is private.
+          if [ -f /run/secrets/harbor-registry-password ]; then
+            HARBOR_REG_PW=$(cat /run/secrets/harbor-registry-password)
+            $kubectl create secret docker-registry harbor-registry \
+              --namespace=forgejo \
+              --docker-server=10.0.0.56:5000 \
+              --docker-username=harbor_registry_user \
+              --docker-password="$HARBOR_REG_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected harbor-registry (forgejo namespace) for act-runner pulls"
+          fi
+
           # CNPG edukurs password
           if [ -f /run/secrets/cnpg-edukurs-password ]; then
             CNPG_PW=$(cat /run/secrets/cnpg-edukurs-password)

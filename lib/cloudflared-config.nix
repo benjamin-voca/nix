@@ -45,8 +45,12 @@
       service = "http://127.0.0.1:30856";
     }
     {
+      # Minecraft Java server on the MetalLB LoadBalancer VIP (reachable from
+      # the host via kube-proxy). Vanilla/cracked clients cannot use a Cloudflare
+      # Tunnel directly — connect via the LAN VIP 192.168.1.245 or over Tailscale.
+      # This route only serves cloudflared-access users.
       hostname = "minecraft.quadtech.dev";
-      service = "tcp://127.0.0.1:25565";
+      service = "tcp://192.168.1.245:25565";
     }
     {
       hostname = "edukurs.quadtech.dev";

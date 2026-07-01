@@ -1,0 +1,702 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: "Run all jobs (ignore change detection)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MIX_ENV: test
+  MIX_ENV_PROD: prod
+  REGISTRY: 10.0.0.56:5000
+  APP_IMAGE: 10.0.0.56:5000/library/orkestr
+  PROXY_IMAGE: 10.0.0.56:5000/library/orkestr-electric-proxy
+  PNPM_VERSION: "10.33.4"
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  # 1. Change detection (always runs)
+  # ═══════════════════════════════════════════════════════════════
+  detect-changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    container:
+      image: node:25-bookworm
+    outputs:
+      fe_changed: ${{ steps.detect.outputs.fe_changed }}
+      be_changed: ${{ steps.detect.outputs.be_changed }}
+      mkt_changed: ${{ steps.detect.outputs.mkt_changed }}
+      app_changed: ${{ steps.detect.outputs.app_changed }}
+      admin_changed: ${{ steps.detect.outputs.admin_changed }}
+      mix_lock_changed: ${{ steps.detect.outputs.mix_lock_changed }}
+      any_changed: ${{ steps.detect.outputs.any_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Compute change flags
+        id: detect
+        shell: bash
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          set -e
+
+          if [ "${GITHUB_EVENT_NAME}" = 'pull_request' ] && [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF}"
+            BASE="origin/${GITHUB_BASE_REF}"
+          elif [ -n "${GITHUB_EVENT_BEFORE:-}" ] && [ "${GITHUB_EVENT_BEFORE}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${GITHUB_EVENT_BEFORE}"
+          else
+            BASE="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+           FILES="$(git diff --name-only "${BASE}" "${GITHUB_SHA}" || true)"
+
+           FE_CHANGED=false
+           BE_CHANGED=false
+           MKT_CHANGED=false
+           APP_CHANGED=false
+           ADMIN_CHANGED=false
+           MIX_LOCK_CHANGED=false
+           ANY_CHANGED=false
+
+          while IFS= read -r file; do
+            [ -z "${file}" ] && continue
+            ANY_CHANGED=true
+
+            case "${file}" in
+              # CI/infra tooling → run everything
+              .gitea/workflows/*|.gitea/actions/*|mise.toml|.tool-versions)
+                FE_CHANGED=true
+                BE_CHANGED=true
+                APP_CHANGED=true
+                ADMIN_CHANGED=true
+                ;;
+              # Root FE config → all FE apps
+              package.json|pnpm-lock.yaml|pnpm-workspace.yaml|tsconfig.json|vitest.config.ts|eslint.config.js|.oxlintrc.json|turbo.json)
+                FE_CHANGED=true
+                APP_CHANGED=true
+                ADMIN_CHANGED=true
+                ;;
+              # Marketing
+              apps/marketing/*)
+                MKT_CHANGED=true
+                ;;
+              # App
+              apps/app/*)
+                FE_CHANGED=true
+                APP_CHANGED=true
+                ;;
+              # Admin
+              apps/admin/*)
+                FE_CHANGED=true
+                ADMIN_CHANGED=true
+                ;;
+              # Shared packages → both apps
+              packages/*|packages/**)
+                FE_CHANGED=true
+                APP_CHANGED=true
+                ADMIN_CHANGED=true
+                ;;
+              # Other FE (e2e, playwright)
+              apps/*|apps/**|e2e/*|e2e/**|playwright/*|playwright/**|playwright-ct.config.ts|playwright.config.ts)
+                FE_CHANGED=true
+                ;;
+              mix.lock)
+                BE_CHANGED=true
+                MIX_LOCK_CHANGED=true
+                ;;
+              # Backend
+              lib/*|lib/**|config/*|config/**|priv/*|priv/**|test/*|test/**|mix.exs|Dockerfile|Dockerfile.ci|.formatter.exs|.credo.exs|k8s/*|k8s/**)
+                BE_CHANGED=true
+                ;;
+            esac
+          done <<EOF
+          ${FILES}
+          EOF
+
+          echo "fe_changed=${FE_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "be_changed=${BE_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "mkt_changed=${MKT_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "app_changed=${APP_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "admin_changed=${ADMIN_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "mix_lock_changed=${MIX_LOCK_CHANGED}" >> "${GITHUB_OUTPUT}"
+          echo "any_changed=${ANY_CHANGED}" >> "${GITHUB_OUTPUT}"
+
+  # ═══════════════════════════════════════════════════════════════
+  # 2. Fast checks (single runner, failure-resistant)
+  # ═══════════════════════════════════════════════════════════════
+  fast-checks:
+    name: Fast checks
+    runs-on: ubuntu-latest
+    container:
+      image: node:25-bookworm
+    needs: [detect-changes]
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.any_changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.gitea/actions/setup
+        with:
+          backend: ${{ needs.detect-changes.outputs.be_changed }}
+          backend_cache_suffix: "test"
+          backend_mix_env: "test"
+          frontend: ${{ needs.detect-changes.outputs.fe_changed }}
+
+      - name: Check test build cache
+        if: needs.detect-changes.outputs.be_changed == 'true'
+        id: mix_test_build_fast
+        shell: bash
+        run: |
+          if [ -d "_build/test/lib/orkestr/ebin" ]; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Restore backend deps
+        if: needs.detect-changes.outputs.be_changed == 'true'
+        run: MIX_ENV=test mix deps.get
+
+      - name: Compile backend (test)
+        if: needs.detect-changes.outputs.be_changed == 'true' && steps.mix_test_build_fast.outputs.exists != 'true'
+        env:
+          MIX_ENV: test
+        run: |
+          mix deps.compile
+          mix compile
+
+      - name: Restore frontend deps
+        if: needs.detect-changes.outputs.fe_changed == 'true' || needs.detect-changes.outputs.mkt_changed == 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Electric tenant safety
+        if: needs.detect-changes.outputs.be_changed == 'true'
+        run: MIX_ENV=test mix run --no-start -e "Orkestr.Electric.TenantSafety.verify!()"
+
+      - name: BE format
+        if: needs.detect-changes.outputs.be_changed == 'true'
+        run: MIX_ENV=test mix format --check-formatted
+
+      - name: BE credo
+        if: needs.detect-changes.outputs.be_changed == 'true'
+        run: MIX_ENV=test mix credo --strict
+
+      - name: FE format
+        if: needs.detect-changes.outputs.fe_changed == 'true'
+        run: pnpm format --check
+
+      - name: FE lint
+        if: needs.detect-changes.outputs.fe_changed == 'true'
+        run: pnpm lint
+
+      - name: FE typecheck (app + admin + packages)
+        if: needs.detect-changes.outputs.fe_changed == 'true'
+        run: pnpm typecheck
+
+      - name: Marketing typecheck
+        if: needs.detect-changes.outputs.mkt_changed == 'true'
+        run: pnpm --filter @orkestr/marketing exec astro check
+
+  # ═══════════════════════════════════════════════════════════════
+  # 3. Backend slow checks (tests, generate, dialyzer, security)
+  # ═══════════════════════════════════════════════════════════════
+  backend-slow:
+    name: Backend slow checks
+    runs-on: ubuntu-latest
+    container:
+      image: node:25-bookworm
+    needs: [detect-changes]
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.be_changed == 'true'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orkestr_test
+    env:
+      DATABASE_URL: ecto://postgres:postgres@postgres:5432/orkestr_test
+      PGHOST: postgres
+      PGPORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Setup action restores mix test cache (deps + _build/test) and pnpm store
+      - uses: ./.gitea/actions/setup
+        with:
+          backend: "true"
+          backend_cache_suffix: "test"
+          backend_mix_env: "test"
+          frontend: "true"
+
+      - name: Check test build cache
+        id: mix_test_build
+        shell: bash
+        run: |
+          if [ -d "_build/test/lib/orkestr/ebin" ]; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Restore backend deps
+        run: MIX_ENV=test mix deps.get
+
+      - name: Compile backend (test)
+        if: steps.mix_test_build.outputs.exists != 'true'
+        env:
+          MIX_ENV: test
+        run: |
+          mix deps.compile
+          mix compile
+
+      - name: Restore frontend deps (for oxfmt in codegen formatting)
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      # ── Dialyzer setup ──────────────────────────────────────────
+      # Cache PLTs + dev build together — deps are cached separately by setup action
+      - name: Restore dialyzer PLTs + dev build
+        id: dialyzer_cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            _build/dev
+            priv/plts
+          key: ${{ runner.os }}-dialyzer-v2-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', '.tool-versions') }}
+          restore-keys: |
+            ${{ runner.os }}-dialyzer-v2-
+
+      - name: Compile deps for dialyzer
+        if: steps.dialyzer_cache.outputs.cache-hit != 'true'
+        env:
+          MIX_ENV: dev
+        run: |
+          mix deps.get
+          mix deps.compile
+
+      - name: Build dialyzer PLTs
+        if: steps.dialyzer_cache.outputs.cache-hit != 'true'
+        env:
+          MIX_ENV: dev
+        run: mix dialyzer --plt
+
+      # ── Code generation ───────────────────────────────────────────
+
+      - name: Generate types & audit
+        env:
+          MIX_ENV: test
+        run: |
+          mix codegen
+          mix hex.audit || true
+
+      - name: Format generated files
+        shell: bash
+        run: |
+          set -e
+          pnpm format packages/db/generated/ apps/app/src/types/generated-iam.ts apps/app/src/types/generated-permissions.ts
+
+      - name: Check no generated diff
+        shell: bash
+        run: |
+          set -e
+          changed=0
+          for path in packages/db/generated/ apps/app/src/types/generated-iam.ts apps/app/src/types/generated-permissions.ts; do
+            if [ -e "$path" ]; then
+              if ! git diff --exit-code --quiet "$path"; then
+                echo "Changes in $path"
+                changed=1
+              fi
+            fi
+          done
+          if [ $changed -eq 1 ]; then
+            echo "Generated files have changed. Commit the updated generated files."
+            exit 1
+          fi
+
+      - name: Wait for Postgres
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            if (echo > /dev/tcp/postgres/5432) >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Postgres service did not become ready in time"
+          exit 1
+
+      - name: Setup database
+        shell: bash
+        run: |
+          MIX_ENV=test mix ecto.create
+          MIX_ENV=test mix ecto.migrate
+
+      - name: Run dialyzer
+        run: MIX_ENV=dev mix dialyzer --no-compile
+
+      - name: Run backend tests
+        run: mix test
+
+      # MUST use if: always() so cache saves even when earlier steps fail
+      - name: Save dialyzer cache
+        if: always() && steps.dialyzer_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            _build/dev
+            priv/plts
+          key: ${{ runner.os }}-dialyzer-v2-${{ hashFiles('mix.lock', 'mix.exs', 'mise.toml', '.tool-versions') }}
+
+  # ═══════════════════════════════════════════════════════════════
+  # 4. Frontend slow checks (tests, CT, security)
+  # ═══════════════════════════════════════════════════════════════
+  frontend-slow:
+    name: Frontend slow checks
+    runs-on: ubuntu-latest
+    container:
+      image: node:25-bookworm
+    needs: [detect-changes]
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.fe_changed == 'true'
+    env:
+      NODE_ENV: production
+      PLAYWRIGHT_BROWSERS_PATH: /root/.cache/ms-playwright
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.gitea/actions/setup
+        with:
+          frontend: "true"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+          key: ${{ runner.os }}-nodemodules-v2-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-nodemodules-v2-
+
+      - run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Install Playwright system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq || true
+          apt-get install -y --no-install-recommends \
+            libasound2 libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
+            libcups2 libdbus-1-3 libdrm2 libgbm1 libnspr4 libnss3 \
+            libxcomposite1 libxdamage1 libxfixes3 libxkbcommon0 libxrandr2 \
+            xvfb fonts-liberation fonts-noto-color-emoji fonts-unifont \
+            xfonts-scalable fonts-freefont-ttf fonts-ipafont-gothic \
+            fonts-wqy-zenhei fonts-tlwg-loma-otf 2>/dev/null || true
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: /root/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-v2-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-v2-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          # Retry apt-get update with backoff — Debian mirrors are flaky in CI
+          for i in 1 2 3 4 5; do
+            if apt-get update -qq 2>/dev/null; then
+              echo "apt-get update succeeded"
+              pnpm exec playwright install --with-deps chromium
+              exit $?
+            fi
+            echo "apt-get update failed (attempt $i/5), retrying in $((i * 10))s..."
+            sleep $((i * 10))
+          done
+          # Fallback: install browsers without system deps
+          echo "::warning::apt-get update failed after 5 retries. Installing playwright browsers without system deps."
+          pnpm exec playwright install chromium
+
+      - name: Run component tests
+        run: pnpm test:ct -- --reporter=line
+
+      - name: Audit frontend deps
+        continue-on-error: true
+        run: pnpm audit --audit-level=moderate
+
+  # ═══════════════════════════════════════════════════════════════
+  # 5. Deploy jobs (only on main push)
+  # ═══════════════════════════════════════════════════════════════
+  deploy-app:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    container:
+      image: node:25-bookworm
+    needs: [detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.app_changed == 'true'
+    env:
+      PNPM_VERSION: "10.33.4"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        run: |
+          if command -v corepack >/dev/null 2>&1; then
+            corepack enable
+            corepack prepare pnpm@${PNPM_VERSION} --activate
+          else
+            npm install -g pnpm@${PNPM_VERSION}
+          fi
+
+      - name: Cache pnpm install
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.local/share/pnpm/store
+          key: cd-app-v2-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            cd-app-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: |
+          cd apps/app
+          VITE_API_URL=https://api.orkestr-os.com npx vite build
+
+      - name: Deploy app to Cloudflare Pages
+        run: |
+          cd apps/app
+          npx wrangler@latest pages deploy dist --project-name=orkestr-app --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy-admin:
+    name: Deploy admin
+    runs-on: ubuntu-latest
+    container:
+      image: node:25-bookworm
+    needs: [detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.admin_changed == 'true'
+    env:
+      PNPM_VERSION: "10.33.4"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        run: |
+          if command -v corepack >/dev/null 2>&1; then
+            corepack enable
+            corepack prepare pnpm@${PNPM_VERSION} --activate
+          else
+            npm install -g pnpm@${PNPM_VERSION}
+          fi
+
+      - name: Cache pnpm install
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.local/share/pnpm/store
+          key: cd-admin-v2-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            cd-admin-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build admin
+        run: |
+          cd apps/admin
+          VITE_API_URL=https://api.orkestr-os.com npx vite build
+
+      - name: Deploy admin to Cloudflare Pages
+        run: |
+          cd apps/admin
+          npx wrangler@latest pages deploy dist --project-name=orkestr-admin --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy-marketing:
+    name: Deploy marketing page
+    runs-on: ubuntu-latest
+    container:
+      image: node:25-bookworm
+    needs: [detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.mkt_changed == 'true'
+    env:
+      PNPM_VERSION: "10.33.4"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        run: |
+          if command -v corepack >/dev/null 2>&1; then
+            corepack enable
+            corepack prepare pnpm@${PNPM_VERSION} --activate
+          else
+            npm install -g pnpm@${PNPM_VERSION}
+          fi
+
+      - name: Cache pnpm install
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            ~/.local/share/pnpm/store
+          key: cd-mkt-v2-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            cd-mkt-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter @orkestr/marketing build
+
+      - name: Deploy to Cloudflare Pages
+        run: |
+          npx wrangler@latest pages deploy apps/marketing/dist --project-name=orkestr-landing --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  build-images:
+    name: Build images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.be_changed == 'true'
+    container:
+      image: node:25-bookworm
+    env:
+      MIX_ENV: prod
+      DOCKER_HOST: unix:///var/run/docker.sock
+      APP_IMAGE: 10.0.0.56:5000/library/orkestr
+      PROXY_IMAGE: 10.0.0.56:5000/library/orkestr-electric-proxy
+    steps:
+      - name: Install Docker
+        run: |
+          set -ex
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update && apt-get install -y --no-install-recommends docker.io
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.gitea/actions/setup
+        with:
+          backend: true
+          backend_mix_env: prod
+          frontend: false
+
+      # Setup action restores _build/prod from cache — stale .beam files
+      # poison the release. Nuke it and rebuild app code from scratch.
+      - name: Remove stale _build/prod
+        run: rm -rf _build/prod
+
+      - name: Build release
+        run: |
+          set -e
+          mkdir -p priv/static && touch priv/static/.keep
+          mix local.hex --force && mix local.rebar --force
+          mix deps.get --only prod
+          mix deps.compile
+          mix compile
+          mix phx.digest
+          MIX_BUILD=strip mix release
+
+      - name: Package release
+        run: |
+          set -e
+          mkdir -p release-context
+          cp -r _build/prod/rel/orkestr release-context/
+
+      - name: Start Docker daemon
+        run: |
+          set -e
+          if ! docker info >/dev/null 2>&1; then
+            dockerd --iptables=false > /tmp/dockerd.log 2>&1 &
+            for i in $(seq 1 30); do
+              docker info >/dev/null 2>&1 && break
+              sleep 1
+            done
+          fi
+          docker info
+
+      - name: Log in to Harbor
+        run: |
+          echo "${{ secrets.HARBOR_REGISTRY_PASSWORD }}" | docker login \
+            -u "${{ secrets.HARBOR_REGISTRY_USER }}" \
+            --password-stdin \
+            10.0.0.56:5000
+
+      - name: Build & push app image
+        run: |
+          set -e
+          docker build --target runtime \
+            -f Dockerfile \
+            -t $APP_IMAGE:${{ github.sha }} \
+            -t $APP_IMAGE:latest \
+            .
+          docker push $APP_IMAGE:${{ github.sha }}
+          docker push $APP_IMAGE:latest
+          rm -rf release-context/
+
+      - name: Build & push proxy image
+        run: |
+          set -e
+          docker build \
+            -t $PROXY_IMAGE:${{ github.sha }} \
+            -t $PROXY_IMAGE:latest \
+            ./infra/electric-proxy/
+          docker push $PROXY_IMAGE:${{ github.sha }}
+          docker push $PROXY_IMAGE:latest
+
+      - name: Sync ArgoCD app
+        run: |
+          set -e
+          cd /tmp
+          rm -rf deploy-kustomize 2>/dev/null || true
+          git clone https://x-access-token:${{ secrets.CI_TOKEN }}@forge.quadtech.dev/QuadCoreTech/orkestr.git deploy-kustomize
+          cd deploy-kustomize
+          git config user.email "ci@orkestr-os.com"
+          git config user.name "CI Deploy"
+          git checkout main
+          sed -i 's|newTag: .*|newTag: ${{ github.sha }}|g' k8s/overlays/production/kustomization.yaml
+          git add k8s/overlays/production/kustomization.yaml
+          git commit -m "ci: deploy orkestr ${{ github.sha }} [skip ci]"
+          git push origin main

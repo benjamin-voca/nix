@@ -30,6 +30,20 @@
           };
         };
       };
+
+      # metallb 0.16.0 ships an frr-k8s subchart whose
+      # `service-monitor.yaml` template unconditionally reads
+      # `.Values.prometheus.serviceMonitor.enabled`, but the upstream
+      # values.yaml leaves that key commented out, so the render errors
+      # with "nil pointer evaluating interface {}.serviceMonitor" on any
+      # install. Pass an explicit (false) value through.
+      frr-k8s = {
+        prometheus = {
+          serviceMonitor = {
+            enabled = false;
+          };
+        };
+      };
     };
   };
 }
