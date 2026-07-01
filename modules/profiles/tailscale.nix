@@ -14,7 +14,9 @@
     # (e.g. the Minecraft server on MetalLB VIP 192.168.1.245:25565) without
     # an SSH tunnel. Route must be approved in the Tailscale admin console,
     # and clients must enable "accept routes".
-    advertiseRoutes = ["192.168.1.0/24"];
+    # (extraSetFlags rather than advertiseRoutes — this nixpkgs' tailscale
+    # module predates the structured advertiseRoutes option.)
+    extraSetFlags = ["--advertise-routes=192.168.1.0/24"];
   };
 
   # Allow Tailscale through firewall
