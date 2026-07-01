@@ -62,11 +62,13 @@
               servicePort: 25565
               # Create mod + its required Modrinth dependencies (Flywheel, Ponder, ...)
               # JEI = recipe/item browser ("Just Enough Items"); pairs with Create.
+              # allowedVersionType: beta — JEI's 1.21.1/NeoForge builds are all beta.
               modrinth:
                 projects:
                   - create
                   - jei
                 downloadDependencies: required
+                allowedVersionType: beta
               # RCON password comes from the injected minecraft-rcon-secret (sops)
               rcon:
                 enabled: true
