@@ -80,7 +80,7 @@
               dataDir:
                 enabled: true
                 storageClass: ceph-block
-                Size: 50Gi
+                Size: 200Gi
             resources:
               requests:
                 # CPU requests on backbone-01 are already ~95% saturated, so keep
