@@ -40,6 +40,18 @@
             };
           };
         };
+        # metallb 0.16.0 ships an frr-k8s subchart whose service-monitor.yaml
+        # template reads .Values.prometheus.serviceMonitor.enabled, but the
+        # subchart leaves that key unset, so the chart fails to render with
+        # "nil pointer evaluating interface {}.serviceMonitor". Pass an
+        # explicit false so the service-monitor template is skipped.
+        frr-k8s = {
+          prometheus = {
+            serviceMonitor = {
+              enabled = false;
+            };
+          };
+        };
       };
     }
     [kubelib.buildHelmChart];
