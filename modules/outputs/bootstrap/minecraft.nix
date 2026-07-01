@@ -61,9 +61,11 @@
               loadBalancerIP: 192.168.1.245
               servicePort: 25565
               # Create mod + its required Modrinth dependencies (Flywheel, Ponder, ...)
+              # JEI = recipe/item browser ("Just Enough Items"); pairs with Create.
               modrinth:
                 projects:
                   - create
+                  - jei
                 downloadDependencies: required
               # RCON password comes from the injected minecraft-rcon-secret (sops)
               rcon:

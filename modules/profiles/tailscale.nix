@@ -10,6 +10,11 @@
     enable = true;
     useRoutingFeatures = "server"; # subnet router + relay
     authKeyFile = "/run/secrets/tailscale-auth-key";
+    # Advertise the cluster LAN so tailnet peers can reach LAN-only services
+    # (e.g. the Minecraft server on MetalLB VIP 192.168.1.245:25565) without
+    # an SSH tunnel. Route must be approved in the Tailscale admin console,
+    # and clients must enable "accept routes".
+    advertiseRoutes = ["192.168.1.0/24"];
   };
 
   # Allow Tailscale through firewall
