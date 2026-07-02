@@ -62,11 +62,17 @@
               servicePort: 25565
               # Create mod + its required Modrinth dependencies (Flywheel, Ponder, ...)
               # JEI = recipe/item browser ("Just Enough Items"); pairs with Create.
+              # teleport-commands = server-side teleport commands for all players
+              #   (vanilla /tp needs op-lvl2 which also grants /give etc.; this
+              #   avoids handing out cheats). Client-unsupported = no client mod.
+              # sophisticated-backpacks = backpacks (auto-pulls sophisticated-core).
               # allowedVersionType: beta — JEI's 1.21.1/NeoForge builds are all beta.
               modrinth:
                 projects:
                   - create
                   - jei
+                  - teleport-commands
+                  - sophisticated-backpacks
                 downloadDependencies: required
                 allowedVersionType: beta
               # RCON password comes from the injected minecraft-rcon-secret (sops)
