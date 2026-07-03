@@ -79,11 +79,11 @@
                   # Pinned to EXACT Modrinth version IDs so server<->client stop
                   # drifting on every restart (itzg otherwise re-pulls "latest").
                   - create:UjX6dr61               # 6.0.10
-                  - sophisticated-core:G3rcMJMX      # 1.4.62 (matches client)
+                  - sophisticated-core:XCVRH6ak       # 1.4.63 (matches client)
                   - sophisticated-backpacks:y2W0V4fw   # 3.25.65 (matches client)
                   - jei                            # lenient (optional both sides)
                   - teleport-commands              # server-only
-                downloadDependencies: required
+                downloadDependencies: none  # explicit pins only; Create bundles flywheel/ponder as jarinjar
                 allowedVersionType: beta
               # RCON password comes from the injected minecraft-rcon-secret (sops)
               rcon:
