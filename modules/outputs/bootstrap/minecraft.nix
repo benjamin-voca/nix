@@ -76,10 +76,13 @@
               # allowedVersionType: beta — JEI's 1.21.1/NeoForge builds are all beta.
               modrinth:
                 projects:
-                  - create
-                  - jei
-                  - teleport-commands
-                  - sophisticated-backpacks
+                  # Pinned to EXACT Modrinth version IDs so server<->client stop
+                  # drifting on every restart (itzg otherwise re-pulls "latest").
+                  - create:UjX6dr61               # 6.0.10
+                  - sophisticated-core:XCVRH6ak    # 1.4.63 (matches client)
+                  - sophisticated-backpacks:7XdJmOp2 # 3.25.66 (matches client)
+                  - jei                            # lenient (optional both sides)
+                  - teleport-commands              # server-only
                 downloadDependencies: required
                 allowedVersionType: beta
               # RCON password comes from the injected minecraft-rcon-secret (sops)
@@ -93,6 +96,10 @@
               # Fewer simulated chunks = big per-tick CPU win (chart has no
               # dedicated simulationDistance key, so pass the itzg env directly).
               SIMULATION_DISTANCE: "6"
+              # Pin NeoForge build to match the client (21.1.234). If the itzg
+              # image ignores this env, the server stays on latest (21.1.235) and
+              # the client must instead be updated to 21.1.235.
+              NEOFORGE_VERSION: "21.1.234"
             persistence:
               dataDir:
                 enabled: true
