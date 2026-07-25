@@ -79,6 +79,9 @@
                   # Pinned to EXACT Modrinth version IDs so server<->client stop
                   # drifting on every restart (itzg otherwise re-pulls "latest").
                   - create:UjX6dr61               # 6.0.10
+                  - create-aeronautics:w7zlLnea    # 1.3.0+mc1.21.1 (airships/contraptions)
+                  - sable:1L6XJqnY                 # 2.0.3+mc1.21.1 (required dep of create-aeronautics)
+                  - treechop:iLXWmfax              # 0.19.3 (HT's TreeChop — chop whole trees)
                   - sophisticated-core:XCVRH6ak       # 1.4.63 (matches client)
                   - sophisticated-backpacks:y2W0V4fw   # 3.25.65 (matches client)
                   - jei                            # lenient (optional both sides)
