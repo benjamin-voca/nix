@@ -1,5 +1,5 @@
 {helmLib}: let
-  forgejoTag = "15.0.1";
+  forgejoTag = "16.0.1";
   forgejoRegistry = "codeberg.org";
   forgejoRepo = "forgejo/forgejo";
   forgejoImage = "${forgejoRegistry}/${forgejoRepo}:${forgejoTag}";
