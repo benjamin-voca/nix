@@ -32,6 +32,9 @@
           storage: 50Gi
   '';
 
+  # NOTE: despite the "patch" name this is the full forgejo-db Cluster spec
+  # (applied via `kubectl apply`). It defines the CNPG postgres cluster used
+  # by Forgejo, so storage sizing and postgres tuning live here.
   forgejoDbStorageclassPatch = ''
     apiVersion: postgresql.cnpg.io/v1
     kind: Cluster
@@ -39,10 +42,20 @@
       name: forgejo-db
       namespace: forgejo
     spec:
+      instances: 3
       storage:
         storageClass: ceph-block
-        size: 20Gi
-      instances: 3
+        size: 40Gi
+      postgresql:
+        parameters:
+          # Cap how much WAL a single replication slot may retain. The
+          # default (-1 = unlimited) let a diverged replica's slot pin WAL
+          # until pg_wal filled the entire 20Gi data volume and prevented
+          # the primary from starting (Forgejo SSH then failed with
+          # "Key check failed" because the DB was unreachable). 2GB is
+          # generous for a healthy replica to catch up while guaranteeing
+          # a stuck slot can never exhaust the disk again.
+          max_slot_wal_keep_size: 2GB
   '';
 
   forgejoRunnerSecret = ''

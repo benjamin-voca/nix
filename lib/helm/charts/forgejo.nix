@@ -176,6 +176,17 @@ in rec {
           webhook = {
             ALLOWED_HOST_LIST = "*";
           };
+
+          # Repository code search indexer.
+          # Exclude agent workspace dirs so .agents/ contents don't pollute
+          # repo search results. NOTE: requires a re-index of affected repos
+          # after deploy for existing content to be dropped from the index.
+          indexer = {
+            # Code search indexer (Bleve). Enabled explicitly so the
+            # REPO_INDEXER_EXCLUDE glob below is actually applied.
+            REPO_INDEXER_ENABLED = true;
+            REPO_INDEXER_EXCLUDE = "**/.agents/**";
+          };
         };
 
         additionalConfigFromEnvs = [
