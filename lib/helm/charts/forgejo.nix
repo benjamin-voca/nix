@@ -186,6 +186,11 @@ in rec {
             # REPO_INDEXER_EXCLUDE glob below is actually applied.
             REPO_INDEXER_ENABLED = true;
             REPO_INDEXER_EXCLUDE = "**/.agents/**";
+            # Opening the bleve index on cold CephFS takes >30s (node reboot /
+            # cold cache), and the default 30s startup timeout is FATAL — the
+            # web pod crash-looped for days (4k+ restarts), flapping readiness
+            # and 502-ing act-runner task fetches. 5m is plenty for a cold open.
+            REPO_INDEXER_STARTUP_TIMEOUT = "5m";
           };
         };
 
