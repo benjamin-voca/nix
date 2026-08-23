@@ -1,4 +1,5 @@
 {helmLib}: let
+  d = import ../../domain.nix;
   compatChartSource = "https://dl." + "gi" + "tea" + ".com/charts";
   compatRootUrlKey = "gi" + "teaRootURL";
 in {
@@ -7,15 +8,21 @@ in {
     chart = helmLib.kubelib.downloadHelmChart {
       repo = compatChartSource;
       chart = "actions";
-      version = "0.0.3";
-      chartHash = "sha256-DyqFssxzyKD4+LMbdsU133IFVcGqHeFOaqLPgZo28Eg=";
+      version = "0.1.2";
+      chartHash = "sha256-w4m98OUGJGInipFPEB96zyGRndD/Sq4hRMukLaGFgTo=";
     };
     namespace = "forgejo";
     values = {
       enabled = true;
-      ${compatRootUrlKey} = "https://forge.quadtech.dev";
+      ${compatRootUrlKey} = d.url "forge";
       existingSecret = "forgejo-runner-token";
       existingSecretKey = "token";
+
+      # kubelet-side pull credentials. The dind sidecar image is pulled from
+      # Harbor's dockerhub proxy project, which requires authentication —
+      # without this the STS init container dies with
+      # "pull access denied ... no basic auth credentials" (ImagePullBackOff).
+      global.imagePullSecrets = ["harbor-registry"];
 
       statefulset = {
         replicas = 3;
@@ -30,7 +37,8 @@ in {
                       {
                         key = "app.kubernetes.io/name";
                         operator = "In";
-                        values = ["forgejo-actions"];
+                        # chart >=0.1.x labels runner pods "actions-runner"
+                        values = ["actions-runner"];
                       }
                     ];
                   };
@@ -41,7 +49,7 @@ in {
           };
         };
 
-        actRunner = {
+        runner = {
           # /root/.docker/config.json supplies Harbor credentials to the
           # Go docker SDK when pulling private job-container images.
           extraVolumeMounts = [
@@ -121,11 +129,15 @@ in {
         ];
 
         dind = {
-          # Pull the dind sidecar image itself from Harbor's pull-through
-          # cache so even the sidecar image doesn't depend on docker.io
-          # being reachable. `library/docker` is the implicit Docker Hub
-          # namespace; Harbor's "dockerhub" proxy project serves it.
-          fullOverride = "10.0.0.56:5000/dockerhub/library/docker:28.3.3-dind";
+          # Pull dind directly from docker.io (chart default: docker:29.5.2-dind).
+          # We previously routed it through Harbor's `dockerhub` pull-through
+          # proxy (10.0.0.56:5000/dockerhub/...), but that only fetches
+          # upstream via core's repoproxy middleware (requests through
+          # harbor.voltrum.co). Direct registry pulls on cache-miss return an
+          # instant 404 "manifest unknown" — after the node reboot wiped
+          # containerd's image store, the runner STS was stuck in
+          # Init:ImagePullBackOff with no way to self-recover. Public images
+          # (docker.io, docker.gitea.com, codeberg.org) pull fine directly.
           extraVolumeMounts = [
             {
               name = "dind-daemon-config";

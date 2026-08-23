@@ -1,4 +1,5 @@
 {helmLib}: let
+  d = import ../../domain.nix;
   forgejoTag = "16.0.1";
   forgejoRegistry = "codeberg.org";
   forgejoRepo = "forgejo/forgejo";
@@ -31,7 +32,12 @@ in rec {
       };
 
       # Best-effort HA deployment (Forgejo app-level HA still has upstream caveats).
-      replicaCount = 2;
+      # ONE web replica while REPO_INDEXER_ENABLED=true: the bleve code
+      # indexer lives on the shared PVC, and two web pods racing to open/
+      # populate the same index made the second pod fatal-timeout forever
+      # (crash-loop) no matter how large STARTUP_TIMEOUT was. Git SSH,
+      # CNPG HA and valkey HA are unaffected by web replica count.
+      replicaCount = 1;
       strategy = {
         type = "RollingUpdate";
         rollingUpdate = {
@@ -55,7 +61,7 @@ in rec {
           nodePort = 32222;
           clusterIP = "";
           annotations = {
-            "external-dns.alpha.kubernetes.io/hostname" = "forge-ssh.quadtech.dev";
+            "external-dns.alpha.kubernetes.io/hostname" = d.host "forge-ssh";
           };
         };
       };
@@ -69,7 +75,7 @@ in rec {
         };
         hosts = [
           {
-            host = "forge.quadtech.dev";
+            host = d.host "forge";
             paths = [
               {
                 path = "/";
@@ -123,7 +129,7 @@ in rec {
           existingSecret = "forgejo-admin";
           username = "forgejo_admin";
           password = "REPLACE_ME";
-          email = "admin@quadtech.dev";
+          email = d.email "admin";
         };
 
         config = {
@@ -132,9 +138,9 @@ in rec {
             ROOT_PATH = "${compatDataPath}/custom/log";
           };
           server = {
-            DOMAIN = "forge.quadtech.dev";
-            ROOT_URL = "https://forge.quadtech.dev";
-            SSH_DOMAIN = "forge-ssh.quadtech.dev";
+            DOMAIN = d.host "forge";
+            ROOT_URL = d.url "forge";
+            SSH_DOMAIN = d.host "forge-ssh";
             SSH_PORT = 22;
             DISABLE_SSH = false;
             START_SSH_SERVER = false;
@@ -186,11 +192,16 @@ in rec {
             # REPO_INDEXER_EXCLUDE glob below is actually applied.
             REPO_INDEXER_ENABLED = true;
             REPO_INDEXER_EXCLUDE = "**/.agents/**";
-            # Opening the bleve index on cold CephFS takes >30s (node reboot /
-            # cold cache), and the default 30s startup timeout is FATAL — the
-            # web pod crash-looped for days (4k+ restarts), flapping readiness
-            # and 502-ing act-runner task fetches. 5m is plenty for a cold open.
-            REPO_INDEXER_STARTUP_TIMEOUT = "5m";
+            # Opening the bleve index on cold CephFS can take minutes
+            # (node reboot / cold cache), and the default 30s startup timeout
+            # is FATAL — the web pod crash-looped for days (4k+ restarts),
+            # flapping readiness and 502-ing act-runner task fetches.
+            # -1s = never time out; paired with replicaCount=1 there is no
+            # second pod racing for the index.
+            # NOTE: the correct app.ini key is [indexer] STARTUP_TIMEOUT
+            # (REPO_INDEXER_STARTUP_TIMEOUT does not exist and is ignored —
+            # that was the original bug behind fa4743e).
+            STARTUP_TIMEOUT = "-1s";
           };
         };
 
@@ -281,8 +292,8 @@ in rec {
                           # Generate keys ONLY if they don't exist
                           if [ ! -f "$SSH_KEYS_DIR/forgejo.rsa" ]; then
                             echo "Generating new SSH host keys..."
-                            ssh-keygen -t rsa -b 4096 -f "$SSH_KEYS_DIR/forgejo.rsa" -N "" -C "forgejo@quadtech.dev"
-                            ssh-keygen -t ed25519 -f "$SSH_KEYS_DIR/forgejo.ed25519" -N "" -C "forgejo@quadtech.dev"
+                            ssh-keygen -t rsa -b 4096 -f "$SSH_KEYS_DIR/forgejo.rsa" -N "" -C "${d.email "forgejo"}"
+                            ssh-keygen -t ed25519 -f "$SSH_KEYS_DIR/forgejo.ed25519" -N "" -C "${d.email "forgejo"}"
                             echo "SSH host keys generated"
                           else
                             echo "Using existing SSH host keys from persistent storage"
