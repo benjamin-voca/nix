@@ -691,7 +691,7 @@ jobs:
           set -e
           cd /tmp
           rm -rf deploy-kustomize 2>/dev/null || true
-          git clone https://x-access-token:${{ secrets.CI_TOKEN }}@forge.quadtech.dev/QuadCoreTech/orkestr.git deploy-kustomize
+          git clone https://x-access-token:${{ secrets.CI_TOKEN }}@forge.voltrum.co/QuadCoreTech/orkestr.git deploy-kustomize
           cd deploy-kustomize
           git config user.email "ci@orkestr-os.com"
           git config user.name "CI Deploy"

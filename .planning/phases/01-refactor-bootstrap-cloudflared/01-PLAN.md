@@ -46,24 +46,24 @@ Then in `config` section, set the DEFAULT ingress rules by reconciling the two c
 The combined route list (from both backbone.nix and bootstrap.nix, deduplicated) should be:
 
 ```
-{ hostname = "backbone-01.quadtech.dev"; service = "ssh://127.0.0.1:22"; }
-{ hostname = "forge-ssh.quadtech.dev"; service = "tcp://127.0.0.1:32222"; }
-{ hostname = "forge.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "argocd.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "helpdesk.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "harbor.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "backbone-01.voltrum.co"; service = "ssh://127.0.0.1:22"; }
+{ hostname = "forge-ssh.voltrum.co"; service = "tcp://127.0.0.1:32222"; }
+{ hostname = "forge.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "argocd.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "helpdesk.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "harbor.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
 { hostname = "educourses-pd.com"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
 { hostname = "www.educourses-pd.com"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "verdaccio.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "minecraft.quadtech.dev"; service = "tcp://127.0.0.1:25565"; }
-{ hostname = "edukurs.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "batllavatourist.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "quadpacienti.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "openclaw.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "grafana.k8s.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "grafana.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "verdaccio.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "minecraft.voltrum.co"; service = "tcp://127.0.0.1:25565"; }
+{ hostname = "edukurs.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "batllavatourist.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "quadpacienti.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "openclaw.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "grafana.k8s.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "grafana.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
 { hostname = "api.orkestr-os.com"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
-{ hostname = "*.quadtech.dev"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
+{ hostname = "*.voltrum.co"; service = "http://127.0.0.1:${toString cfg.nodePort}"; }
 { service = "http_status:404"; }
 ```
 

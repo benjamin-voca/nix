@@ -4,6 +4,7 @@
   inputs,
   ...
 }: let
+  d = import ../../lib/domain.nix;
   systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
   forAllSystems = lib.genAttrs systems;
   helmLibFor = system: let
@@ -22,8 +23,8 @@
       chart = helmLib.charts.argoproj.argo-cd;
       namespace = "argocd";
       values = import ../../lib/argocd-values.nix {
-        domain = "argocd.quadtech.dev";
-        serverUrl = "https://argocd.quadtech.dev";
+        domain = d.host "argocd";
+        serverUrl = d.url "argocd";
         serverReplicas = 1;
         controllerReplicas = 1;
         repoServerReplicas = 1;

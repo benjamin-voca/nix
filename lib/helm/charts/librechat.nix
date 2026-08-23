@@ -1,4 +1,6 @@
-{helmLib}: {
+{helmLib}: let
+  d = import ../../domain.nix;
+in {
   librechat = helmLib.buildChart {
     name = "librechat";
     chart = helmLib.kubelib.downloadHelmChart {
@@ -32,7 +34,7 @@
         };
         hosts = [
           {
-            host = "chat.quadtech.dev";
+            host = d.host "chat";
             paths = [
               {
                 path = "/";

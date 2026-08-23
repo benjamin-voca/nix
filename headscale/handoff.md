@@ -21,7 +21,7 @@ Headscale replaces the Tailscale control plane while keeping the same official T
 | Component | Role | Status |
 |---|---|---|
 | Tailscale (profiles/tailscale.nix) | VPN mesh for remote admin (backbone-01 only currently) | Active, auth key in SOPS |
-| Cloudflare Tunnel | HTTP ingress (Forgejo, ArgoCD, Harbor, etc.) + SSH via `f1.quadtech.dev` | Active, stays |
+| Cloudflare Tunnel | HTTP ingress (Forgejo, ArgoCD, Harbor, etc.) + SSH via `f1.voltrum.co` | Active, stays |
 | frontline-01 | Kubernetes worker node | No Tailscale currently |
 | backbone-01 | Kubernetes control plane + services | Tailscale enabled as subnet router |
 
@@ -137,7 +137,7 @@ networking.firewall.allowedUDPPorts = [ 51820 ];
 ├─────────────────────────────────────────────────────────┤
 │  Cloudflare Tunnel ──► HTTP services (stays as-is)      │
 │                                                          │
-│  vpn.quadtech.dev ──► Headscale (K8s, namespace: vpn)   │
+│  vpn.voltrum.co ──► Headscale (K8s, namespace: vpn)   │
 │       │                    │                              │
 │       │                    ├── Embedded DERP (TCP/HTTPS) │
 │       │                    └── STUN (UDP/3478)           │
@@ -156,7 +156,7 @@ networking.firewall.allowedUDPPorts = [ 51820 ];
 
 ### Layers:
 
-1. **Primary VPN:** Headscale (K8s deployment) → Tailscale clients connect to `vpn.quadtech.dev`
+1. **Primary VPN:** Headscale (K8s deployment) → Tailscale clients connect to `vpn.voltrum.co`
 2. **Fallback VPN:** WireGuard on backbone-01 (host-level) → direct UDP/51820
 3. **HTTP ingress:** Cloudflare Tunnel (unchanged)
 
@@ -180,7 +180,7 @@ in {
 
     loginServer = lib.mkOption {
       type = lib.types.str;
-      default = "https://vpn.quadtech.dev";
+      default = "https://vpn.voltrum.co";
       description = "Headscale control server URL";
     };
 
@@ -358,12 +358,12 @@ in {
 
       # --- Environment variables (Headscale config via env) ---
       env = {
-        HEADSCALE_SERVER_URL = "https://vpn.quadtech.dev";
+        HEADSCALE_SERVER_URL = "https://vpn.voltrum.co";
         HEADSCALE_LISTEN_ADDR = "0.0.0.0:8080";
         HEADSCALE_METRICS_LISTEN_ADDR = "0.0.0.0:9090";
         HEADSCALE_DATABASE_TYPE = "sqlite";
         HEADSCALE_DATABASE_SQLITE_PATH = "/data/headscale.db";
-        HEADSCALE_DNS_BASE_DOMAIN = "tail.quadtech.dev";
+        HEADSCALE_DNS_BASE_DOMAIN = "tail.voltrum.co";
         HEADSCALE_DNS_NAMESERVERS_GLOBAL = "1.1.1.1,1.0.0.1";
         HEADSCALE DERP_SERVER_ENABLED = "true";
         HEADSCALE_DERP_SERVER_REGION_ID = "900";
@@ -395,7 +395,7 @@ in {
           };
           hosts = [
             {
-              host = "vpn.quadtech.dev";
+              host = "vpn.voltrum.co";
               paths = [
                 { path = "/"; }
               ];
@@ -479,7 +479,7 @@ Or manage via ArgoCD app-of-apps pattern (consistent with existing `argocd-apps.
 
 ### Phase 0: Preparation (No Disruption)
 1. Deploy Headscale in K8s namespace `vpn` with gabe565 chart
-2. Configure `vpn.quadtech.dev` DNS → Cloudflare Tunnel → Headscale service
+2. Configure `vpn.voltrum.co` DNS → Cloudflare Tunnel → Headscale service
 3. Generate Headscale pre-auth key
 4. Set up ACL policy file (start permissive, tighten later)
 5. Enable embedded DERP server
@@ -493,7 +493,7 @@ Or manage via ArgoCD app-of-apps pattern (consistent with existing `argocd-apps.
    - The solution: run a SECOND tailscale instance for Headscale during migration
    - OR: switch backbone-01 to Headscale first (lowest risk — can revert)
 4. Test connectivity via Headscale IP
-5. Enroll laptop: `tailscale up --login-server=https://vpn.quadtech.dev`
+5. Enroll laptop: `tailscale up --login-server=https://vpn.voltrum.co`
 6. Verify LAN access through Headscale subnet route
 
 ### Phase 2: Switch Over
@@ -517,7 +517,7 @@ The official Tailscale client connects to exactly one control plane. You **canno
 **Option A (Recommended): Per-machine cutover**
 - Stop `tailscaled` on a machine
 - Reconfigure to point at Headscale
-- `tailscale up --login-server=https://vpn.quadtech.dev`
+- `tailscale up --login-server=https://vpn.voltrum.co`
 - Downtime: ~30 seconds per machine
 
 **Option B: Second tailscaled instance**
@@ -565,7 +565,7 @@ Example policy file (`secrets/headscale-acl.hujson` or ConfigMap):
 ```json
 {
   "groups": {
-    "group:admin": ["benjamin@quadtech.dev"]
+    "group:admin": ["benjamin@voltrum.co"]
   },
   "acls": [
     // Admins can access everything
@@ -644,9 +644,9 @@ PersistentKeepalive = 25
    - No backup (acceptable for personal infra?)
 
 8. **DNS for Headscale endpoint?**
-   - `vpn.quadtech.dev` via Cloudflare (needs tunnel route)
+   - `vpn.voltrum.co` via Cloudflare (needs tunnel route)
    - Direct public IP / DDNS hostname
-   - `headscale.k8s.quadtech.dev` via existing ingress
+   - `headscale.k8s.voltrum.co` via existing ingress
 
 9. **Cloudflare Tunnel for SSH access?**
    - Keep as-is alongside Headscale (belt and suspenders)
@@ -688,7 +688,7 @@ modules/roles/backbone.nix                # Switch profiles
 modules/hosts/backbone-01.nix             # Add SOPS secrets + config
 modules/roles/frontline.nix               # Add headscale profile
 secrets/backbone-01.yaml                  # Add headscale-auth-key + wireguard keys
-lib/cloudflared-config.nix                # Add vpn.quadtech.dev route (optional)
+lib/cloudflared-config.nix                # Add vpn.voltrum.co route (optional)
 ```
 
 ### Optionally Removed (After Migration)

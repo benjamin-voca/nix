@@ -1,110 +1,99 @@
+# Local ingress for the backbone Cloudflare Tunnel.
+#
+# IMPORTANT: this tunnel is remotely configured. On connect, cloudflared
+# pulls ingress from the Cloudflare API and overwrites this file's rules.
+# After changing hostnames here, also PUT
+#   /accounts/{id}/cfd_tunnel/{tunnelId}/configurations
+# (the cert.pem Argo Tunnel token can auth that API). DNS CNAMEs live in
+# the voltrum.co zone, NOT via `cloudflared tunnel route dns` (that CLI is
+# bound to the quadtech.dev zone in cert.pem).
 {
   tunnelId,
   credentialsFile,
   metrics ? "0.0.0.0:2003",
   protocol ? "http2",
-  ingress ? [
+  ingress ? null,
+}: let
+  d = import ./domain.nix;
+  httpNode = "http://127.0.0.1:30856";
+  httpHost = name: {
+    hostname = d.host name;
+    service = httpNode;
+  };
+  defaultIngress = [
     {
-      hostname = "mainssh.quadtech.dev";
+      hostname = d.host "mainssh";
       service = "ssh://localhost:22";
     }
     {
-      hostname = "backbone-01.quadtech.dev";
+      hostname = d.host "backbone-01";
       service = "ssh://localhost:22";
     }
     {
-      hostname = "f1.quadtech.dev";
+      hostname = d.host "f1";
       service = "ssh://localhost:22";
     }
     {
-      hostname = "forge-ssh.quadtech.dev";
+      hostname = d.host "forge-ssh";
       service = "tcp://127.0.0.1:32222";
     }
-    {
-      hostname = "forge.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "argocd.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "helpdesk.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "harbor.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
+    (httpHost "forge")
+    (httpHost "argocd")
+    (httpHost "helpdesk")
+    (httpHost "harbor")
     {
       hostname = "educourses-pd.com";
-      service = "http://127.0.0.1:30856";
+      service = httpNode;
     }
     {
       hostname = "www.educourses-pd.com";
-      service = "http://127.0.0.1:30856";
+      service = httpNode;
     }
+    (httpHost "verdaccio")
     {
       # Minecraft Java server on the MetalLB LoadBalancer VIP (reachable from
       # the host via kube-proxy). Vanilla/cracked clients cannot use a Cloudflare
       # Tunnel directly — connect via the LAN VIP 192.168.1.245 or over Tailscale.
       # This route only serves cloudflared-access users.
-      hostname = "minecraft.quadtech.dev";
+      hostname = d.host "minecraft";
       service = "tcp://192.168.1.245:25565";
     }
-    {
-      hostname = "edukurs.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "batllavatourist.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "quadpacienti.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "openclaw.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "grafana.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "grafana.k8s.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
+    (httpHost "edukurs")
+    (httpHost "batllavatourist")
+    (httpHost "quadpacienti")
+    (httpHost "pacienti")
+    (httpHost "openclaw")
+    (httpHost "grafana")
+    (httpHost "grafana.k8s")
     {
       hostname = "app.orkestr-os.com";
-      service = "http://127.0.0.1:30856";
+      service = httpNode;
     }
     {
       hostname = "api.orkestr-os.com";
-      service = "http://127.0.0.1:30856";
+      service = httpNode;
     }
     {
-      hostname = "k8s.quadtech.dev";
+      hostname = d.host "k8s";
       service = "tcp://127.0.0.1:6443";
     }
+    (httpHost "chat")
     {
-      hostname = "chat.quadtech.dev";
-      service = "http://127.0.0.1:30856";
-    }
-    {
-      hostname = "*.quadtech.dev";
-      service = "http://127.0.0.1:30856";
+      hostname = d.host "*";
+      service = httpNode;
     }
     {
       service = "http_status:404";
     }
-  ],
-}: {
+  ];
+in {
   tunnel = tunnelId;
   "credentials-file" = credentialsFile;
   protocol = protocol;
   metrics = metrics;
   "no-autoupdate" = true;
-  ingress = ingress;
+  ingress =
+    if ingress == null
+    then defaultIngress
+    else ingress;
 }

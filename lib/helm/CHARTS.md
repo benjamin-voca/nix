@@ -49,7 +49,7 @@ Pre-configured Helm charts for the QuadNix infrastructure.
   - Actions enabled
 - **Storage**: 50Gi for git data, 20Gi for PostgreSQL
 - **Access**: `helmCharts.forgejo`
-- **URL**: https://forge.quadtech.dev
+- **URL**: https://forge.voltrum.co
 
 ### Databases & Analytics
 
@@ -60,7 +60,7 @@ Pre-configured Helm charts for the QuadNix infrastructure.
 - **Storage**: 100Gi per instance, 10Gi for ZooKeeper
 - **Ports**: HTTP (8123), TCP (9000), Interserver (9009)
 - **Access**: `helmCharts.clickhouse`
-- **URL**: https://clickhouse.quadtech.dev
+- **URL**: https://clickhouse.voltrum.co
 
 #### ClickHouse Operator
 - **Namespace**: `clickhouse-operator`

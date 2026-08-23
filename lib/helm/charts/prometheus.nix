@@ -1,4 +1,6 @@
-{helmLib}: {
+{helmLib}: let
+  d = import ../../domain.nix;
+in {
   # Prometheus configuration using kube-prometheus-stack
   prometheus = helmLib.buildChart {
     name = "monitoring";
@@ -35,11 +37,11 @@
           annotations = {
             "nginx.ingress.kubernetes.io/ssl-redirect" = "false";
           };
-          hosts = ["grafana.quadtech.dev"];
+          hosts = [(d.host "grafana")];
           tls = [
             {
               secretName = "grafana-tls";
-              hosts = ["grafana.quadtech.dev"];
+              hosts = [(d.host "grafana")];
             }
           ];
         };

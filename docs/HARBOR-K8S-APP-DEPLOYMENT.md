@@ -11,7 +11,7 @@ It covers:
 
 ## Current environment
 
-- Harbor UI/API hostname: `harbor.quadtech.dev`
+- Harbor UI/API hostname: `harbor.voltrum.co`
 - Harbor internal registry: `10.0.0.56:5000`
 - Kubernetes ingress IP: `192.168.1.240`
 - Cluster admin access on backbone host:
@@ -58,9 +58,9 @@ docker buildx build --platform linux/amd64 -t 10.0.0.56:5000/library/edukurs:202
 If Docker login/push works in your environment:
 
 ```sh
-docker login harbor.quadtech.dev
-docker tag 10.0.0.56:5000/library/<app>:<tag> harbor.quadtech.dev/library/<app>:<tag>
-docker push harbor.quadtech.dev/library/<app>:<tag>
+docker login harbor.voltrum.co
+docker tag 10.0.0.56:5000/library/<app>:<tag> harbor.voltrum.co/library/<app>:<tag>
+docker push harbor.voltrum.co/library/<app>:<tag>
 ```
 
 ### Push option B: direct registry upload helper
@@ -99,7 +99,7 @@ kubectl create secret docker-registry harbor-registry \
   --docker-server=10.0.0.56:5000 \
   --docker-username='<harbor-user>' \
   --docker-password='<harbor-password>' \
-  --docker-email='infra@quadtech.dev'
+  --docker-email='infra@voltrum.co'
 ```
 
 Reference it from the pod spec:

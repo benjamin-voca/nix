@@ -4,6 +4,7 @@
   pkgs,
   lib,
 }: let
+  d = import ../../../lib/domain.nix;
   edukursNamespace = ''
     apiVersion: v1
     kind: Namespace
@@ -42,7 +43,7 @@
     spec:
       project: default
       source:
-        repoURL: https://forge.quadtech.dev/QuadCoreTech/edukurs.git
+        repoURL: ${d.url "forge"}/QuadCoreTech/edukurs.git
         path: k8s
         targetRevision: main
       destination:
@@ -65,7 +66,7 @@
     spec:
       project: default
       source:
-        repoURL: https://forge.quadtech.dev/QuadCoreTech/batllavatourist.git
+        repoURL: ${d.url "forge"}/QuadCoreTech/batllavatourist.git
         path: k8s
         targetRevision: main
       destination:
@@ -88,12 +89,49 @@
     spec:
       project: default
       source:
-        repoURL: https://forge.quadtech.dev/QuadCoreTech/quadpacienti.git
+        repoURL: ${d.url "forge"}/QuadCoreTech/quadpacienti.git
         path: k8s
         targetRevision: main
       destination:
         server: https://kubernetes.default.svc
         namespace: quadpacienti
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+  '';
+
+  verdaccioArgocdApp = ''
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: verdaccio
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        chart: verdaccio
+        repoURL: https://charts.verdaccio.org
+        targetRevision: "4.29.0"
+        helm:
+          parameters:
+            - name: service.type
+              value: ClusterIP
+            - name: ingress.enabled
+              value: "true"
+            - name: ingress.className
+              value: nginx
+            - name: ingress.hosts[0]
+              value: ${d.host "verdaccio"}
+            - name: persistence.enabled
+              value: "true"
+            - name: persistence.existingClaim
+              value: verdaccio-data
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: verdaccio
       syncPolicy:
         automated:
           prune: true
@@ -109,6 +147,7 @@ in {
     "16-edukurs-argocd-app.yaml" = edukursArgocdApp;
     "16-batllavatourist-argocd-app.yaml" = batllavatouristArgocdApp;
     "16-quadpacienti-argocd-app.yaml" = quadpacientiArgocdApp;
+    "16-verdaccio-argocd-app.yaml" = verdaccioArgocdApp;
   };
 
   order = [
@@ -118,5 +157,6 @@ in {
     "16-edukurs-argocd-app.yaml"
     "16-batllavatourist-argocd-app.yaml"
     "16-quadpacienti-argocd-app.yaml"
+    "16-verdaccio-argocd-app.yaml"
   ];
 }

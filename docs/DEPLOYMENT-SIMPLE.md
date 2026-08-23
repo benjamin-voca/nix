@@ -8,9 +8,9 @@ This guide walks you through deploying internal services (Forgejo, ClickHouse, G
 ┌─────────────────────────────────────────────────────────────┐
 │  Cloudflare Tunnel (cloudflared)                            │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │ forge.quadtech.dev → localhost:30080                   │ │
-│  │ clickhouse.quadtech.dev → localhost:30081              │ │
-│  │ grafana.quadtech.dev → localhost:30082                 │ │
+│  │ forge.voltrum.co → localhost:30080                   │ │
+│  │ clickhouse.voltrum.co → localhost:30081              │ │
+│  │ grafana.voltrum.co → localhost:30082                 │ │
 │  └────────────────────────────────────────────────────────┘ │
 └───────────────────────┬─────────────────────────────────────┘
                         │
@@ -75,11 +75,11 @@ If you want to keep your existing `modules/roles/backbone.nix`, add the Cloudfla
     credentialsFile = "/home/klajd/.cloudflared/9832df66-f04a-40ea-b004-f6f9b100eb14.json";
 
     routes = [
-      { hostname = "edukurs.quadtech.dev"; service = "http://localhost:3000"; }
-      { hostname = "ssh.quadtech.dev"; service = "ssh://localhost:22"; }
-      { hostname = "forge.quadtech.dev"; service = "http://localhost:30080"; }
-      { hostname = "clickhouse.quadtech.dev"; service = "http://localhost:30081"; }
-      { hostname = "grafana.quadtech.dev"; service = "http://localhost:30082"; }
+      { hostname = "edukurs.voltrum.co"; service = "http://localhost:3000"; }
+      { hostname = "ssh.voltrum.co"; service = "ssh://localhost:22"; }
+      { hostname = "forge.voltrum.co"; service = "http://localhost:30080"; }
+      { hostname = "clickhouse.voltrum.co"; service = "http://localhost:30081"; }
+      { hostname = "grafana.voltrum.co"; service = "http://localhost:30082"; }
     ];
   };
 }
@@ -178,9 +178,9 @@ kubectl logs -n grafana deployment/grafana
 
 Your services should now be accessible via Cloudflare Tunnel:
 
-- **Forgejo:** https://forge.quadtech.dev
-- **ClickHouse:** https://clickhouse.quadtech.dev
-- **Grafana:** https://grafana.quadtech.dev
+- **Forgejo:** https://forge.voltrum.co
+- **ClickHouse:** https://clickhouse.voltrum.co
+- **Grafana:** https://grafana.voltrum.co
 
 ### Default Credentials
 
@@ -206,7 +206,7 @@ kubectl exec -n forgejo deployment/forgejo -- forgejo admin user change-password
 ```
 
 **Grafana:**
-Access https://grafana.quadtech.dev and change password via UI.
+Access https://grafana.voltrum.co and change password via UI.
 
 **ClickHouse:**
 Update the Helm chart values and redeploy.
@@ -293,11 +293,11 @@ tunnel: 9832df66-f04a-40ea-b004-f6f9b100eb14
 credentials-file: /home/klajd/.cloudflared/9832df66-f04a-40ea-b004-f6f9b100eb14.json
 
 ingress:
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://localhost:30080
-  - hostname: clickhouse.quadtech.dev
+  - hostname: clickhouse.voltrum.co
     service: http://localhost:30081
-  - hostname: grafana.quadtech.dev
+  - hostname: grafana.voltrum.co
     service: http://localhost:30082
   - service: http_status:404
 ```
@@ -306,9 +306,9 @@ ingress:
 
 | Service    | K8s Port | NodePort | Cloudflare Route            |
 |------------|----------|----------|-----------------------------|
-| Forgejo      | 3000     | 30080    | forge.quadtech.dev          |
-| ClickHouse | 8123     | 30081    | clickhouse.quadtech.dev     |
-| Grafana    | 80       | 30082    | grafana.quadtech.dev        |
+| Forgejo      | 3000     | 30080    | forge.voltrum.co          |
+| ClickHouse | 8123     | 30081    | clickhouse.voltrum.co     |
+| Grafana    | 80       | 30082    | grafana.voltrum.co        |
 
 ### Helm Chart Locations
 

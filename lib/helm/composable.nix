@@ -8,6 +8,7 @@
 #     composable.mkNamespace "my-namespace" {}
 {pkgs ? throw "pkgs is required"}: let
   inherit (pkgs) lib;
+  d = import ../domain.nix;
 
   # ===========================================================================
   # Base Kubernetes Resource Builders (defined first for forward references)
@@ -231,7 +232,7 @@
     name ? "forgejo-actions",
     namespace ? "forgejo",
     replicas ? 2,
-    forgejoInstanceUrl ? "https://forge.quadtech.dev",
+    forgejoInstanceUrl ? d.url "forge",
     runnerTokenSecret ? "forgejo-runner-token",
     runnerName ? "k8s-runner",
     runnerLabels ? "ubuntu-latest,linux,x86_64,self-hosted",

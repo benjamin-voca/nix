@@ -115,7 +115,7 @@ Tailscale is defined in the role module via `profiles/tailscale.nix`. This is no
 2. Deploy Headscale to K8s (`vpn` namespace)
 3. Create `profiles/headscale-client.nix`
 4. In `machines/default.nix`, swap `profiles/tailscale.nix` → `profiles/headscale-client.nix` in the relevant role(s)
-5. Enroll clients with `tailscale up --login-server=https://vpn.quadtech.dev`
+5. Enroll clients with `tailscale up --login-server=https://vpn.voltrum.co`
 
 **No code change needed to `machines/default.nix`** to swap the VPN backer — it's all in the role module imports.
 

@@ -30,7 +30,7 @@ Headscale replaces the Tailscale control plane. Tailscale clients (all devices) 
 Now                          Later (static IP)
 ─────────────────────────    ─────────────────────────────────────
 Tailscale SaaS control    →   Headscale self-hosted control
-plane (for coordination)      (vpn.quadtech.dev)
+plane (for coordination)      (vpn.voltrum.co)
 
 Tailscale public DERP     →   Your own embedded DERP relay
 (relay when UDP fails)        (public IP + port 443)
@@ -39,7 +39,7 @@ Same Tailscale clients   →   Same Tailscale clients
 Same SSH access          →   Same SSH access + DERP fallback
 ```
 
-**No change to clients except:** `tailscale up --login-server=https://vpn.quadtech.dev`
+**No change to clients except:** `tailscale up --login-server=https://vpn.voltrum.co`
 
 ## 3. NixOS Module Design
 
@@ -58,10 +58,10 @@ When these conditions are met, implement in this order:
 1. [ ] Static IP acquired
 2. [ ] Port 443 forwarded to K8s ingress (or NodePort)
 3. [ ] Port 3478/UDP opened for STUN
-4. [ ] `vpn.quadtech.dev` DNS pointed to static IP
+4. [ ] `vpn.voltrum.co` DNS pointed to static IP
 5. [ ] Deploy Headscale to `vpn` namespace via `bootstrap-refactor/`
 6. [ ] Generate pre-auth keys for each machine
-7. [ ] Enroll clients: `tailscale up --login-server=https://vpn.quadtech.dev`
+7. [ ] Enroll clients: `tailscale up --login-server=https://vpn.voltrum.co`
 8. [ ] Remove Tailscale SaaS auth key from SOPS
 
 ## 5. Fallback: WireGuard Native

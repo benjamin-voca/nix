@@ -1,20 +1,23 @@
 {
   config,
   ...
-}: {
+}: let
+  d = import ../../../lib/domain.nix;
+  harborHost = d.host "harbor";
+in {
   virtualisation.containerd = {
     enable = true;
     settings = {
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options.SystemdCgroup = true;
       plugins."io.containerd.grpc.v1.cri".registry.config_path = "/etc/containerd/certs.d";
-      plugins."io.containerd.grpc.v1.cri".registry.configs."harbor.quadtech.dev".tls.insecure_skip_verify = true;
+      plugins."io.containerd.grpc.v1.cri".registry.configs.${harborHost}.tls.insecure_skip_verify = true;
     };
   };
 
-  environment.etc."containerd/certs.d/harbor.quadtech.dev/hosts.toml".text = ''
-    server = "https://harbor.quadtech.dev"
+  environment.etc."containerd/certs.d/${harborHost}/hosts.toml".text = ''
+    server = "${d.url "harbor"}"
 
-    [host."https://harbor.quadtech.dev"]
+    [host."${d.url "harbor"}"]
       capabilities = ["pull", "resolve", "push"]
       skip_verify = true
   '';

@@ -4,18 +4,18 @@ protocol: http2
 metrics: 0.0.0.0:2002
 no-autoupdate: true
 ingress:
-  - hostname: mainssh.quadtech.dev
+  - hostname: mainssh.voltrum.co
     service: ssh://localhost:22
-  - hostname: forge-ssh.quadtech.dev
+  - hostname: forge-ssh.voltrum.co
     service: tcp://192.168.1.14:32222
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://192.168.1.240:80
-  - hostname: argocd.quadtech.dev
+  - hostname: argocd.voltrum.co
     service: http://192.168.1.240:80
-  - hostname: helpdesk.quadtech.dev
+  - hostname: helpdesk.voltrum.co
     service: http://192.168.1.240:80
   - hostname: "api.orkestr-os.com"
     service: http://192.168.1.240:80
-  - hostname: "*.quadtech.dev"
+  - hostname: "*.voltrum.co"
     service: http://192.168.1.240:80
   - service: http_status:404

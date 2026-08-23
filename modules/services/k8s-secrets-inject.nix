@@ -4,6 +4,7 @@
   pkgs,
   ...
 }: let
+  d = import ../../lib/domain.nix;
   cfg = config.services.quadnix.k8s-secrets-inject;
 in {
   options.services.quadnix.k8s-secrets-inject = {
@@ -54,7 +55,7 @@ in {
               argocd.argoproj.io/secret-type: repo-creds
           type: Opaque
           stringData:
-            url: https://forge.quadtech.dev/$ORG_NAME
+            url: ${d.url "forge"}/$ORG_NAME
             username: "$FORGEJO_USER"
             password: "$FORGEJO_TOKEN"
           EOF
@@ -103,7 +104,7 @@ in {
             HARBOR_PW=$(cat /run/secrets/harbor-admin-password)
             $kubectl create secret docker-registry harbor-registry \
               --namespace=quadpacienti \
-              --docker-server=harbor.quadtech.dev \
+              --docker-server=${d.host "harbor"} \
               --docker-username=admin \
               --docker-password="$HARBOR_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
@@ -176,7 +177,7 @@ in {
               --namespace=forgejo \
               --from-literal=username=forgejo_admin \
               --from-literal=password="$FORGEJO_ADMIN_PW" \
-              --from-literal=email=admin@quadtech.dev \
+              --from-literal=email=${d.email "admin"} \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected forgejo-admin secret"
           fi

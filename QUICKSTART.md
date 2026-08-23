@@ -16,9 +16,9 @@ cd /etc/nixos
 # Choose option 4 (Deploy all services)
 
 # 4. Access your services
-open https://forge.quadtech.dev
-open https://clickhouse.quadtech.dev
-open https://grafana.quadtech.dev
+open https://forge.voltrum.co
+open https://clickhouse.voltrum.co
+open https://grafana.voltrum.co
 ```
 
 ## What Was Fixed
@@ -61,19 +61,19 @@ tunnel: 9832df66-f04a-40ea-b004-f6f9b100eb14
 credentials-file: /home/klajd/.cloudflared/9832df66-f04a-40ea-b004-f6f9b100eb14.json
 
 ingress:
-  - hostname: edukurs.quadtech.dev
+  - hostname: edukurs.voltrum.co
     service: http://localhost:3000
-  - hostname: ssh.quadtech.dev
+  - hostname: ssh.voltrum.co
     service: ssh://localhost:22
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://localhost:8080  # ← Will change to :30080 (K8s NodePort)
   - service: http_status:404
 ```
 
 After deployment, it will route to:
-- `forge.quadtech.dev` → `localhost:30080` (K8s service via NodePort)
-- `clickhouse.quadtech.dev` → `localhost:30081` (new)
-- `grafana.quadtech.dev` → `localhost:30082` (new)
+- `forge.voltrum.co` → `localhost:30080` (K8s service via NodePort)
+- `clickhouse.voltrum.co` → `localhost:30081` (new)
+- `grafana.voltrum.co` → `localhost:30082` (new)
 
 ## Deployment Options
 
@@ -199,23 +199,23 @@ curl localhost:30081/ping  # Should return "Ok."
 curl localhost:30082  # Should return Grafana HTML
 
 # Test Cloudflare Tunnel routing
-curl https://forge.quadtech.dev
-curl https://clickhouse.quadtech.dev/ping
-curl https://grafana.quadtech.dev
+curl https://forge.voltrum.co
+curl https://clickhouse.voltrum.co/ping
+curl https://grafana.voltrum.co
 ```
 
 ### 8. Access Services
 
 Open in browser:
-- **Forgejo:** https://forge.quadtech.dev
+- **Forgejo:** https://forge.voltrum.co
   - Username: `forgejo_admin`
   - Password: `changeme` (change immediately!)
 
-- **Grafana:** https://grafana.quadtech.dev
+- **Grafana:** https://grafana.voltrum.co
   - Username: `admin`
   - Password: `changeme` (change immediately!)
 
-- **ClickHouse:** https://clickhouse.quadtech.dev
+- **ClickHouse:** https://clickhouse.voltrum.co
   - User: `admin`
   - Password: `changeme` (change in Helm values)
 

@@ -71,13 +71,13 @@ base64 -w0 /etc/kubernetes/cluster-admin.kubeconfig
 #### ARGOCD_SERVER
 
 - Inside cluster: `http://argocd-server.argocd:80`
-- External: `https://argocd.quadtech.dev`
+- External: `https://argocd.voltrum.co`
 
 #### ARGOCD_API_TOKEN
 
 ```bash
 # Login to ArgoCD
-argocd login argocd.quadtech.dev --username admin --password <password>
+argocd login argocd.voltrum.co --username admin --password <password>
 
 # Create a project token (or use admin token for CI)
 argocd account generate-token --account admin

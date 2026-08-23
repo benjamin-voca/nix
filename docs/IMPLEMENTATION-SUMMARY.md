@@ -40,11 +40,11 @@ modules/roles/backbone.nix            # Complete K8s + Cloudflare setup
 **Configuration:**
 - Kubernetes control plane enabled
 - Cloudflare Tunnel with 5 routes:
-  - edukurs.quadtech.dev → localhost:3000 (existing app)
-  - ssh.quadtech.dev → localhost:22 (SSH)
-  - forge.quadtech.dev → localhost:30080 (K8s NodePort)
-  - clickhouse.quadtech.dev → localhost:30081 (K8s NodePort)
-  - grafana.quadtech.dev → localhost:30082 (K8s NodePort)
+  - edukurs.voltrum.co → localhost:3000 (existing app)
+  - ssh.voltrum.co → localhost:22 (SSH)
+  - forge.voltrum.co → localhost:30080 (K8s NodePort)
+  - clickhouse.voltrum.co → localhost:30081 (K8s NodePort)
+  - grafana.voltrum.co → localhost:30082 (K8s NodePort)
 
 ### Deployment Scripts
 ```
@@ -85,9 +85,9 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 ┌─────────────────────────────────────────────────────────────┐
 │  Internet (Cloudflare Tunnel)                               │
 │  ┌────────────────────────────────────────────────────────┐ │
-│  │ forge.quadtech.dev → TLS termination                   │ │
-│  │ clickhouse.quadtech.dev → TLS termination              │ │
-│  │ grafana.quadtech.dev → TLS termination                 │ │
+│  │ forge.voltrum.co → TLS termination                   │ │
+│  │ clickhouse.voltrum.co → TLS termination              │ │
+│  │ grafana.voltrum.co → TLS termination                 │ │
 │  └────────────────────────────────────────────────────────┘ │
 └───────────────────────┬─────────────────────────────────────┘
                         │ (encrypted tunnel)
@@ -95,9 +95,9 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 │  backbone-01 (NixOS Host)                                   │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │ cloudflared (systemd service)                          │ │
-│  │ ├─ forge.quadtech.dev → localhost:30080               │ │
-│  │ ├─ clickhouse.quadtech.dev → localhost:30081          │ │
-│  │ └─ grafana.quadtech.dev → localhost:30082             │ │
+│  │ ├─ forge.voltrum.co → localhost:30080               │ │
+│  │ ├─ clickhouse.voltrum.co → localhost:30081          │ │
+│  │ └─ grafana.voltrum.co → localhost:30082             │ │
 │  └────────────────────────┬───────────────────────────────┘ │
 │                           │ (localhost)                     │
 │  ┌────────────────────────┴───────────────────────────────┐ │
@@ -134,9 +134,9 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
    - Exposes services via NodePort (30080, 30081, 30082)
 
 3. **Verification**
-   - Visit https://forge.quadtech.dev (Forgejo UI)
-   - Visit https://clickhouse.quadtech.dev/ping (ClickHouse health)
-   - Visit https://grafana.quadtech.dev (Grafana UI)
+   - Visit https://forge.voltrum.co (Forgejo UI)
+   - Visit https://clickhouse.voltrum.co/ping (ClickHouse health)
+   - Visit https://grafana.voltrum.co (Grafana UI)
 
 ## Key Benefits
 
@@ -188,14 +188,14 @@ modules/roles/backbone.nix            # Added services.kubernetes.masterAddress
 4. **Test access:**
    ```bash
    # Should all return 200 OK
-   curl -I https://forge.quadtech.dev
-   curl https://clickhouse.quadtech.dev/ping
-   curl -I https://grafana.quadtech.dev
+   curl -I https://forge.voltrum.co
+   curl https://clickhouse.voltrum.co/ping
+   curl -I https://grafana.voltrum.co
    ```
 
 5. **Change default passwords:**
-   - Forgejo: https://forge.quadtech.dev (login as forgejo_admin/changeme, change in settings)
-   - Grafana: https://grafana.quadtech.dev (login as admin/changeme, change in profile)
+   - Forgejo: https://forge.voltrum.co (login as forgejo_admin/changeme, change in settings)
+   - Grafana: https://grafana.voltrum.co (login as admin/changeme, change in profile)
    - ClickHouse: Update Helm chart values and redeploy
 
 6. **Deploy to backbone-02** (optional for redundancy):
@@ -239,7 +239,7 @@ kubectl port-forward -n forgejo svc/forgejo-http 3000:3000
 services.cloudflared-k8s.routes = [
   # ... existing routes
   {
-    hostname = "newservice.quadtech.dev";
+    hostname = "newservice.voltrum.co";
     service = "http://localhost:30083";  # New NodePort
   }
 ];

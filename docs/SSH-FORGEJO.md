@@ -2,7 +2,7 @@
 
 ## Setup
 
-The cloudflared tunnel is configured to route `forge-ssh.quadtech.dev` to the Forgejo SSH service.
+The cloudflared tunnel is configured to route `forge-ssh.voltrum.co` to the Forgejo SSH service.
 
 ### 1. Configure Cloudflare Tunnel Public Hostname
 
@@ -12,7 +12,7 @@ In Cloudflare Dashboard:
 3. Go to **Public Hostnames** tab
 4. Click **Add a public hostname**:
    - **Subdomain**: `forge-ssh`
-   - **Domain**: `quadtech.dev`
+   - **Domain**: `voltrum.co`
    - **Type**: `TCP`
    - **URL**: `127.0.0.1:32222`
 5. Click **Save hostname**
@@ -22,8 +22,8 @@ In Cloudflare Dashboard:
 Add to `~/.ssh/config`:
 
 ```ssh
-Host forge-ssh.quadtech.dev
-  HostName forge-ssh.quadtech.dev
+Host forge-ssh.voltrum.co
+  HostName forge-ssh.voltrum.co
   User git
   Port 2222
   IdentityFile ~/.ssh/id_ed25519
@@ -34,7 +34,7 @@ Host forge-ssh.quadtech.dev
 ### 3. Test
 
 ```bash
-ssh git@forge-ssh.quadtech.dev
+ssh git@forge-ssh.voltrum.co
 ```
 
 ## Alternative: Direct NodePort Access
@@ -45,7 +45,7 @@ If you prefer direct SSH without Cloudflare:
 kubectl -n forgejo get svc forgejo-ssh
 ```
 
-Then SSH to: `backbone-01.quadtech.dev:32222`
+Then SSH to: `backbone-01.voltrum.co:32222`
 
 ## Troubleshooting
 

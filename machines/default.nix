@@ -7,7 +7,9 @@
 # Secret files are listed per-machine; requiredSecrets per-role.
 # Typed secrets infrastructure is ready but NOT wired into consumer yet.
 # Actual secrets remain in secrets/backbone-01.yaml and secrets/frontline-01.yaml.
-{
+let
+  d = import ../lib/domain.nix;
+in {
   machines = {
     backbone-01 = {
       system = "x86_64-linux";
@@ -82,7 +84,7 @@
                 "no-autoupdate" = true;
                 ingress = [
                   {
-                    hostname = "f1.quadtech.dev";
+                    hostname = d.host "f1";
                     service = "ssh://localhost:22";
                   }
                   {

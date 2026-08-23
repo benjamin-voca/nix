@@ -155,7 +155,7 @@ jobs:
       - name: Publish chart packages to Forgejo registry
         env:
           FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          FORGEJO_URL: https://forge.quadtech.dev
+          FORGEJO_URL: https://forge.voltrum.co
           ORG_NAME: quadnix
         run: |
           curl -fS -u "${{ github.actor }}:$FORGEJO_TOKEN" -X POST "$FORGEJO_URL/api/packages/$ORG_NAME/helm" \
@@ -168,7 +168,7 @@ jobs:
           mkdir -p dist
           cp argocd-chart dist/
           cp forgejo-chart dist/
-          nix shell nixpkgs#kubernetes-helm -c helm repo index dist --url "https://forge.quadtech.dev/api/packages/quadnix/helm"
+          nix shell nixpkgs#kubernetes-helm -c helm repo index dist --url "https://forge.voltrum.co/api/packages/quadnix/helm"
 
       - name: Show index path
         run: ls -l dist/index.yaml

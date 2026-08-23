@@ -12,10 +12,10 @@ QuadNix Infrastructure
 │   ├── backbone-01  192.168.1.10  (Primary control plane)
 │   ├── backbone-02  192.168.1.11  (Secondary control plane, HA)
 │   └── Services:
-│       ├── Forgejo         (forge.quadtech.dev)
-│       ├── ClickHouse    (clickhouse.quadtech.dev)
-│       ├── Grafana       (grafana.quadtech.dev)
-│       └── Prometheus    (prometheus.quadtech.dev)
+│       ├── Forgejo         (forge.voltrum.co)
+│       ├── ClickHouse    (clickhouse.voltrum.co)
+│       ├── Grafana       (grafana.voltrum.co)
+│       └── Prometheus    (prometheus.voltrum.co)
 │
 └── Frontline (Worker Nodes + Client Apps)
     ├── frontline-01  192.168.1.20  (Worker node)
@@ -44,7 +44,7 @@ QuadNix Infrastructure
 
 - All nodes on same network (192.168.1.0/24)
 - DNS or /etc/hosts entries for service domains
-- External access to backbone-01 via mainssh.quadtech.dev
+- External access to backbone-01 via mainssh.voltrum.co
 
 ## Step 1: Deploy Backbone Nodes
 
@@ -75,8 +75,8 @@ sudo nixos-rebuild switch --flake .#backbone-02
 ```sh
 # Deploy backbone-01
 nixos-rebuild switch --flake .#backbone-01 \
-  --target-host root@mainssh.quadtech.dev \
-  --build-host root@mainssh.quadtech.dev
+  --target-host root@mainssh.voltrum.co \
+  --build-host root@mainssh.voltrum.co
 
 # Deploy backbone-02
 nixos-rebuild switch --flake .#backbone-02 \
@@ -264,20 +264,20 @@ kubectl get ingress --all-namespaces
 ```
 
 Expected ingresses:
-- forgejo → forge.quadtech.dev
-- grafana → grafana.quadtech.dev
-- clickhouse → clickhouse.quadtech.dev
-- prometheus → prometheus.quadtech.dev
+- forgejo → forge.voltrum.co
+- grafana → grafana.voltrum.co
+- clickhouse → clickhouse.voltrum.co
+- prometheus → prometheus.voltrum.co
 
 ## Step 5: Configure DNS
 
 Add DNS entries or update `/etc/hosts`:
 
 ```
-192.168.1.10  forge.quadtech.dev
-192.168.1.10  grafana.quadtech.dev
-192.168.1.10  clickhouse.quadtech.dev
-192.168.1.10  prometheus.quadtech.dev
+192.168.1.10  forge.voltrum.co
+192.168.1.10  grafana.voltrum.co
+192.168.1.10  clickhouse.voltrum.co
+192.168.1.10  prometheus.voltrum.co
 ```
 
 Or use external DNS service pointing to your ingress load balancer.
@@ -285,24 +285,24 @@ Or use external DNS service pointing to your ingress load balancer.
 ## Step 6: Access Services
 
 ### Forgejo
-- URL: https://forge.quadtech.dev
+- URL: https://forge.voltrum.co
 - Default admin: `forgejo_admin` / `changeme` (CHANGE THIS!)
-- SSH: `forge.quadtech.dev:2222`
+- SSH: `forge.voltrum.co:2222`
 
 ### Grafana
-- URL: https://grafana.quadtech.dev
+- URL: https://grafana.voltrum.co
 - Default admin: `admin` / `changeme` (CHANGE THIS!)
 - Pre-configured datasources: Prometheus, Loki, ClickHouse
 
 ### ClickHouse
-- URL: https://clickhouse.quadtech.dev
+- URL: https://clickhouse.voltrum.co
 - HTTP port: 8123
 - TCP port: 9000
 - Default user: `default` / no password
 - Admin user: `admin` / `changeme` (CHANGE THIS!)
 
 ### Prometheus
-- URL: https://prometheus.quadtech.dev (via Grafana or direct access)
+- URL: https://prometheus.voltrum.co (via Grafana or direct access)
 - Grafana already configured to use it
 
 ## Step 7: Deploy Client Applications
@@ -426,7 +426,7 @@ Ensure your domains point to the ingress controller's external IP.
 
 ### Access Grafana
 
-1. Navigate to https://grafana.quadtech.dev
+1. Navigate to https://grafana.voltrum.co
 2. Login with admin credentials
 3. Dashboards are pre-configured for:
    - Kubernetes cluster metrics

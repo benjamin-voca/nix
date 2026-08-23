@@ -72,14 +72,14 @@ ssh backbone01 'cd /etc/nixos && git remote -v'
 # Output: origin  https://github.com/benjamin-voca/nix (push)
 
 # Should be Forgejo:
-# origin  ssh://git@forge-ssh.quadtech.dev/QuadCoreTech/nix.git (push)
+# origin  ssh://git@forge-ssh.voltrum.co/QuadCoreTech/nix.git (push)
 ```
 
 **Fix:**
 
 ```bash
 ssh backbone01 'cd /etc/nixos && \
-  sudo git remote add forgejo ssh://git@forge-ssh.quadtech.dev/QuadCoreTech/nix.git && \
+  sudo git remote add forgejo ssh://git@forge-ssh.voltrum.co/QuadCoreTech/nix.git && \
   sudo git fetch forgejo && \
   sudo git reset --hard forgejo/main'
 ```

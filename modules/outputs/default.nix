@@ -383,6 +383,8 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/16-quadpacienti-argocd-app.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
+      cat $out/16-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
       cat $out/17-openclaw-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/17a-openclaw-pvc.yaml >> $out/bootstrap.yaml

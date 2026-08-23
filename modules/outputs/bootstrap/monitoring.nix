@@ -5,6 +5,7 @@
   lib,
   existingCharts,
 }: let
+  d = import ../../../lib/domain.nix;
   monitoringChart = existingCharts.prometheus;
   grafanaChart = existingCharts.grafana;
 
@@ -196,7 +197,7 @@
     spec:
       ingressClassName: nginx
       rules:
-      - host: grafana.quadtech.dev
+      - host: ${d.host "grafana"}
         http:
           paths:
           - path: /

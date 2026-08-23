@@ -1,5 +1,5 @@
 {
-  domain ? "argocd.quadtech.dev",
+  domain ? (import ./domain.nix).host "argocd",
   serverUrl ? "http://${domain}",
   serverReplicas ? 1,
   controllerReplicas ? 1,

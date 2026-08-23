@@ -203,10 +203,10 @@ show_status() {
     echo ""
     
     info "Service URLs:"
-    echo "  Forgejo:    https://forge.quadtech.dev"
-    echo "  Grafana:    https://grafana.quadtech.dev"
-    echo "  ClickHouse: https://clickhouse.quadtech.dev"
-    echo "  Prometheus: https://prometheus.quadtech.dev"
+    echo "  Forgejo:    https://forge.voltrum.co"
+    echo "  Grafana:    https://grafana.voltrum.co"
+    echo "  ClickHouse: https://clickhouse.voltrum.co"
+    echo "  Prometheus: https://prometheus.voltrum.co"
     echo ""
     
     warning "Default passwords are set to 'changeme' - CHANGE THEM IMMEDIATELY!"

@@ -1,4 +1,6 @@
-{helmLib}: {
+{helmLib}: let
+  d = import ../../domain.nix;
+in {
   # Grafana - Single Instance Configuration for Cloudflare Tunnel
   grafana = helmLib.buildChart {
     name = "grafana";
@@ -41,8 +43,8 @@
       # Grafana configuration
       "grafana.ini" = {
         server = {
-          root_url = "https://grafana.quadtech.dev";
-          domain = "grafana.quadtech.dev";
+          root_url = d.url "grafana";
+          domain = d.host "grafana";
         };
 
         database = {

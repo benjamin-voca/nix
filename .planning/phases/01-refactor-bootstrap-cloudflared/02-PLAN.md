@@ -220,7 +220,7 @@ Return all as manifest entries. Note: the forgejo-actions chart may be empty (ch
 - File returns manifests for forgejo chart, PVCs, DB patch, runner secret, actions chart, and ArgoCD repo
 - Forgejo shared storage uses `ceph-filesystem-csi`, `ReadWriteMany`, `50Gi`
 - Runner secret token is `RUNNER_TOKEN_PLACEHOLDER`
-- ArgoCD repo URL is `https://forge.quadtech.dev/QuadCoreTech`
+- ArgoCD repo URL is `https://forge.voltrum.co/QuadCoreTech`
 </acceptance_criteria>
 
 ### Task 8: Create `modules/outputs/bootstrap/cloudflared.nix`
@@ -365,7 +365,7 @@ Return all as manifest entries.
 <acceptance_criteria>
 - File returns 3 ArgoCD app manifests
 - Each app has `automated.prune = true`, `selfHeal = true`
-- EduKurs repoURL is `https://forge.quadtech.dev/QuadCoreTech/edukurs.git`
+- EduKurs repoURL is `https://forge.voltrum.co/QuadCoreTech/edukurs.git`
 - All apps reference `path: k8s`, `targetRevision: main`
 </acceptance_criteria>
 
@@ -388,7 +388,7 @@ Return both as manifest entries.
 <acceptance_criteria>
 - File returns namespace and ingress manifests
 - Ingress has permanent-redirect annotation to `/desk/helpdesk` with code 308
-- Ingress is for host `helpdesk.quadtech.dev`
+- Ingress is for host `helpdesk.voltrum.co`
 </acceptance_criteria>
 
 ## Verification

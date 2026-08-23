@@ -42,8 +42,8 @@ A Nix module that exposes `config.quad.cloudflared.ingressRules` — a single li
 The actual route list goes in `backbone.nix` (or a dedicated config module):
 ```nix
 config.quad.cloudflared.ingressRules = [
-  { hostname = "forge.quadtech.dev"; service = "http://127.0.0.1:${nodePort}"; }
-  { hostname = "argocd.quadtech.dev"; service = "http://127.0.0.1:${nodePort}"; }
+  { hostname = "forge.voltrum.co"; service = "http://127.0.0.1:${nodePort}"; }
+  { hostname = "argocd.voltrum.co"; service = "http://127.0.0.1:${nodePort}"; }
   # ... etc
 ];
 ```

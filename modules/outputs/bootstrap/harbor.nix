@@ -5,6 +5,7 @@
   lib,
   existingCharts,
 }: let
+  d = import ../../../lib/domain.nix;
   harborChart = existingCharts.harbor;
 
   harborNamespace = ''
@@ -98,10 +99,10 @@
       ingressClassName: nginx
       tls:
       - hosts:
-        - harbor.quadtech.dev
+        - ${d.host "harbor"}
         secretName: harbor-ingress
       rules:
-      - host: harbor.quadtech.dev
+      - host: ${d.host "harbor"}
         http:
           paths:
           - path: /api/

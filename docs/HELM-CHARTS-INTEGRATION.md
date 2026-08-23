@@ -12,7 +12,7 @@ This implementation provides automatic propagation of Nix-built Helm charts to K
 
 ### 2. Forgejo as Helm Repository
 - **Package Registry**: Forgejo's built-in OCI-compatible package registry
-- **Repository URL**: `https://forge.quadtech.dev/chartrepo/quadnix`
+- **Repository URL**: `https://forge.voltrum.co/chartrepo/quadnix`
 - **Authentication**: API tokens for automated publishing
 
 ### 3. Automated CI/CD Pipeline

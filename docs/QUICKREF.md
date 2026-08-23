@@ -7,10 +7,10 @@ Backbone (Internal Services)
 ├── backbone-01 (192.168.1.10) - Primary control plane
 ├── backbone-02 (192.168.1.11) - Secondary control plane
 └── Services:
-    ├── Forgejo       forge.quadtech.dev
-    ├── ClickHouse  clickhouse.quadtech.dev
-    ├── Grafana     grafana.quadtech.dev
-    └── Prometheus  prometheus.quadtech.dev
+    ├── Forgejo       forge.voltrum.co
+    ├── ClickHouse  clickhouse.voltrum.co
+    ├── Grafana     grafana.voltrum.co
+    └── Prometheus  prometheus.voltrum.co
 
 Frontline (Client Applications)
 ├── frontline-01 (192.168.1.20) - Worker node
@@ -145,20 +145,20 @@ ClickHouse: admin / changeme
 ### Service URLs
 
 ```
-Forgejo:      https://forge.quadtech.dev
-Grafana:    https://grafana.quadtech.dev
-ClickHouse: https://clickhouse.quadtech.dev
-Prometheus: https://prometheus.quadtech.dev (via Grafana)
+Forgejo:      https://forge.voltrum.co
+Grafana:    https://grafana.voltrum.co
+ClickHouse: https://clickhouse.voltrum.co
+Prometheus: https://prometheus.voltrum.co (via Grafana)
 ```
 
 ### SSH Access
 
 ```sh
 # Forgejo SSH
-git clone git@forge.quadtech.dev:2222/user/repo.git
+git clone git@forge.voltrum.co:2222/user/repo.git
 
 # Backbone nodes
-ssh root@mainssh.quadtech.dev  # backbone-01
+ssh root@mainssh.voltrum.co  # backbone-01
 ssh root@192.168.1.11           # backbone-02
 
 # Frontline nodes
@@ -300,7 +300,7 @@ If cluster pulls from wrong repo:
 ssh backbone01 'cd /etc/nixos && git remote -v && git log --oneline -3'
 
 # Add correct remote
-ssh backbone01 'cd /etc/nixos && sudo git remote add forgejo ssh://git@forge-ssh.quadtech.dev/QuadCoreTech/nix.git'
+ssh backbone01 'cd /etc/nixos && sudo git remote add forgejo ssh://git@forge-ssh.voltrum.co/QuadCoreTech/nix.git'
 ssh backbone01 'cd /etc/nixos && sudo git fetch forgejo && sudo git reset --hard forgejo/main'
 ```
 
@@ -349,7 +349,7 @@ kubectl autoscale deployment <name> -n <namespace> --min=2 --max=10 --cpu-percen
 
 ### View Metrics in Grafana
 
-1. Access https://grafana.quadtech.dev
+1. Access https://grafana.voltrum.co
 2. Login with admin credentials
 3. Navigate to Dashboards
 4. Pre-configured dashboards available for Kubernetes, nodes, services

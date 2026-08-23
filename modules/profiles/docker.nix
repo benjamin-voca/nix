@@ -1,4 +1,6 @@
-{pkgs, ...}: {
+{pkgs, ...}: let
+  d = import ../../lib/domain.nix;
+in {
   environment.systemPackages = with pkgs; [docker];
 
   virtualisation.docker = {
@@ -6,7 +8,7 @@
     autoPrune.enable = true;
     daemon.settings = {
       insecure-registries = [
-        "harbor.quadtech.dev"
+        (d.host "harbor")
         "10.0.0.56:5000"
       ];
     };

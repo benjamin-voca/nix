@@ -172,7 +172,7 @@ ls -la /run/secrets/cloudflared-credentials.json
 systemctl status cloudflared.service
 
 # Test your tunnel
-curl https://forge.quadtech.dev
+curl https://forge.voltrum.co
 ```
 
 ## Troubleshooting

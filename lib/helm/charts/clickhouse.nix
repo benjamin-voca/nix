@@ -1,4 +1,5 @@
 {helmLib}: let
+  d = import ../../domain.nix;
   chart = helmLib.kubelib.downloadHelmChart {
     repo = "https://charts.bitnami.com/bitnami";
     chart = "clickhouse";
@@ -58,7 +59,7 @@ in {
         };
         hosts = [
           {
-            host = "clickhouse.quadtech.dev";
+            host = d.host "clickhouse";
             paths = [
               {
                 path = "/";
@@ -70,7 +71,7 @@ in {
         tls = [
           {
             secretName = "clickhouse-tls";
-            hosts = ["clickhouse.quadtech.dev"];
+            hosts = [(d.host "clickhouse")];
           }
         ];
       };

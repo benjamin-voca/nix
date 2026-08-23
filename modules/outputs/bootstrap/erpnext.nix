@@ -4,6 +4,7 @@
   pkgs,
   lib,
 }: let
+  d = import ../../../lib/domain.nix;
   erpnextNamespace = ''
     apiVersion: v1
     kind: Namespace
@@ -25,7 +26,7 @@
     spec:
       ingressClassName: nginx
       rules:
-      - host: helpdesk.quadtech.dev
+      - host: ${d.host "helpdesk"}
         http:
           paths:
           - path: /helpdesk

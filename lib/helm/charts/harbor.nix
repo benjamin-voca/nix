@@ -1,4 +1,5 @@
 {helmLib}: let
+  d = import ../../domain.nix;
   chart = helmLib.kubelib.downloadHelmChart {
     repo = "https://helm.goharbor.io";
     chart = "harbor";
@@ -24,7 +25,7 @@ in {
         };
         ingress = {
           hosts = {
-            core = "harbor.quadtech.dev";
+            core = d.host "harbor";
           };
           className = "nginx";
           annotations = {
@@ -36,7 +37,7 @@ in {
         };
       };
 
-      externalURL = "https://harbor.quadtech.dev";
+      externalURL = d.url "harbor";
 
       persistence = {
         enabled = true;
@@ -82,11 +83,11 @@ in {
         env = [
           {
             name = "EXT_PUBLIC_URL";
-            value = "https://harbor.quadtech.dev";
+            value = d.url "harbor";
           }
           {
             name = "PROXY_PUBLIC_URL";
-            value = "https://harbor.quadtech.dev";
+            value = d.url "harbor";
           }
         ];
       };

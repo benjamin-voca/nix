@@ -20,7 +20,7 @@ kubectl create secret generic forgejo-admin \
   --namespace=forgejo \
   --from-literal=username=forgejo_admin \
   --from-literal=password="$FORGEJO_ADMIN_PASSWORD" \
-  --from-literal=email=admin@quadtech.dev \
+  --from-literal=email=admin@voltrum.co \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Waiting for Forgejo deployment rollout..."

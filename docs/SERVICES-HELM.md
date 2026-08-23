@@ -5,7 +5,7 @@ preconfigured charts in `lib/helm/charts/` and keeps Cloudflare Tunnel as the pu
 
 ## Architecture
 
-- Cloudflare Tunnel routes `*.quadtech.dev` to ingress-nginx (ClusterIP)
+- Cloudflare Tunnel routes `*.voltrum.co` to ingress-nginx (ClusterIP)
 - ingress-nginx routes to services via Ingress
 - cert-manager is not required (Cloudflare terminates TLS)
 - CloudNativePG provides Postgres for apps that need it
@@ -56,7 +56,7 @@ kubectl apply -f ./result
 Cloudflare Tunnel should include a wildcard rule:
 
 ```
-*.quadtech.dev -> http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
+*.voltrum.co -> http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
 ```
 
 ## Argo CD
@@ -82,9 +82,9 @@ kubectl apply -f ./result
 
 ## Endpoints
 
-- https://argocd.quadtech.dev
-- https://forge.quadtech.dev
-- https://verdaccio.quadtech.dev
+- https://argocd.voltrum.co
+- https://forge.voltrum.co
+- https://verdaccio.voltrum.co
 
 ## Storage (Rook/Ceph)
 

@@ -39,7 +39,7 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
   hosts:
-    - host: helpdesk.quadtech.dev
+    - host: helpdesk.voltrum.co
       paths:
         - path: /
 

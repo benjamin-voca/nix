@@ -6,6 +6,7 @@
   charts,
   kubelib,
 }: let
+  d = import ../../../lib/domain.nix;
   argocdChart =
     pkgs.lib.pipe
     {
@@ -14,8 +15,8 @@
       namespace = "argocd";
       values =
         (import ../../../lib/argocd-values.nix {
-          domain = "argocd.quadtech.dev";
-          serverUrl = "http://argocd.quadtech.dev";
+          domain = d.host "argocd";
+          serverUrl = "http://${d.host "argocd"}";
           serverReplicas = 1;
           controllerReplicas = 1;
           repoServerReplicas = 1;
@@ -27,7 +28,7 @@
             cm = {
               "server.insecure" = true;
               "server.forceHttp" = true;
-              url = "http://argocd.quadtech.dev";
+              url = "http://${d.host "argocd"}";
             };
             params = {
               "server.insecure" = true;
@@ -58,7 +59,7 @@
     spec:
       ingressClassName: nginx
       rules:
-      - host: argocd.quadtech.dev
+      - host: ${d.host "argocd"}
         http:
           paths:
           - path: /

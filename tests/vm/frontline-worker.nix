@@ -1,7 +1,10 @@
 {
   lib,
   pkgs,
-}:
+}: let
+  d = import ../../lib/domain.nix;
+  harborHost = d.host "harbor";
+in
 pkgs.testers.nixosTest {
   name = "quadnix-vm-frontline-worker";
 
@@ -76,10 +79,10 @@ pkgs.testers.nixosTest {
       "systemctl is-active kubelet.service"
     )
     worker.wait_until_succeeds(
-      "test -f /etc/containerd/certs.d/harbor.quadtech.dev/hosts.toml"
+      "test -f /etc/containerd/certs.d/${harborHost}/hosts.toml"
     )
     worker.wait_until_succeeds(
-      "grep -q 'server = \"https://harbor.quadtech.dev\"' /etc/containerd/certs.d/harbor.quadtech.dev/hosts.toml"
+      "grep -q 'server = \"${d.url "harbor"}\"' /etc/containerd/certs.d/${harborHost}/hosts.toml"
     )
   '';
 }

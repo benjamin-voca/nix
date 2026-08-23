@@ -2,6 +2,7 @@
   lib,
   pkgs,
 }: let
+  d = import ../../../lib/domain.nix;
   render = import ./render.nix {inherit lib pkgs;};
 
   namespace = {
@@ -299,7 +300,7 @@
       ingressClassName = "nginx";
       rules = [
         {
-          host = "chat.quadtech.dev";
+          host = d.host "chat";
           http = {
             paths = [
               {

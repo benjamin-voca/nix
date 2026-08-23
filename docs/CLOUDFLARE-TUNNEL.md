@@ -57,11 +57,11 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://localhost:3000
-  - hostname: clickhouse.quadtech.dev
+  - hostname: clickhouse.voltrum.co
     service: http://localhost:8123
-  - hostname: grafana.quadtech.dev
+  - hostname: grafana.voltrum.co
     service: http://localhost:3000
   - service: http_status:404
 ```
@@ -74,7 +74,7 @@ ingress:
 ```yaml
 # /etc/cloudflared/config.yml
 ingress:
-  - hostname: "*.quadtech.dev"
+  - hostname: "*.voltrum.co"
     service: http://localhost:80  # Points to ingress-nginx
   - service: http_status:404
 ```
@@ -133,9 +133,9 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://localhost:3000  # Forgejo port
-  - hostname: clickhouse.quadtech.dev
+  - hostname: clickhouse.voltrum.co
     service: http://localhost:8123  # ClickHouse HTTP
   - service: http_status:404
 ```
@@ -151,11 +151,11 @@ credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   # Point directly to Kubernetes services
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://forgejo.forgejo.svc.cluster.local:3000
-  - hostname: clickhouse.quadtech.dev
+  - hostname: clickhouse.voltrum.co
     service: http://clickhouse.clickhouse.svc.cluster.local:8123
-  - hostname: grafana.quadtech.dev
+  - hostname: grafana.voltrum.co
     service: http://grafana.grafana.svc.cluster.local:80
   - service: http_status:404
 ```
@@ -181,7 +181,7 @@ spec:
 ```yaml
 # /etc/cloudflared/config.yml
 ingress:
-  - hostname: "*.quadtech.dev"
+  - hostname: "*.voltrum.co"
     service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
   - service: http_status:404
 ```
@@ -210,7 +210,7 @@ Then use standard Kubernetes Ingress resources (but without TLS sections).
         enabled = true;
         className = "nginx";
         hosts = [{
-          host = "forge.quadtech.dev";
+          host = "forge.voltrum.co";
           paths = [{ path = "/"; pathType = "Prefix"; }];
         }];
         # NO tls section - Cloudflare handles it
@@ -248,7 +248,7 @@ In Cloudflare Dashboard:
    - Tunnel → Public Hostname → Add
    - For each service:
      - Subdomain: `forgejo`, `clickhouse`, `grafana`
-     - Domain: `quadtech.dev`
+     - Domain: `voltrum.co`
      - Service: `http://localhost:3000` (or K8s service)
 
 3. **Automatic DNS Records**:
@@ -299,19 +299,19 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://localhost:3000
-  - hostname: clickhouse.quadtech.dev
+  - hostname: clickhouse.voltrum.co
     service: http://localhost:8123
-  - hostname: grafana.quadtech.dev
+  - hostname: grafana.voltrum.co
     service: http://localhost:3000
   - service: http_status:404
 EOF
 
 # Route DNS (in Cloudflare dashboard or via CLI)
-cloudflared tunnel route dns quadnix forge.quadtech.dev
-cloudflared tunnel route dns quadnix clickhouse.quadtech.dev
-cloudflared tunnel route dns quadnix grafana.quadtech.dev
+cloudflared tunnel route dns quadnix forge.voltrum.co
+cloudflared tunnel route dns quadnix clickhouse.voltrum.co
+cloudflared tunnel route dns quadnix grafana.voltrum.co
 ```
 
 ### 2. Deploy Services
@@ -343,7 +343,7 @@ Or for Kubernetes services:
 
 ```yaml
 ingress:
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://forgejo.forgejo.svc.cluster.local:3000
 ```
 
@@ -354,8 +354,8 @@ ingress:
 cloudflared tunnel info quadnix
 
 # Check service accessibility
-curl https://forge.quadtech.dev
-curl https://clickhouse.quadtech.dev
+curl https://forge.voltrum.co
+curl https://clickhouse.voltrum.co
 ```
 
 ## Simplified Architecture Recommendation
@@ -388,15 +388,15 @@ tunnel: <id>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: forge.quadtech.dev
+  - hostname: forge.voltrum.co
     service: http://localhost:3000
-  - hostname: clickhouse.quadtech.dev
+  - hostname: clickhouse.voltrum.co
     service: http://localhost:8123
   - service: http_status:404
 ```
 
 **Result:**
-- Services accessible at `https://forge.quadtech.dev`, etc.
+- Services accessible at `https://forge.voltrum.co`, etc.
 - No ingress, no cert-manager, no LoadBalancer needed
 - Cloudflare handles everything external
 

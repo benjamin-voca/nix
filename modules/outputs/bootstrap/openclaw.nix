@@ -2,6 +2,7 @@
   lib,
   pkgs,
 }: let
+  d = import ../../../lib/domain.nix;
   render = import ./render.nix {inherit lib pkgs;};
 
   openclawConfigJson = builtins.toJSON {
@@ -20,8 +21,8 @@
       controlUi = {
         enabled = true;
         allowedOrigins = [
-          "https://openclaw.quadtech.dev"
-          "http://openclaw.quadtech.dev"
+          (d.url "openclaw")
+          "http://${d.host "openclaw"}"
         ];
         dangerouslyDisableDeviceAuth = true;
       };
@@ -103,9 +104,9 @@
         - When asked to summarize recent chat, summarize the latest 20 channel messages.
 
         ## Forgejo integration
-        - Forgejo is hosted at https://forge.quadtech.dev.
+        - Forgejo is hosted at ${d.url "forge"}.
         - Use the FORGEJO_AGENT_TOKEN environment variable for API authentication.
-        - Use this endpoint for REST calls: https://forge.quadtech.dev/api/v1.
+        - Use this endpoint for REST calls: ${d.url "forge"}/api/v1.
         - Send header: Authorization: token <FORGEJO_AGENT_TOKEN>.
         - When asked to turn a summary into issues, create issues in Forgejo with clear titles and markdown descriptions.
       '';
@@ -409,7 +410,7 @@
       ingressClassName = "nginx";
       rules = [
         {
-          host = "openclaw.quadtech.dev";
+          host = d.host "openclaw";
           http = {
             paths = [
               {

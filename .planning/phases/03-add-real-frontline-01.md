@@ -77,7 +77,7 @@ Ensure frontline-01 can reach:
 
 Add to `modules/roles/frontline.nix`:
 ```nix
-networking.hosts."192.168.1.240" = [ "harbor.quadtech.dev" ];
+networking.hosts."192.168.1.240" = [ "harbor.voltrum.co" ];
 ```
 
 ### Step 6: Deploy and verify

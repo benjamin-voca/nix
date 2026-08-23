@@ -117,7 +117,7 @@ EOF
         echo "     systemctl status clickhouse"
         echo ""
         echo "  3. Access services:"
-        echo "     Forgejo: http://192.168.1.10:3000 or https://forge.quadtech.dev"
+        echo "     Forgejo: http://192.168.1.10:3000 or https://forge.voltrum.co"
         echo "     ClickHouse: http://192.168.1.10:8123"
         ;;
     
@@ -209,7 +209,7 @@ EOF
         echo "=== OPTION 2: Kubernetes Services ==="
         echo "• All services run in Kubernetes pods"
         echo "• Deployed via Helm charts (from lib/helm/charts/)"
-        echo "• Access: Via ingress (forge.quadtech.dev, etc.)"
+        echo "• Access: Via ingress (forge.voltrum.co, etc.)"
         echo "• Management: kubectl, helm"
         echo "• Multi-node, high availability"
         echo "• Includes: Forgejo, ClickHouse, Grafana, Prometheus, Loki"

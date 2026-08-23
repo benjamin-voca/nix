@@ -1,4 +1,6 @@
-{helmLib}: {
+{helmLib}: let
+  d = import ../../domain.nix;
+in {
   # Grafana standalone configuration
   grafana = helmLib.buildChart {
     name = "grafana";
@@ -32,7 +34,7 @@
         };
         hosts = [
           {
-            host = "grafana.quadtech.dev";
+            host = d.host "grafana";
             paths = [
               {
                 path = "/";
@@ -44,7 +46,7 @@
         tls = [
           {
             secretName = "grafana-tls";
-            hosts = ["grafana.quadtech.dev"];
+            hosts = [(d.host "grafana")];
           }
         ];
       };
@@ -63,8 +65,8 @@
       # Grafana configuration
       "grafana.ini" = {
         server = {
-          root_url = "https://grafana.quadtech.dev";
-          domain = "grafana.quadtech.dev";
+          root_url = d.url "grafana";
+          domain = d.host "grafana";
         };
 
         database = {
