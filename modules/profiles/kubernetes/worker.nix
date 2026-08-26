@@ -7,6 +7,7 @@
   imports = [
     ../../shared/quad-common.nix
     ./containerd-registry.nix
+    ./kubelet-image-gc.nix
   ];
 
   environment.systemPackages = with pkgs; [
