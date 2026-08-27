@@ -130,21 +130,8 @@ in {
             echo "Injected shared-pg-app secret"
           fi
 
-          # Grafana database/admin secret
-          if [ -f /run/secrets/cnpg-edukurs-password ] && [ -f /run/secrets/grafana-admin-password ]; then
-            CNPG_PW=$(cat /run/secrets/cnpg-edukurs-password)
-            GRAFANA_ADMIN_PW=$(cat /run/secrets/grafana-admin-password)
-            $kubectl create secret generic grafana-db \
-              --namespace=grafana \
-              --from-literal=GF_DATABASE_TYPE=postgres \
-              --from-literal=GF_DATABASE_HOST=shared-pg-rw.cnpg-system.svc.cluster.local:5432 \
-              --from-literal=GF_DATABASE_NAME=grafana \
-              --from-literal=GF_DATABASE_USER=edukurs \
-              --from-literal=GF_DATABASE_PASSWORD="$CNPG_PW" \
-              --from-literal=GF_SECURITY_ADMIN_PASSWORD="$GRAFANA_ADMIN_PW" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected grafana-db secret"
-          fi
+          # (grafana-db injection removed — standalone grafana namespace wound
+          # down; kube-prometheus-stack grafana manages its own admin secret)
 
           # Forgejo database bootstrap secret (CNPG initdb)
           if [ -f /run/secrets/forgejo-db-password ]; then
