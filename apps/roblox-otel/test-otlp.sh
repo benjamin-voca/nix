@@ -11,7 +11,7 @@ NOW_MS="$(date +%s)000"
 
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$HOST/v1/logs" \
   -H 'content-type: application/json' \
-  -H "authorization: Bearer $TOKEN" \
+  -H "authorization: $TOKEN" \
   -d @- <<EOF
 {
   "resourceLogs": [{

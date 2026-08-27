@@ -6,7 +6,8 @@
 -- the OtelLogSink RemoteEvent) and POSTs them as OTLP/HTTP JSON to the
 -- cluster's collector:
 --     POST https://otlp.voltrum.co/v1/logs
---     Authorization: Bearer <ingestion token>
+--     Authorization: <ingestion token>  (RAW token — the ClickStack
+--     standalone collector's bearertokenauth uses scheme="", no Bearer)
 --
 -- Configuration via ServerScriptService attributes (set once at startup):
 --   ServerScriptService:SetAttribute("OtelEndpoint", "https://otlp.voltrum.co/v1/logs")
@@ -189,7 +190,8 @@ local function flush(): boolean
 			Method = "POST",
 			Headers = {
 				["content-type"] = "application/json",
-				["authorization"] = "Bearer " .. CONFIG.Token,
+				-- RAW token, no "Bearer " prefix (collector scheme="")
+				["authorization"] = CONFIG.Token,
 			},
 			Body = HttpService:JSONEncode(resourceLogsPayload(batch)),
 		})

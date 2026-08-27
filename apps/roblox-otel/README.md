@@ -4,7 +4,8 @@ Luau SDK that ships logs from Roblox experiences into self-hosted ClickStack
 (HyperDX) running on the QuadNix cluster.
 
 - **Endpoint:** `https://otlp.voltrum.co/v1/logs` (OTLP/HTTP JSON)
-- **Auth:** `Authorization: Bearer <clickstack-otlp-token>`
+- **Auth:** `Authorization: <clickstack-otlp-token>` (RAW token — the
+  standalone collector's bearertokenauth uses `scheme: ""`, no Bearer prefix)
   (the `clickstack-otlp-token` sops key == HyperDX `OTLP_AUTH_TOKEN`)
 - **Search:** HyperDX UI at `https://hyperdx.voltrum.co`, filter
   `service.name: roblox`

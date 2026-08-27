@@ -298,6 +298,14 @@ ${tolerations}
                 name: clickstack-config
             - secretRef:
                 name: clickstack-secrets
+          env:
+            # Run the distro in standalone mode (its shipped config reads
+            # CLICKHOUSE_* / OTLP_AUTH_TOKEN from env). Supervisor/OpAMP mode
+            # crashes during remote-config application in this topology.
+            - name: OPAMP_SERVER_URL
+              value: ""
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://clickstack-app:4318"
           resources:
             requests:
               cpu: 20m

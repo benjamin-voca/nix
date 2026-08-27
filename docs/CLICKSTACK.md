@@ -89,3 +89,22 @@ auto-seeded sources (Local ClickHouse → Logs/Traces/Metrics), search
   receiver endpoint enabled).
 - DORA/prometheus integration (kube-prometheus-stack grafana still up and
   can read ClickHouse via the plugin if ever needed).
+
+## Deployed-state deltas (2026-08-27)
+
+Decisions locked during first deploy — do not regress:
+
+- **Collector runs standalone** (`OPAMP_SERVER_URL=""` env override in
+  13f). Supervisor/OpAMP mode crashes during remote-config application in
+  this topology. Standalone config reads `CLICKHOUSE_*` + `OTLP_AUTH_TOKEN`
+  envs, health_check on 13133.
+- **Auth scheme is RAW token**: bearertokenauth ships `scheme: ""` — the
+  `Authorization` header must be exactly `clickstack-otlp-token`, NOT
+  `Bearer <token>`. Roblox SDK + test-otlp.sh follow this.
+- **CH entrypoint**: `CLICKHOUSE_SKIP_USER_SETUP=1` (users.d is a read-only
+  secret mount); `default` user lockdown ships as `default-user.xml` in the
+  managed secret.
+- **Cloudflare DNS**: tunnel ingress has a `*` route but voltrum.co has
+  per-host CNAMEs only. `otlp` / `hyperdx` CNAMEs must be added to the
+  voltrum.co zone pointing at the tunnel (`<tunnel-id>.cfargotunnel.com`)
+  before public URLs resolve.
