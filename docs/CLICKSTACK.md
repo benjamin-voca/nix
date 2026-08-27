@@ -116,3 +116,13 @@ Decisions locked during first deploy — do not regress:
 Explicit records (www → Pages, mosaic, f1 → old frontline tunnel, mail/TXT)
 always win over the wildcard — nothing was swallowed. `otlp` / `hyperdx` /
 any future service hostname now resolve with zero DNS work.
+
+## Session-cookie fix (2026-08-27)
+
+HyperDX sets `sess.cookie.secure = true` when FRONTEND_URL is https (and
+`trust proxy 1`), so express-session withholds Set-Cookie when the origin
+hop is plain HTTP — login succeeded server-side but the browser never got
+`connect.sid` → 401 on /api/me. Fixed by routing the tunnel wildcard
+`*.voltrum.co` over TLS to nginx (https://127.0.0.1:31797, noTLSVerify) so
+X-Forwarded-Proto: https reaches the app. Tunnel config v43; mirrored in
+lib/cloudflared-config.nix.
