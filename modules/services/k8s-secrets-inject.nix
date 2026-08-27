@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -197,6 +197,54 @@ in {
                 echo "Refreshed forgejo-runner-token from Forgejo"
               fi
             fi
+          fi
+
+          # ClickStack secrets (HyperDX + OTel collector + Mongo + CH users.d)
+          # Backed by sops keys: clickstack-otlp-token, clickstack-session-secret,
+          # clickstack-ch-app-password, clickstack-ch-collector-password,
+          # clickstack-hyperdx-api-key, clickstack-mongo-password
+          if [ -f /run/secrets/clickstack-hyperdx-api-key ] \
+             && [ -f /run/secrets/clickstack-ch-app-password ] \
+             && [ -f /run/secrets/clickstack-ch-collector-password ] \
+             && [ -f /run/secrets/clickstack-session-secret ] \
+             && [ -f /run/secrets/clickstack-mongo-password ] \
+             && [ -f /run/secrets/clickstack-otlp-token ]; then
+            HK=$(cat /run/secrets/clickstack-hyperdx-api-key)
+            APP_PW=$(cat /run/secrets/clickstack-ch-app-password)
+            COLL_PW=$(cat /run/secrets/clickstack-ch-collector-password)
+            SESS=$(cat /run/secrets/clickstack-session-secret)
+            MONGO_PW=$(cat /run/secrets/clickstack-mongo-password)
+            OTLP_TOKEN=$(cat /run/secrets/clickstack-otlp-token)
+
+            # Shared HyperDX + collector env/config secret.
+            # DEFAULT_CONNECTIONS / DEFAULT_SOURCES seed the HyperDX UI sources
+            # (mirrors the chart defaults, trimmed to Logs/Traces/Metrics).
+            DEFAULT_CONNECTIONS='[{"name":"Local ClickHouse","host":"http://clickhouse.clickstack.svc.cluster.local:8123","port":8123,"username":"app","password":"'"$APP_PW"'"}]'
+            DEFAULT_SOURCES='[{"from":{"databaseName":"default","tableName":"otel_logs"},"kind":"log","timestampValueExpression":"Timestamp","name":"Logs","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"Body","serviceNameExpression":"ServiceName","bodyExpression":"Body","eventAttributesExpression":"LogAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,SeverityText,Body","severityTextExpression":"SeverityText","traceIdExpression":"TraceId","spanIdExpression":"SpanId","connection":"Local ClickHouse","traceSourceId":"Traces","metricSourceId":"Metrics"},{"from":{"databaseName":"default","tableName":"otel_traces"},"kind":"trace","timestampValueExpression":"Timestamp","name":"Traces","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"SpanName","serviceNameExpression":"ServiceName","bodyExpression":"SpanName","eventAttributesExpression":"SpanAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,StatusCode,round(Duration/1e6),SpanName","traceIdExpression":"TraceId","spanIdExpression":"SpanId","durationExpression":"Duration","durationPrecision":9,"parentSpanIdExpression":"ParentSpanId","spanNameExpression":"SpanName","spanKindExpression":"SpanKind","statusCodeExpression":"StatusCode","statusMessageExpression":"StatusMessage","connection":"Local ClickHouse","logSourceId":"Logs","metricSourceId":"Metrics"},{"from":{"databaseName":"default","tableName":""},"kind":"metric","timestampValueExpression":"TimeUnix","name":"Metrics","resourceAttributesExpression":"ResourceAttributes","metricTables":{"gauge":"otel_metrics_gauge","histogram":"otel_metrics_histogram","sum":"otel_metrics_sum"},"connection":"Local ClickHouse","logSourceId":"Logs","traceSourceId":"Traces"}]'
+
+            $kubectl -n clickstack create secret generic clickstack-secrets \
+              --from-literal="HYPERDX_API_KEY=$HK" \
+              --from-literal="OTLP_AUTH_TOKEN=$OTLP_TOKEN" \
+              --from-literal="CLICKHOUSE_APP_PASSWORD=$APP_PW" \
+              --from-literal="CLICKHOUSE_PASSWORD=$COLL_PW" \
+              --from-literal="CLICKHOUSE_USER=otelcollector" \
+              --from-literal="EXPRESS_SESSION_SECRET=$SESS" \
+              --from-literal="MONGO_PASSWORD=$MONGO_PW" \
+              --from-literal="MONGO_URI=mongodb://hyperdx:$MONGO_PW@mongo.clickstack.svc.cluster.local:27017/hyperdx?authSource=admin" \
+              --from-literal="DEFAULT_CONNECTIONS=$DEFAULT_CONNECTIONS" \
+              --from-literal="DEFAULT_SOURCES=$DEFAULT_SOURCES" \
+              --dry-run=client -o yaml | $kubectl apply -f - >/dev/null 2>&1 \
+              && echo "Injected clickstack-secrets"
+
+            # ClickHouse users.d — hashed passwords; the server hot-reloads
+            # this file when the secret is updated.
+            APP_HASH=$(printf '%s' "$APP_PW" | sha256sum | cut -d' ' -f1)
+            COLL_HASH=$(printf '%s' "$COLL_PW" | sha256sum | cut -d' ' -f1)
+            USERS_XML="<clickhouse><users><app><password_sha256_hex>$APP_HASH</password_sha256_hex><networks><ip>::/0</ip></networks><profile>default</profile><quota>default</quota><grants><query>GRANT SHOW ON *.*, SELECT ON system.*, SELECT ON default.*</query></grants></app><otelcollector><password_sha256_hex>$COLL_HASH</password_sha256_hex><networks><ip>::/0</ip></networks><profile>default</profile><quota>default</quota><grants><query>GRANT SELECT,INSERT,CREATE,SHOW ON default.*</query></grants></otelcollector></users></clickhouse>"
+            $kubectl -n clickstack create secret generic clickstack-clickhouse-users \
+              --from-literal="users.xml=$USERS_XML" \
+              --dry-run=client -o yaml | $kubectl apply -f - >/dev/null 2>&1 \
+              && echo "Injected clickstack-clickhouse-users"
           fi
 
           # Ceph RGW S3 credentials for CNPG backups

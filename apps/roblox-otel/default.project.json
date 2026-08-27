@@ -1,0 +1,24 @@
+{
+  "name": "roblox-otel",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "OtelServer": {
+        "$path": "src/OtelServer.luau"
+      },
+      "ExampleUsage": {
+        "$path": "src/ExampleUsage.server.luau"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "OtelClientBridge": {
+          "$path": "src/OtelClientBridge.client.luau"
+        }
+      }
+    }
+  }
+}

@@ -51,6 +51,7 @@
     appNamespacesMod = import ./bootstrap/app-namespaces.nix {inherit pkgs lib;};
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
     mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
+    clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
     # Existing sub-module
@@ -67,6 +68,7 @@
       // cloudflaredMod.chartFiles
       // harborMod.chartFiles
       // monitoringMod.chartFiles
+      // clickstackMod.chartFiles
       // appNamespacesMod.chartFiles
       // orkestrMod.chartFiles;
       # // doraMod.chartFiles;
@@ -83,6 +85,7 @@
       // cloudflaredMod.inlineFiles
       // harborMod.inlineFiles
       // monitoringMod.inlineFiles
+      // clickstackMod.inlineFiles
       // minecraftMod.inlineFiles
       // appNamespacesMod.inlineFiles
       // orkestrMod.inlineFiles
@@ -216,6 +219,30 @@
           path.write_text("\n---\n".join(cleaned_docs) + "\n")
       PY
 
+      # ── Post-processing: namespace injection for ClickStack chart ─────
+      # The clickstack chart templates omit metadata.namespace entirely
+      # (unlike kube-prometheus-stack), so objects would land in `default`.
+      chmod u+w $out/13z-clickstack-chart.yaml
+      OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
+      import os
+      from pathlib import Path
+
+      path = Path(os.environ["OUT"]) / "13z-clickstack-chart.yaml"
+      docs = path.read_text().split("\n---\n")
+      out_docs = []
+      for doc in docs:
+          if not doc.strip():
+              continue
+          lines = doc.split("\n")
+          patched = []
+          for line in lines:
+              patched.append(line)
+              if line == "metadata:":
+                  patched.append("  namespace: clickstack")
+          out_docs.append("\n".join(patched))
+      path.write_text("\n---\n".join(out_docs) + "\n")
+      PY
+
       # ── Post-processing: Forgejo service targetPort normalization ────────
       chmod u+w $out/03-forgejo.yaml
       OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
@@ -342,6 +369,22 @@
       cat $out/12c-promtail-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12d-orkestr-dashboard.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13a-clickstack-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13b-clickhouse-services.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13c-clickhouse-statefulset.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13d-mongo.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13e-mongo-pvc.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13f-collector.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13g-ingresses.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/13z-clickstack-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
                   cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml

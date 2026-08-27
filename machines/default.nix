@@ -137,6 +137,13 @@ in {
         "cnpg-edukurs-password"
         # Grafana
         "grafana-admin-password"
+        # ClickStack (observability)
+        "clickstack-otlp-token"
+        "clickstack-session-secret"
+        "clickstack-ch-app-password"
+        "clickstack-ch-collector-password"
+        "clickstack-hyperdx-api-key"
+        "clickstack-mongo-password"
         # OpenClaw
         "openclaw-gateway-token"
         "openclaw-minimax-api-key"
