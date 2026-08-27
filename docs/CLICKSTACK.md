@@ -108,3 +108,11 @@ Decisions locked during first deploy — do not regress:
   per-host CNAMEs only. `otlp` / `hyperdx` CNAMEs must be added to the
   voltrum.co zone pointing at the tunnel (`<tunnel-id>.cfargotunnel.com`)
   before public URLs resolve.
+
+## DNS (2026-08-27)
+
+`*.voltrum.co` CNAME → `b6bac523-be70-4625-8b67-fa78a9e1c7a5.cfargotunnel.com`
+(proxied) created via Cloudflare API (record id b8e9687f9d77b6c4f090be1fcea88bf6).
+Explicit records (www → Pages, mosaic, f1 → old frontline tunnel, mail/TXT)
+always win over the wildcard — nothing was swallowed. `otlp` / `hyperdx` /
+any future service hostname now resolve with zero DNS work.
