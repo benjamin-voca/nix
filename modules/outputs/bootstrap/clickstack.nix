@@ -103,6 +103,10 @@ ${tolerations}
           env:
             - name: CLICKHOUSE_DB
               value: default
+            # Entrypoint user setup writes to users.d (read-only secret mount);
+            # all users incl. the default-user lockdown ship in the secret.
+            - name: CLICKHOUSE_SKIP_USER_SETUP
+              value: "1"
           resources:
             requests:
               cpu: 250m
@@ -132,6 +136,8 @@ ${tolerations}
             items:
               - key: users.xml
                 path: users.xml
+              - key: default-user.xml
+                path: default-user.xml
             defaultMode: 0644
   volumeClaimTemplates:
     - metadata:

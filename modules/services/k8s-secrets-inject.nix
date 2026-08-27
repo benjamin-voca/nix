@@ -228,8 +228,13 @@ in {
             APP_HASH=$(printf '%s' "$APP_PW" | sha256sum | cut -d' ' -f1)
             COLL_HASH=$(printf '%s' "$COLL_PW" | sha256sum | cut -d' ' -f1)
             USERS_XML="<clickhouse><users><app><password_sha256_hex>$APP_HASH</password_sha256_hex><networks><ip>::/0</ip></networks><profile>default</profile><quota>default</quota><grants><query>GRANT SHOW ON *.*, SELECT ON system.*, SELECT ON default.*</query></grants></app><otelcollector><password_sha256_hex>$COLL_HASH</password_sha256_hex><networks><ip>::/0</ip></networks><profile>default</profile><quota>default</quota><grants><query>GRANT SELECT,INSERT,CREATE,SHOW ON default.*</query></grants></otelcollector></users></clickhouse>"
+            # Entrypoint-equivalent lockdown: default user is local-only.
+            # Required because CLICKHOUSE_SKIP_USER_SETUP=1 (users.d is a
+            # read-only secret mount; the entrypoint would fail writing it).
+            DEFAULT_USER_XML="<clickhouse><users><default><networks><ip>::1</ip><ip>127.0.0.1</ip></networks></default></users></clickhouse>"
             $kubectl -n clickstack create secret generic clickstack-clickhouse-users \
               --from-literal="users.xml=$USERS_XML" \
+              --from-literal="default-user.xml=$DEFAULT_USER_XML" \
               --dry-run=client -o yaml | $kubectl apply -f - >/dev/null 2>&1 \
               && echo "Injected clickstack-clickhouse-users"
           fi
