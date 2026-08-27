@@ -101,6 +101,8 @@ in {
           # Connections + sources seed come from the managed secret
           useExistingConfigSecret = true;
           existingConfigSecret = "clickstack-secrets";
+          existingConfigConnectionsKey = "DEFAULT_CONNECTIONS";
+          existingConfigSourcesKey = "DEFAULT_SOURCES";
 
           # Sensitive env injected from the managed secret (overrides envFrom)
           env = [
