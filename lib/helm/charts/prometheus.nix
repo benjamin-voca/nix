@@ -66,6 +66,24 @@ in {
       # Node exporter
       nodeExporter = {
         enabled = true;
+        # DaemonSet pods tolerate unschedulable:NoSchedule, so the rollout keeps
+        # spawning a replica on cordoned frontline-01 that can never start.
+        # Pin to backbone until frontline actually rejoins the cluster.
+        affinity = {
+          nodeAffinity = {
+            requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms = [
+              {
+                matchExpressions = [
+                  {
+                    key = "kubernetes.io/hostname";
+                    operator = "In";
+                    values = ["backbone-01.local"];
+                  }
+                ];
+              }
+            ];
+          };
+        };
       };
 
       # Kube state metrics
