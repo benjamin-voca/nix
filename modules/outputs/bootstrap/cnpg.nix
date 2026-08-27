@@ -79,27 +79,6 @@
       cluster:
         name: shared-pg
       owner: app
-    ---
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Database
-    metadata:
-      name: quadpacienti
-      namespace: cnpg-system
-    spec:
-      cluster:
-        name: shared-pg
-      owner: app
-    ---
-    apiVersion: postgresql.cnpg.io/v1
-    kind: Database
-    metadata:
-      name: grafana
-      namespace: cnpg-system
-    spec:
-      cluster:
-        name: shared-pg
-      name: grafana
-      owner: edukurs
   '';
 in {
   chartFiles = {

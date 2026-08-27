@@ -13,11 +13,11 @@
 #   bootstrap/harbor.nix         - Harbor chart + namespace + PVCs + ingress
 #   bootstrap/monitoring.nix     - Prometheus + Grafana charts
 #   bootstrap/minecraft.nix      - Minecraft namespace + ArgoCD app
-#   bootstrap/erpnext.nix        - ERPNext namespace + helpdesk redirect
-#   bootstrap/app-namespaces.nix - EduKurs/BatllavaTourist/QuadPacienti ns + apps
+#   bootstrap/app-namespaces.nix - EduKurs/BatllavaTourist ns + apps
 #   bootstrap/orkestr.nix        - Orkestr namespace + CI RBAC
 #   bootstrap/openclaw.nix       - OpenClaw (existing)
-#   bootstrap/librechat.nix      - LibreChat (existing)
+# Removed (wound down): erpnext, tempo, librechat, verdaccio, quadpacienti,
+#   standalone grafana namespace (kube-prometheus-stack grafana remains)
 {
   config,
   lib,
@@ -47,16 +47,14 @@
     cloudflaredMod = import ./bootstrap/cloudflared.nix {inherit pkgs lib;};
     harborMod = import ./bootstrap/harbor.nix {inherit pkgs lib existingCharts;};
     monitoringMod = import ./bootstrap/monitoring.nix {inherit pkgs lib existingCharts;};
-    tempoMod = import ./bootstrap/tempo.nix {inherit lib existingCharts;};
     minecraftMod = import ./bootstrap/minecraft.nix {inherit pkgs lib;};
-    erpnextMod = import ./bootstrap/erpnext.nix {inherit pkgs lib;};
     appNamespacesMod = import ./bootstrap/app-namespaces.nix {inherit pkgs lib;};
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
+    mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
-    # Existing sub-modules (openclaw, librechat)
+    # Existing sub-module
     openclawBootstrap = import ./bootstrap/openclaw.nix {inherit lib pkgs;};
-    librechatBootstrap = import ./bootstrap/librechat.nix {inherit lib pkgs;};
 
     # Collect all chart files from all modules
     allChartFiles = {}
@@ -69,7 +67,6 @@
       // cloudflaredMod.chartFiles
       // harborMod.chartFiles
       // monitoringMod.chartFiles
-      // tempoMod.chartFiles
       // appNamespacesMod.chartFiles
       // orkestrMod.chartFiles;
       # // doraMod.chartFiles;
@@ -86,11 +83,10 @@
       // cloudflaredMod.inlineFiles
       // harborMod.inlineFiles
       // monitoringMod.inlineFiles
-      // tempoMod.inlineFiles
       // minecraftMod.inlineFiles
-      // erpnextMod.inlineFiles
       // appNamespacesMod.inlineFiles
-      // orkestrMod.inlineFiles;
+      // orkestrMod.inlineFiles
+      // mosaicMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -134,15 +130,7 @@
       cp ${openclawBootstrap.manifests."17d-openclaw-service.yaml"} $out/17d-openclaw-service.yaml
       cp ${openclawBootstrap.manifests."17e-openclaw-ingress.yaml"} $out/17e-openclaw-ingress.yaml
 
-      # ── LibreChat manifests ───────────────────────────────────────────────
-      cp ${librechatBootstrap.manifests."19-librechat-namespace.yaml"} $out/19-librechat-namespace.yaml
-      cp ${librechatBootstrap.manifests."19a-librechat-configmap.yaml"} $out/19a-librechat-configmap.yaml
-      cp ${librechatBootstrap.manifests."19b-librechat-pvc.yaml"} $out/19b-librechat-pvc.yaml
-      cp ${librechatBootstrap.manifests."19c-librechat-deployment.yaml"} $out/19c-librechat-deployment.yaml
-      cp ${librechatBootstrap.manifests."19d-librechat-service.yaml"} $out/19d-librechat-service.yaml
-      cp ${librechatBootstrap.manifests."19e-librechat-ingress.yaml"} $out/19e-librechat-ingress.yaml
-
-      # ── Post-processing: StorageClass filtering ──────────────────────────
+            # ── Post-processing: StorageClass filtering ──────────────────────────
       chmod u+w $out/03-rook-ceph-cluster.yaml
       OUT="$out" ${pkgs.python3}/bin/python - <<'PY'
       import os
@@ -345,29 +333,17 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/12-harbor-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/12aa-erpnext-namespace.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/12a-erpnext-helpdesk-redirect-ingress.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
+                  cat $out/11-monitoring-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12-monitoring-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/12-grafana-chart.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/12a-grafana-ingress.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/12b-loki-chart.yaml >> $out/bootstrap.yaml
+                  cat $out/12b-loki-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12c-promtail-chart.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/12d-orkestr-dashboard.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/11a-tempo-namespace.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/12e-tempo-chart.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
+                  cat $out/11-minecraft-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/14-minecraft-argocd-app.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
@@ -375,17 +351,11 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/15-batllavatourist-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/15-quadpacienti-namespace.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/16-edukurs-argocd-app.yaml >> $out/bootstrap.yaml
+            cat $out/16-edukurs-argocd-app.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/16-batllavatourist-argocd-app.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/16-quadpacienti-argocd-app.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/16-verdaccio-argocd-app.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/17-openclaw-namespace.yaml >> $out/bootstrap.yaml
+                  cat $out/17-openclaw-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/17a-openclaw-pvc.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
@@ -397,19 +367,15 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/17e-openclaw-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/19-librechat-namespace.yaml >> $out/bootstrap.yaml
+                                          cat $out/18-orkestr-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/19a-librechat-configmap.yaml >> $out/bootstrap.yaml
+      cat $out/21-mosaic-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/19b-librechat-pvc.yaml >> $out/bootstrap.yaml
+      cat $out/21a-mosaic-ci-rbac.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/19c-librechat-deployment.yaml >> $out/bootstrap.yaml
+      cat $out/21b-mosaic-rgw-user.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/19d-librechat-service.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/19e-librechat-ingress.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/18-orkestr-namespace.yaml >> $out/bootstrap.yaml
+      cat $out/21c-mosaic-rgw-buckets.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml

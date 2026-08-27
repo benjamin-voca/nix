@@ -9,6 +9,11 @@
 #   - RCON enabled via the injected `minecraft-rcon-secret`
 #   - Exposed as a MetalLB LoadBalancer on 192.168.1.245:25565 (LAN VIP)
 #
+# PARKED (replicaCount: 0): server wound down while the cluster is
+# effectively single-node (frontline-01 cordoned/NotReady). The PVC
+# minecraft-datadir (200Gi ceph-block) holds all world data — it stays
+# bound and untouched. To bring the server back, set replicaCount: 1.
+#
 # NOTE on chart value keys (itzg/minecraft-server-charts):
 #   The main Service type/IP live under `minecraftServer.serviceType` and
 #   `minecraftServer.loadBalancerIP` — NOT under a top-level `service:` block.
@@ -44,6 +49,10 @@
         targetRevision: 5.1.3
         helm:
           values: |
+            # Wind-down: scale the server Deployment to zero without touching
+            # any other resource (Service/PVC/secret all remain). Re-enable by
+            # setting this back to 1.
+            replicaCount: 0
             minecraftServer:
               eula: "TRUE"
               # NeoForge is the only loader Create 6.x ships for on 1.21.1

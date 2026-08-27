@@ -133,9 +133,6 @@ in {
         "ceph-rgw-s3-secret-key"
         # Minecraft
         "minecraft-rcon-password"
-        # ERPNext
-        "erpnext-db-admin-password"
-        "erpnext-admin-password"
         # EduKurs (CNPG)
         "cnpg-edukurs-password"
         # Grafana
@@ -153,10 +150,6 @@ in {
         "orkestr-electric-secret"
         "orkestr-dns-cluster-query"
         "orkestr-openrouter-api-key"
-        # LibreChat
-        "librechat-zhipu-api-key"
-        "librechat-minimax-api-key"
-        "librechat-jwt-secret"
         # Tailscale
         "tailscale-auth-key"
       ];

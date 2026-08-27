@@ -10,7 +10,8 @@ in {
       # Prometheus configuration
       prometheus = {
         prometheusSpec = {
-          replicas = 2;
+          # Single node cluster — HA replicas buy nothing here
+          replicas = 1;
           retention = "30d";
           storageSpec = null;
           # Resource limits
@@ -56,7 +57,8 @@ in {
       alertmanager = {
         enabled = true;
         alertmanagerSpec = {
-          replicas = 2;
+          # Single node cluster — HA replicas buy nothing here
+          replicas = 1;
           storage = null;
         };
       };

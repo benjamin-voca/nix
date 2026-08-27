@@ -7,7 +7,6 @@
 }: let
   d = import ../../../lib/domain.nix;
   monitoringChart = existingCharts.prometheus;
-  grafanaChart = existingCharts.grafana;
 
   monitoringNamespace = ''
     apiVersion: v1
@@ -16,13 +15,6 @@
       name: monitoring
       labels:
         app.kubernetes.io/name: monitoring
-    ---
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      name: grafana
-      labels:
-        app.kubernetes.io/name: grafana
     ---
     apiVersion: v1
     kind: Namespace
@@ -77,7 +69,7 @@
     kind: ConfigMap
     metadata:
       name: grafana-dashboard-orkestr-k8s
-      namespace: grafana
+      namespace: monitoring
       labels:
         grafana_dashboard: "1"
     data:
@@ -185,40 +177,15 @@
         }
   '';
 
-  grafanaIngress = ''
-    apiVersion: networking.k8s.io/v1
-    kind: Ingress
-    metadata:
-      name: grafana
-      namespace: grafana
-      annotations:
-        nginx.ingress.kubernetes.io/ssl-redirect: "false"
-        nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    spec:
-      ingressClassName: nginx
-      rules:
-      - host: ${d.host "grafana"}
-        http:
-          paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: grafana
-                port:
-                  number: 80
-  '';
-in {
+  in {
   chartFiles = {
     "12-monitoring-chart.yaml" = monitoringChart;
-    "12-grafana-chart.yaml" = grafanaChart;
     "12b-loki-chart.yaml" = existingCharts.loki;
     "12c-promtail-chart.yaml" = existingCharts.promtail;
   };
 
   inlineFiles = {
     "11-monitoring-namespace.yaml"         = monitoringNamespace;
-    "12a-grafana-ingress.yaml"             = grafanaIngress;
     "12d-orkestr-dashboard.yaml"           = orkestrGrafanaDashboard;
   };
 
@@ -228,8 +195,6 @@ in {
   order = [
     "11-monitoring-namespace.yaml"
     "12-monitoring-chart.yaml"
-    "12-grafana-chart.yaml"
-    "12a-grafana-ingress.yaml"
     "12b-loki-chart.yaml"
     "12c-promtail-chart.yaml"
     "12d-orkestr-dashboard.yaml"

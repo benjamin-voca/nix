@@ -12,6 +12,9 @@ in {
       };
 
       csi = {
+        # CSI provisioners need pod anti-affinity across nodes; with one node
+        # in the cluster the 2nd replica can never schedule (Pending forever)
+        provisionerReplicas = 1;
         enableRBDDriver = true;
         enableCephfsDriver = true;
         rookUseCsiOperator = false;

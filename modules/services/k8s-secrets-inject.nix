@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo quadpacient minecraft erpnext openclaw quadpacienti rook-ceph orkestr librechat argocd; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -99,18 +99,7 @@ in {
             fi
           fi
 
-          # Harbor docker config for quadpacienti namespace
-          if [ -f /run/secrets/harbor-admin-password ]; then
-            HARBOR_PW=$(cat /run/secrets/harbor-admin-password)
-            $kubectl create secret docker-registry harbor-registry \
-              --namespace=quadpacienti \
-              --docker-server=${d.host "harbor"} \
-              --docker-username=admin \
-              --docker-password="$HARBOR_PW" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected harbor-registry (quadpacienti namespace)"
-          fi
-
+          
           # Harbor pull secret for the forgejo-actions runner.
           # The runner's Docker-in-Docker sidecar pulls private job images
           # (e.g. library/orkestr-ci) via the Go docker SDK in the act-runner
@@ -223,7 +212,7 @@ in {
           fi
 
           if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
-            for target_ns in cnpg-system edukurs forgejo quadpacient orkestr; do
+            for target_ns in cnpg-system edukurs forgejo orkestr mosaic; do
               $kubectl create secret generic ceph-rgw-s3-credentials \
                 --namespace="$target_ns" \
                 --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
@@ -246,17 +235,7 @@ in {
             echo "Pinned edukurs-app-secrets POSTGRES_URL to Ceph"
           fi
 
-          if $kubectl -n quadpacient get secret quadpacient-app-secrets >/dev/null 2>&1 && \
-             $kubectl -n quadpacient get secret quadpacient-db-ceph-secret >/dev/null 2>&1; then
-            QUADPACIENT_DB_USER=$($kubectl -n quadpacient get secret quadpacient-db-ceph-secret -o jsonpath='{.data.username}' | base64 -d)
-            QUADPACIENT_DB_PASS=$($kubectl -n quadpacient get secret quadpacient-db-ceph-secret -o jsonpath='{.data.password}' | base64 -d)
-            QUADPACIENT_DB_URL="postgresql://$QUADPACIENT_DB_USER:$QUADPACIENT_DB_PASS@quadpacient-db-ceph-rw.quadpacient.svc.cluster.local:5432/quadpacient"
-            QUADPACIENT_DB_URL_B64=$(printf '%s' "$QUADPACIENT_DB_URL" | base64 | tr -d '\n')
-            $kubectl -n quadpacient patch secret quadpacient-app-secrets --type merge \
-              -p "{\"data\":{\"POSTGRES_URL\":\"$QUADPACIENT_DB_URL_B64\"}}"
-            echo "Pinned quadpacient-app-secrets POSTGRES_URL to Ceph"
-          fi
-
+          
           # Minecraft RCON password
           if [ -f /run/secrets/minecraft-rcon-password ]; then
             MC_RCON=$(cat /run/secrets/minecraft-rcon-password)
@@ -267,33 +246,7 @@ in {
             echo "Injected minecraft-rcon-secret"
           fi
 
-          # ERPNext DB admin password
-          if [ -f /run/secrets/erpnext-db-admin-password ]; then
-            ERPNEXT_DB_PW=$(cat /run/secrets/erpnext-db-admin-password)
-            $kubectl create secret generic erpnext-db-admin \
-              --namespace=erpnext \
-              --from-literal=password="$ERPNEXT_DB_PW" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected erpnext-db-admin secret"
-
-            $kubectl create secret generic erpnext-mariadb-auth \
-              --namespace=erpnext \
-              --from-literal=mariadb-root-password="$ERPNEXT_DB_PW" \
-              --from-literal=mariadb-password="$ERPNEXT_DB_PW" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected erpnext-mariadb-auth secret"
-          fi
-
-          # ERPNext admin password
-          if [ -f /run/secrets/erpnext-admin-password ]; then
-            ERPNEXT_ADMIN_PW=$(cat /run/secrets/erpnext-admin-password)
-            $kubectl create secret generic erpnext-admin \
-              --namespace=erpnext \
-              --from-literal=password="$ERPNEXT_ADMIN_PW" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected erpnext-admin secret"
-          fi
-
+          
           # OpenClaw secrets
           if [ -f /run/secrets/openclaw-gateway-token ]; then
             OC_TOKEN=$(cat /run/secrets/openclaw-gateway-token)
@@ -330,32 +283,7 @@ in {
             echo "Injected openclaw-secrets"
           fi
 
-          # LibreChat API keys
-          if [ -f /run/secrets/librechat-zhipu-api-key ]; then
-            LIBRECHAT_ZHIPU_KEY=$(cat /run/secrets/librechat-zhipu-api-key)
-            LC_ARGS="--from-literal=ZHIPU_API_KEY=$LIBRECHAT_ZHIPU_KEY"
-            if [ -f /run/secrets/librechat-minimax-api-key ]; then
-              LIBRECHAT_MINIMAX_KEY=$(cat /run/secrets/librechat-minimax-api-key)
-              LC_ARGS="$LC_ARGS --from-literal=MINIMAX_API_KEY=$LIBRECHAT_MINIMAX_KEY"
-            fi
-            # shellcheck disable=SC2086
-            $kubectl create secret generic librechat-api-keys \
-              --namespace=librechat \
-              $LC_ARGS \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected librechat-api-keys"
-          fi
-
-          # LibreChat JWT secret
-          if [ -f /run/secrets/librechat-jwt-secret ]; then
-            LIBRECHAT_JWT_SECRET=$(cat /run/secrets/librechat-jwt-secret)
-            $kubectl create secret generic librechat-jwt-secret \
-              --namespace=librechat \
-              --from-literal=JWT_SECRET="$LIBRECHAT_JWT_SECRET" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected librechat-jwt-secret"
-          fi
-
+          
           # Orkestr secrets
           if [ -f /run/secrets/orkestr-db-password ]; then
             ORKESTR_DB_PW=$(cat /run/secrets/orkestr-db-password)
@@ -436,6 +364,49 @@ in {
               --docker-password="$HARBOR_REG_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected harbor-registry (orkestr namespace)"
+          fi
+
+          # Harbor pull secret for mosaic
+          if [ -f /run/secrets/harbor-registry-password ]; then
+            HARBOR_REG_PW=$(cat /run/secrets/harbor-registry-password)
+            $kubectl create secret docker-registry harbor-registry \
+              --namespace=mosaic \
+              --docker-server=10.0.0.56:5000 \
+              --docker-username=harbor_registry_user \
+              --docker-password="$HARBOR_REG_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected harbor-registry (mosaic namespace)"
+          fi
+
+          # Mosaic Ceph RGW user → mosaic-s3 (app buckets, not CNPG backups)
+          if $kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-mosaic >/dev/null 2>&1; then
+            MOSAIC_S3_KEY=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-mosaic -o jsonpath='{.data.AccessKey}' | base64 -d)
+            MOSAIC_S3_SECRET=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-mosaic -o jsonpath='{.data.SecretKey}' | base64 -d)
+            $kubectl create secret generic mosaic-s3 \
+              --namespace=mosaic \
+              --from-literal=S3_ENDPOINT="http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local" \
+              --from-literal=S3_REGION="us-east-1" \
+              --from-literal=S3_FORCE_PATH_STYLE="true" \
+              --from-literal=S3_ACCESS_KEY_ID="$MOSAIC_S3_KEY" \
+              --from-literal=S3_SECRET_ACCESS_KEY="$MOSAIC_S3_SECRET" \
+              --from-literal=S3_BUCKET_ASSETS="catalog-assets" \
+              --from-literal=S3_BUCKET_IMPORTS="catalog-imports" \
+              --from-literal=S3_BUCKET_RENDERS="catalog-renders" \
+              --from-literal=S3_BUCKET_PROMO="catalog-promo" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected mosaic-s3"
+          fi
+
+          if [ -f /run/secrets/mosaic-db-password ]; then
+            MOSAIC_DB_PW=$(cat /run/secrets/mosaic-db-password)
+            $kubectl create secret generic mosaic-db-secret \
+              --namespace=mosaic \
+              --from-literal=username=mosaic \
+              --from-literal=password="$MOSAIC_DB_PW" \
+              --from-literal=dbname=mosaic \
+              --from-literal=uri="postgresql://mosaic:$MOSAIC_DB_PW@mosaic-db-rw.mosaic.svc.cluster.local:5432/mosaic?sslmode=disable" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected mosaic-db-secret"
           fi
 
           echo "K8s secrets injection complete."

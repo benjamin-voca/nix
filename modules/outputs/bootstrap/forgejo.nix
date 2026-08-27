@@ -42,7 +42,8 @@
       name: forgejo-db
       namespace: forgejo
     spec:
-      instances: 3
+      # Single instance — replicas on one node give no availability benefit
+      instances: 1
       storage:
         storageClass: ceph-block
         size: 40Gi

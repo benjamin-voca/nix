@@ -39,7 +39,6 @@
     }
     (httpHost "forge")
     (httpHost "argocd")
-    (httpHost "helpdesk")
     (httpHost "harbor")
     {
       hostname = "educourses-pd.com";
@@ -49,7 +48,10 @@
       hostname = "www.educourses-pd.com";
       service = httpNode;
     }
-    (httpHost "verdaccio")
+    (httpHost "edukurs")
+    (httpHost "batllavatourist")
+    (httpHost "openclaw")
+    (httpHost "grafana")
     {
       # Minecraft Java server on the MetalLB LoadBalancer VIP (reachable from
       # the host via kube-proxy). Vanilla/cracked clients cannot use a Cloudflare
@@ -60,11 +62,8 @@
     }
     (httpHost "edukurs")
     (httpHost "batllavatourist")
-    (httpHost "quadpacienti")
-    (httpHost "pacienti")
     (httpHost "openclaw")
     (httpHost "grafana")
-    (httpHost "grafana.k8s")
     {
       hostname = "app.orkestr-os.com";
       service = httpNode;
@@ -77,7 +76,6 @@
       hostname = d.host "k8s";
       service = "tcp://127.0.0.1:6443";
     }
-    (httpHost "chat")
     {
       hostname = d.host "*";
       service = httpNode;
