@@ -78,7 +78,14 @@
     }
     {
       hostname = d.host "*";
-      service = httpNode;
+      # TLS origin hop so nginx reports X-Forwarded-Proto: https — required
+      # for HyperDX's Secure session cookies (express-session withholds
+      # Set-Cookie when the app sees a plain-http hop). cert is the
+      # ingress-nginx default self-signed, hence noTLSVerify.
+      service = "https://127.0.0.1:31797";
+      "originRequest" = {
+        "noTLSVerify" = true;
+      };
     }
     {
       service = "http_status:404";
