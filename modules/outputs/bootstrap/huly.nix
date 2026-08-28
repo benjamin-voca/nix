@@ -17,6 +17,12 @@
 #   - MongoDB: only required by the AI bot, which is disabled
 #   - cockroach (metadata), redpanda (queue), elastic (fulltext) come from
 #     the chart on ceph-block PVCs
+#
+# Email verification is intentionally skipped: MAIL_URL is left unset, and
+# without it the account service auto-confirms signups and returns a login
+# token directly (account bundle: forceConfirmation = mailURL !== undefined
+# && mailURL !== ""). Adding MAIL_URL + a mailer service would enable the
+# confirmation-email flow.
 {
   lib,
   pkgs,
