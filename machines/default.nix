@@ -160,9 +160,9 @@ in {
         # n8n
         "n8n-db-password"
         "n8n-encryption-key"
-        # NocoDB
-        "nocodb-db-password"
-        "nocodb-jwt-secret"
+        # Vikunja
+        "vikunja-db-password"
+        "vikunja-service-secret"
         # Tailscale
         "tailscale-auth-key"
       ];

@@ -16,8 +16,9 @@
 #   bootstrap/app-namespaces.nix - EduKurs/BatllavaTourist ns + apps
 #   bootstrap/orkestr.nix        - Orkestr namespace + CI RBAC
 #   bootstrap/openclaw.nix       - OpenClaw (existing)
+#   bootstrap/vikunja.nix        - Vikunja namespace + CNPG + PVC + app + ingress
 # Removed (wound down): erpnext, tempo, librechat, verdaccio, quadpacienti,
-#   standalone grafana namespace (kube-prometheus-stack grafana remains)
+#   nocodb, standalone grafana namespace (kube-prometheus-stack grafana remains)
 {
   config,
   lib,
@@ -52,7 +53,7 @@
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
     mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
     n8nMod = import ./bootstrap/n8n.nix {inherit pkgs lib;};
-    nocodbMod = import ./bootstrap/nocodb.nix {inherit pkgs lib;};
+    vikunjaMod = import ./bootstrap/vikunja.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -93,7 +94,7 @@
       // orkestrMod.inlineFiles
       // mosaicMod.inlineFiles
       // n8nMod.inlineFiles
-      // nocodbMod.inlineFiles;
+      // vikunjaMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -436,17 +437,17 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/22e-n8n-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23-nocodb-namespace.yaml >> $out/bootstrap.yaml
+      cat $out/23-vikunja-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23a-nocodb-pvc.yaml >> $out/bootstrap.yaml
+      cat $out/23a-vikunja-pvc.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23b-nocodb-cnpg.yaml >> $out/bootstrap.yaml
+      cat $out/23b-vikunja-cnpg.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23c-nocodb-deployment.yaml >> $out/bootstrap.yaml
+      cat $out/23c-vikunja-deployment.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23d-nocodb-service.yaml >> $out/bootstrap.yaml
+      cat $out/23d-vikunja-service.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23e-nocodb-ingress.yaml >> $out/bootstrap.yaml
+      cat $out/23e-vikunja-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml

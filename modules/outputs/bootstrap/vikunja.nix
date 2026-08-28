@@ -1,9 +1,9 @@
-# NocoDB (Airtable-like spreadsheet UI)
-# Namespace + CNPG + PVC + Deployment + Service + Ingress (noco.voltrum.co)
+# Vikunja (to-do / task management, unified API+frontend image)
+# Namespace + CNPG + PVC + Deployment + Service + Ingress (vikunja.voltrum.co)
 #
 # Secrets (k8s-secrets-inject from sops):
-#   nocodb-db-secret     CNPG initdb (username/password/dbname)
-#   nocodb-app-secrets   NC_AUTH_JWT_SECRET + NC_DB
+#   vikunja-db-secret     CNPG initdb (username/password/dbname)
+#   vikunja-app-secrets   VIKUNJA_SERVICE_SECRET (JWT signing)
 {
   pkgs,
   lib,
@@ -15,17 +15,17 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nocodb
+  name: vikunja
   labels:
-    app.kubernetes.io/name: nocodb
+    app.kubernetes.io/name: vikunja
 '';
 
   pvc = ''
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: nocodb-data
-  namespace: nocodb
+  name: vikunja-files
+  namespace: vikunja
 spec:
   accessModes:
     - ReadWriteOnce
@@ -39,8 +39,8 @@ spec:
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: nocodb-db
-  namespace: nocodb
+  name: vikunja-db
+  namespace: vikunja
 spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
@@ -57,17 +57,17 @@ spec:
       memory: 1Gi
   bootstrap:
     initdb:
-      database: nocodb
-      owner: nocodb
+      database: vikunja
+      owner: vikunja
       secret:
-        name: nocodb-db-secret
+        name: vikunja-db-secret
   postgresql:
     pg_hba:
       - host all all 0.0.0.0/0 md5
       - host all all ::0/0 md5
   backup:
     barmanObjectStore:
-      destinationPath: "s3://cnpg-backups/nocodb-db"
+      destinationPath: "s3://cnpg-backups/vikunja-db"
       endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
       s3Credentials:
         accessKeyId:
@@ -85,21 +85,21 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nocodb
-  namespace: nocodb
+  name: vikunja
+  namespace: vikunja
   labels:
-    app: nocodb
+    app: vikunja
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nocodb
+      app: vikunja
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: nocodb
+        app: vikunja
     spec:
 ${tolerations}
       securityContext:
@@ -113,7 +113,7 @@ ${tolerations}
           command:
             - sh
             - -c
-            - until nc -z nocodb-db-rw 5432; do echo waiting for postgres; sleep 2; done
+            - until nc -z vikunja-db-rw 5432; do echo waiting for postgres; sleep 2; done
           resources:
             requests:
               cpu: 10m
@@ -122,33 +122,41 @@ ${tolerations}
               cpu: 50m
               memory: 32Mi
       containers:
-        - name: nocodb
-          image: nocodb/nocodb:2026.08.1
+        - name: vikunja
+          # Unified image: API + embedded frontend, runs as uid 1000 (scratch, no shell)
+          image: vikunja/vikunja:2.5.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 3456
               protocol: TCP
           env:
-            - name: PORT
-              value: "8080"
-            - name: NC_PUBLIC_URL
-              value: ${d.url "noco"}
-            - name: NC_DISABLE_TELE
-              value: "true"
-            - name: NC_AUTH_JWT_SECRET
+            - name: VIKUNJA_SERVICE_PUBLICURL
+              value: ${d.url "vikunja"}
+            - name: VIKUNJA_SERVICE_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: nocodb-app-secrets
-                  key: NC_AUTH_JWT_SECRET
-            - name: NC_DB
+                  name: vikunja-app-secrets
+                  key: VIKUNJA_SERVICE_SECRET
+            - name: VIKUNJA_DATABASE_TYPE
+              value: postgres
+            - name: VIKUNJA_DATABASE_HOST
+              value: vikunja-db-rw.vikunja.svc.cluster.local:5432
+            - name: VIKUNJA_DATABASE_USER
               valueFrom:
                 secretKeyRef:
-                  name: nocodb-app-secrets
-                  key: NC_DB
+                  name: vikunja-db-secret
+                  key: username
+            - name: VIKUNJA_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vikunja-db-secret
+                  key: password
+            - name: VIKUNJA_DATABASE_DATABASE
+              value: vikunja
           volumeMounts:
-            - name: data
-              mountPath: /usr/app/data
+            - name: files
+              mountPath: /app/vikunja/files
           resources:
             requests:
               cpu: 50m
@@ -158,43 +166,43 @@ ${tolerations}
               memory: 1Gi
           startupProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/info
               port: http
             periodSeconds: 5
-            failureThreshold: 36
+            failureThreshold: 72
           readinessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/info
               port: http
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 6
           livenessProbe:
             httpGet:
-              path: /api/v1/health
+              path: /api/v1/info
               port: http
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 6
       volumes:
-        - name: data
+        - name: files
           persistentVolumeClaim:
-            claimName: nocodb-data
+            claimName: vikunja-files
 '';
 
   service = ''
 apiVersion: v1
 kind: Service
 metadata:
-  name: nocodb
-  namespace: nocodb
+  name: vikunja
+  namespace: vikunja
 spec:
   type: ClusterIP
   selector:
-    app: nocodb
+    app: vikunja
   ports:
     - name: http
-      port: 8080
+      port: 3456
       targetPort: http
       protocol: TCP
 '';
@@ -203,47 +211,46 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: nocodb
-  namespace: nocodb
+  name: vikunja
+  namespace: vikunja
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/websocket-services: "nocodb"
 spec:
   ingressClassName: nginx
   rules:
-    - host: ${d.host "noco"}
+    - host: ${d.host "vikunja"}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: nocodb
+                name: vikunja
                 port:
-                  number: 8080
+                  number: 3456
 '';
 in {
   chartFiles = {};
 
   inlineFiles = {
-    "23-nocodb-namespace.yaml" = namespace;
-    "23a-nocodb-pvc.yaml" = pvc;
-    "23b-nocodb-cnpg.yaml" = cluster;
-    "23c-nocodb-deployment.yaml" = deployment;
-    "23d-nocodb-service.yaml" = service;
-    "23e-nocodb-ingress.yaml" = ingress;
+    "23-vikunja-namespace.yaml" = namespace;
+    "23a-vikunja-pvc.yaml" = pvc;
+    "23b-vikunja-cnpg.yaml" = cluster;
+    "23c-vikunja-deployment.yaml" = deployment;
+    "23d-vikunja-service.yaml" = service;
+    "23e-vikunja-ingress.yaml" = ingress;
   };
 
   order = [
-    "23-nocodb-namespace.yaml"
-    "23a-nocodb-pvc.yaml"
-    "23b-nocodb-cnpg.yaml"
-    "23c-nocodb-deployment.yaml"
-    "23d-nocodb-service.yaml"
-    "23e-nocodb-ingress.yaml"
+    "23-vikunja-namespace.yaml"
+    "23a-vikunja-pvc.yaml"
+    "23b-vikunja-cnpg.yaml"
+    "23c-vikunja-deployment.yaml"
+    "23d-vikunja-service.yaml"
+    "23e-vikunja-ingress.yaml"
   ];
 }
