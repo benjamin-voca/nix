@@ -157,6 +157,12 @@ in {
         "orkestr-electric-secret"
         "orkestr-dns-cluster-query"
         "orkestr-openrouter-api-key"
+        # n8n
+        "n8n-db-password"
+        "n8n-encryption-key"
+        # NocoDB
+        "nocodb-db-password"
+        "nocodb-jwt-secret"
         # Tailscale
         "tailscale-auth-key"
       ];

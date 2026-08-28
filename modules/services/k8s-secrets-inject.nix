@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nocodb; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -252,7 +252,7 @@ in {
           fi
 
           if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
-            for target_ns in cnpg-system edukurs forgejo orkestr mosaic; do
+            for target_ns in cnpg-system edukurs forgejo orkestr mosaic n8n nocodb; do
               $kubectl create secret generic ceph-rgw-s3-credentials \
                 --namespace="$target_ns" \
                 --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
@@ -447,6 +447,44 @@ in {
               --from-literal=uri="postgresql://mosaic:$MOSAIC_DB_PW@mosaic-db-rw.mosaic.svc.cluster.local:5432/mosaic?sslmode=disable" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected mosaic-db-secret"
+          fi
+
+          # n8n
+          if [ -f /run/secrets/n8n-db-password ] && [ -f /run/secrets/n8n-encryption-key ]; then
+            N8N_DB_PW=$(cat /run/secrets/n8n-db-password)
+            N8N_ENC=$(cat /run/secrets/n8n-encryption-key)
+            $kubectl create secret generic n8n-db-secret \
+              --namespace=n8n \
+              --from-literal=username=n8n \
+              --from-literal=password="$N8N_DB_PW" \
+              --from-literal=dbname=n8n \
+              --from-literal=uri="postgresql://n8n:$N8N_DB_PW@n8n-db-rw.n8n.svc.cluster.local:5432/n8n?sslmode=disable" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            $kubectl create secret generic n8n-app-secrets \
+              --namespace=n8n \
+              --from-literal=N8N_ENCRYPTION_KEY="$N8N_ENC" \
+              --from-literal=DB_POSTGRESDB_PASSWORD="$N8N_DB_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected n8n-db-secret and n8n-app-secrets"
+          fi
+
+          # NocoDB
+          if [ -f /run/secrets/nocodb-db-password ] && [ -f /run/secrets/nocodb-jwt-secret ]; then
+            NOCO_DB_PW=$(cat /run/secrets/nocodb-db-password)
+            NOCO_JWT=$(cat /run/secrets/nocodb-jwt-secret)
+            $kubectl create secret generic nocodb-db-secret \
+              --namespace=nocodb \
+              --from-literal=username=nocodb \
+              --from-literal=password="$NOCO_DB_PW" \
+              --from-literal=dbname=nocodb \
+              --from-literal=uri="postgresql://nocodb:$NOCO_DB_PW@nocodb-db-rw.nocodb.svc.cluster.local:5432/nocodb?sslmode=disable" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            $kubectl create secret generic nocodb-app-secrets \
+              --namespace=nocodb \
+              --from-literal=NC_AUTH_JWT_SECRET="$NOCO_JWT" \
+              --from-literal=NC_DB="pg://nocodb-db-rw.nocodb.svc.cluster.local:5432?u=nocodb&p=$NOCO_DB_PW&d=nocodb" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected nocodb-db-secret and nocodb-app-secrets"
           fi
 
           echo "K8s secrets injection complete."

@@ -65,6 +65,20 @@
     (httpHost "openclaw")
     (httpHost "grafana")
     {
+      hostname = d.host "n8n";
+      service = "https://127.0.0.1:31797";
+      "originRequest" = {
+        "noTLSVerify" = true;
+      };
+    }
+    {
+      hostname = d.host "noco";
+      service = "https://127.0.0.1:31797";
+      "originRequest" = {
+        "noTLSVerify" = true;
+      };
+    }
+    {
       hostname = "app.orkestr-os.com";
       service = httpNode;
     }

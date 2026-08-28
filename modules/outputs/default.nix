@@ -51,6 +51,8 @@
     appNamespacesMod = import ./bootstrap/app-namespaces.nix {inherit pkgs lib;};
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
     mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
+    n8nMod = import ./bootstrap/n8n.nix {inherit pkgs lib;};
+    nocodbMod = import ./bootstrap/nocodb.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -89,7 +91,9 @@
       // minecraftMod.inlineFiles
       // appNamespacesMod.inlineFiles
       // orkestrMod.inlineFiles
-      // mosaicMod.inlineFiles;
+      // mosaicMod.inlineFiles
+      // n8nMod.inlineFiles
+      // nocodbMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -419,6 +423,30 @@
       cat $out/21b-mosaic-rgw-user.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/21c-mosaic-rgw-buckets.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/22-n8n-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/22a-n8n-pvc.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/22b-n8n-cnpg.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/22c-n8n-deployment.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/22d-n8n-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/22e-n8n-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23-nocodb-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23a-nocodb-pvc.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23b-nocodb-cnpg.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23c-nocodb-deployment.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23d-nocodb-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23e-nocodb-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml
