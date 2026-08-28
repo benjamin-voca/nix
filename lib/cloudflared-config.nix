@@ -72,7 +72,7 @@
       };
     }
     {
-      hostname = d.host "vikunja";
+      hostname = d.host "huly";
       service = "https://127.0.0.1:31797";
       "originRequest" = {
         "noTLSVerify" = true;

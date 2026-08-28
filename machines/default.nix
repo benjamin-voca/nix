@@ -160,9 +160,10 @@ in {
         # n8n
         "n8n-db-password"
         "n8n-encryption-key"
-        # Vikunja
-        "vikunja-db-password"
-        "vikunja-service-secret"
+        # Huly
+        "huly-server-secret"
+        "huly-cockroach-password"
+        "huly-redpanda-password"
         # Tailscale
         "tailscale-auth-key"
       ];

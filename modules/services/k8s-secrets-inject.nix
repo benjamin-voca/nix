@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n vikunja; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n huly; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -252,7 +252,7 @@ in {
           fi
 
           if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
-            for target_ns in cnpg-system edukurs forgejo orkestr mosaic n8n vikunja; do
+            for target_ns in cnpg-system edukurs forgejo orkestr mosaic n8n; do
               $kubectl create secret generic ceph-rgw-s3-credentials \
                 --namespace="$target_ns" \
                 --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
@@ -468,21 +468,30 @@ in {
             echo "Injected n8n-db-secret and n8n-app-secrets"
           fi
 
-          # Vikunja
-          if [ -f /run/secrets/vikunja-db-password ] && [ -f /run/secrets/vikunja-service-secret ]; then
-            VIKUNJA_DB_PW=$(cat /run/secrets/vikunja-db-password)
-            VIKUNJA_SECRET=$(cat /run/secrets/vikunja-service-secret)
-            $kubectl create secret generic vikunja-db-secret \
-              --namespace=vikunja \
-              --from-literal=username=vikunja \
-              --from-literal=password="$VIKUNJA_DB_PW" \
-              --from-literal=dbname=vikunja \
+          # Huly
+          # huly-secret is referenced by every huly service via secretKeyRef.
+          # STORAGE_CONFIG points the S3 driver at Ceph RGW using the
+          # huly object-store user's keys (rook-generated).
+          # Must exist before the chart is applied: cockroach reads
+          # COCKROACH_PASSWORD on first boot to bootstrap its user.
+          if [ -f /run/secrets/huly-server-secret ] \
+             && [ -f /run/secrets/huly-cockroach-password ] \
+             && [ -f /run/secrets/huly-redpanda-password ] \
+             && $kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-huly >/dev/null 2>&1; then
+            HULY_SERVER_SECRET=$(cat /run/secrets/huly-server-secret)
+            HULY_CRDB_PW=$(cat /run/secrets/huly-cockroach-password)
+            HULY_RP_PW=$(cat /run/secrets/huly-redpanda-password)
+            HULY_S3_KEY=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-huly -o jsonpath='{.data.AccessKey}' | base64 -d)
+            HULY_S3_SECRET=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-huly -o jsonpath='{.data.SecretKey}' | base64 -d)
+            $kubectl create secret generic huly-secret \
+              --namespace=huly \
+              --from-literal=SERVER_SECRET="$HULY_SERVER_SECRET" \
+              --from-literal=COCKROACH_PASSWORD="$HULY_CRDB_PW" \
+              --from-literal=REDPANDA_SUPERUSER_PASSWORD="$HULY_RP_PW" \
+              --from-literal=CR_DB_URL="postgres://selfhost:$HULY_CRDB_PW@cockroach:26257/defaultdb" \
+              --from-literal=STORAGE_CONFIG="s3|http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local?accessKey=$HULY_S3_KEY&secretKey=$HULY_S3_SECRET&region=us-east-1&rootBucket=huly-data" \
               --dry-run=client -o yaml | $kubectl apply -f -
-            $kubectl create secret generic vikunja-app-secrets \
-              --namespace=vikunja \
-              --from-literal=VIKUNJA_SERVICE_SECRET="$VIKUNJA_SECRET" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected vikunja-db-secret and vikunja-app-secrets"
+            echo "Injected huly-secret"
           fi
 
           echo "K8s secrets injection complete."
