@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n kaneo; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -466,24 +466,6 @@ in {
               --from-literal=DB_POSTGRESDB_PASSWORD="$N8N_DB_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected n8n-db-secret and n8n-app-secrets"
-          fi
-
-          # Kaneo
-          if [ -f /run/secrets/kaneo-db-password ] && [ -f /run/secrets/kaneo-auth-secret ]; then
-            KANEO_DB_PW=$(cat /run/secrets/kaneo-db-password)
-            KANEO_AUTH=$(cat /run/secrets/kaneo-auth-secret)
-            $kubectl create secret generic kaneo-db-secret \
-              --namespace=kaneo \
-              --from-literal=username=kaneo \
-              --from-literal=password="$KANEO_DB_PW" \
-              --from-literal=dbname=kaneo \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            $kubectl create secret generic kaneo-app-secrets \
-              --namespace=kaneo \
-              --from-literal=DATABASE_URL="postgresql://kaneo:$KANEO_DB_PW@kaneo-db-rw.kaneo.svc.cluster.local:5432/kaneo?sslmode=disable" \
-              --from-literal=AUTH_SECRET="$KANEO_AUTH" \
-              --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected kaneo-db-secret and kaneo-app-secrets"
           fi
 
           echo "K8s secrets injection complete."

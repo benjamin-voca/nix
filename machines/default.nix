@@ -160,9 +160,6 @@ in {
         # n8n
         "n8n-db-password"
         "n8n-encryption-key"
-        # Kaneo
-        "kaneo-db-password"
-        "kaneo-auth-secret"
         # Tailscale
         "tailscale-auth-key"
       ];

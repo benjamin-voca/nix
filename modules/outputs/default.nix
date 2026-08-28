@@ -16,10 +16,9 @@
 #   bootstrap/app-namespaces.nix - EduKurs/BatllavaTourist ns + apps
 #   bootstrap/orkestr.nix        - Orkestr namespace + CI RBAC
 #   bootstrap/openclaw.nix       - OpenClaw (existing)
-#   bootstrap/kaneo.nix          - Kaneo namespace + CNPG + app + ingress
 # Removed (wound down): erpnext, tempo, librechat, verdaccio, quadpacienti,
-#   nocodb, vikunja, huly, standalone grafana namespace (kube-prometheus-stack
-#   grafana remains)
+#   nocodb, vikunja, huly, kaneo, standalone grafana namespace
+#   (kube-prometheus-stack grafana remains)
 {
   config,
   lib,
@@ -54,7 +53,6 @@
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
     mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
     n8nMod = import ./bootstrap/n8n.nix {inherit pkgs lib;};
-    kaneoMod = import ./bootstrap/kaneo.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -94,8 +92,7 @@
       // appNamespacesMod.inlineFiles
       // orkestrMod.inlineFiles
       // mosaicMod.inlineFiles
-      // n8nMod.inlineFiles
-      // kaneoMod.inlineFiles;
+      // n8nMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -437,16 +434,6 @@
       cat $out/22d-n8n-service.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/22e-n8n-ingress.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/23-kaneo-namespace.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/23a-kaneo-cnpg.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/23b-kaneo-deployment.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/23c-kaneo-service.yaml >> $out/bootstrap.yaml
-      echo "---" >> $out/bootstrap.yaml
-      cat $out/23d-kaneo-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml
