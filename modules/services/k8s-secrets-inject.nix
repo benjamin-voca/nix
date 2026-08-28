@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n huly; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n kaneo; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -468,30 +468,22 @@ in {
             echo "Injected n8n-db-secret and n8n-app-secrets"
           fi
 
-          # Huly
-          # huly-secret is referenced by every huly service via secretKeyRef.
-          # STORAGE_CONFIG points the S3 driver at Ceph RGW using the
-          # huly object-store user's keys (rook-generated).
-          # Must exist before the chart is applied: cockroach reads
-          # COCKROACH_PASSWORD on first boot to bootstrap its user.
-          if [ -f /run/secrets/huly-server-secret ] \
-             && [ -f /run/secrets/huly-cockroach-password ] \
-             && [ -f /run/secrets/huly-redpanda-password ] \
-             && $kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-huly >/dev/null 2>&1; then
-            HULY_SERVER_SECRET=$(cat /run/secrets/huly-server-secret)
-            HULY_CRDB_PW=$(cat /run/secrets/huly-cockroach-password)
-            HULY_RP_PW=$(cat /run/secrets/huly-redpanda-password)
-            HULY_S3_KEY=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-huly -o jsonpath='{.data.AccessKey}' | base64 -d)
-            HULY_S3_SECRET=$($kubectl -n rook-ceph get secret rook-ceph-object-user-ceph-objectstore-huly -o jsonpath='{.data.SecretKey}' | base64 -d)
-            $kubectl create secret generic huly-secret \
-              --namespace=huly \
-              --from-literal=SERVER_SECRET="$HULY_SERVER_SECRET" \
-              --from-literal=COCKROACH_PASSWORD="$HULY_CRDB_PW" \
-              --from-literal=REDPANDA_SUPERUSER_PASSWORD="$HULY_RP_PW" \
-              --from-literal=CR_DB_URL="postgres://selfhost:$HULY_CRDB_PW@cockroach:26257/defaultdb" \
-              --from-literal=STORAGE_CONFIG="s3|http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local?accessKey=$HULY_S3_KEY&secretKey=$HULY_S3_SECRET&region=us-east-1&rootBucket=huly-data" \
+          # Kaneo
+          if [ -f /run/secrets/kaneo-db-password ] && [ -f /run/secrets/kaneo-auth-secret ]; then
+            KANEO_DB_PW=$(cat /run/secrets/kaneo-db-password)
+            KANEO_AUTH=$(cat /run/secrets/kaneo-auth-secret)
+            $kubectl create secret generic kaneo-db-secret \
+              --namespace=kaneo \
+              --from-literal=username=kaneo \
+              --from-literal=password="$KANEO_DB_PW" \
+              --from-literal=dbname=kaneo \
               --dry-run=client -o yaml | $kubectl apply -f -
-            echo "Injected huly-secret"
+            $kubectl create secret generic kaneo-app-secrets \
+              --namespace=kaneo \
+              --from-literal=DATABASE_URL="postgresql://kaneo:$KANEO_DB_PW@kaneo-db-rw.kaneo.svc.cluster.local:5432/kaneo?sslmode=disable" \
+              --from-literal=AUTH_SECRET="$KANEO_AUTH" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected kaneo-db-secret and kaneo-app-secrets"
           fi
 
           echo "K8s secrets injection complete."

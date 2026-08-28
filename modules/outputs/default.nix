@@ -16,9 +16,9 @@
 #   bootstrap/app-namespaces.nix - EduKurs/BatllavaTourist ns + apps
 #   bootstrap/orkestr.nix        - Orkestr namespace + CI RBAC
 #   bootstrap/openclaw.nix       - OpenClaw (existing)
-#   bootstrap/huly.nix           - Huly (vendored chart) + Ceph RGW user/bucket
+#   bootstrap/kaneo.nix          - Kaneo namespace + CNPG + app + ingress
 # Removed (wound down): erpnext, tempo, librechat, verdaccio, quadpacienti,
-#   nocodb, vikunja, standalone grafana namespace (kube-prometheus-stack
+#   nocodb, vikunja, huly, standalone grafana namespace (kube-prometheus-stack
 #   grafana remains)
 {
   config,
@@ -54,7 +54,7 @@
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
     mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
     n8nMod = import ./bootstrap/n8n.nix {inherit pkgs lib;};
-    hulyMod = import ./bootstrap/huly.nix {inherit pkgs lib existingCharts;};
+    kaneoMod = import ./bootstrap/kaneo.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -73,7 +73,6 @@
       // harborMod.chartFiles
       // monitoringMod.chartFiles
       // clickstackMod.chartFiles
-      // hulyMod.chartFiles
       // appNamespacesMod.chartFiles
       // orkestrMod.chartFiles;
       # // doraMod.chartFiles;
@@ -96,7 +95,7 @@
       // orkestrMod.inlineFiles
       // mosaicMod.inlineFiles
       // n8nMod.inlineFiles
-      // hulyMod.inlineFiles;
+      // kaneoMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -439,13 +438,15 @@
       echo "---" >> $out/bootstrap.yaml
       cat $out/22e-n8n-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23-huly-namespace.yaml >> $out/bootstrap.yaml
+      cat $out/23-kaneo-namespace.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23a-huly-rgw-user.yaml >> $out/bootstrap.yaml
+      cat $out/23a-kaneo-cnpg.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23b-huly-rgw-buckets.yaml >> $out/bootstrap.yaml
+      cat $out/23b-kaneo-deployment.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
-      cat $out/23z-huly-chart.yaml >> $out/bootstrap.yaml
+      cat $out/23c-kaneo-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23d-kaneo-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml

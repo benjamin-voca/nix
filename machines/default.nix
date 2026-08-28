@@ -160,10 +160,9 @@ in {
         # n8n
         "n8n-db-password"
         "n8n-encryption-key"
-        # Huly
-        "huly-server-secret"
-        "huly-cockroach-password"
-        "huly-redpanda-password"
+        # Kaneo
+        "kaneo-db-password"
+        "kaneo-auth-secret"
         # Tailscale
         "tailscale-auth-key"
       ];
