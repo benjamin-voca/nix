@@ -1,6 +1,6 @@
 # ClickStack (HyperDX) — Runbook
 
-Self-hosted observability for logs (traces later), replacing the broken
+Self-hosted observability for logs and traces, replacing the broken
 Loki/Tempo path. Primary consumer today: **Roblox experience debugging**
 via `apps/roblox-otel/`.
 
@@ -28,7 +28,7 @@ races — deliberate for the single-node cluster.
 | Secrets | sops `secrets/backbone-01.yaml` keys `clickstack-*` | see `machines/default.nix` requiredSecrets |
 | Secret injection | `modules/services/k8s-secrets-inject.nix` | creates `clickstack-secrets` + `clickstack-clickhouse-users` |
 | Users | CH `app` (UI), `otelcollector` (ingest) | sha256 hashes in users.d secret, hot-reloaded |
-| Roblox SDK | `apps/roblox-otel/` | OTLP JSON logs + client relay |
+| Roblox SDK | `apps/roblox-otel/` | OTLP JSON logs + server spans + client log relay |
 
 ## Deploy
 
@@ -51,7 +51,7 @@ First-boot ordering: pods may CrashLoop until
 kubectl -n clickstack get pods
 kubectl -n clickstack logs deploy/clickstack-otel-collector --tail=20   # schema init
 OTLP_TOKEN=$(sops -d secrets/backbone-01.yaml | grep clickstack-otlp-token | cut -d' ' -f2) \
-  ./apps/roblox-otel/test-otlp.sh                                       # → 200
+  ./apps/roblox-otel/test-otlp.sh                              # logs: 200, traces: 200
 ```
 
 Then open `https://hyperdx.voltrum.co`, create the admin user, check the

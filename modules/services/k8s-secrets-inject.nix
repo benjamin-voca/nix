@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -252,7 +252,7 @@ in {
           fi
 
           if [ -n "$S3_ACCESS_KEY" ] && [ -n "$S3_SECRET_KEY" ]; then
-            for target_ns in cnpg-system edukurs forgejo orkestr mosaic n8n; do
+            for target_ns in cnpg-system edukurs forgejo orkestr mosaic n8n nextcloud; do
               $kubectl create secret generic ceph-rgw-s3-credentials \
                 --namespace="$target_ns" \
                 --from-literal=ACCESS_KEY_ID="$S3_ACCESS_KEY" \
@@ -466,6 +466,30 @@ in {
               --from-literal=DB_POSTGRESDB_PASSWORD="$N8N_DB_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected n8n-db-secret and n8n-app-secrets"
+          fi
+
+          # Nextcloud database and initial administrator credentials.
+          if [ -f /run/secrets/nextcloud-db-password ]; then
+            NEXTCLOUD_DB_PW=$(cat /run/secrets/nextcloud-db-password)
+            $kubectl create secret generic nextcloud-db-secret \
+              --namespace=nextcloud \
+              --type=kubernetes.io/basic-auth \
+              --from-literal=username=nextcloud \
+              --from-literal=password="$NEXTCLOUD_DB_PW" \
+              --from-literal=dbname=nextcloud \
+              --from-literal=uri="postgresql://nextcloud:$NEXTCLOUD_DB_PW@nextcloud-db-rw.nextcloud.svc.cluster.local:5432/nextcloud?sslmode=disable" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected nextcloud-db-secret"
+          fi
+
+          if [ -f /run/secrets/nextcloud-admin-password ]; then
+            NEXTCLOUD_ADMIN_PW=$(cat /run/secrets/nextcloud-admin-password)
+            $kubectl create secret generic nextcloud-admin-secret \
+              --namespace=nextcloud \
+              --from-literal=username=admin \
+              --from-literal=password="$NEXTCLOUD_ADMIN_PW" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected nextcloud-admin-secret"
           fi
 
           echo "K8s secrets injection complete."

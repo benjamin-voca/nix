@@ -52,6 +52,7 @@
     (httpHost "batllavatourist")
     (httpHost "openclaw")
     (httpHost "grafana")
+    (httpHost "cloud")
     {
       # Minecraft Java server on the MetalLB LoadBalancer VIP (reachable from
       # the host via kube-proxy). Vanilla/cracked clients cannot use a Cloudflare

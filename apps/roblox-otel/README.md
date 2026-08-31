@@ -3,7 +3,7 @@
 Luau SDK that ships logs from Roblox experiences into self-hosted ClickStack
 (HyperDX) running on the QuadNix cluster.
 
-- **Endpoint:** `https://otlp.voltrum.co/v1/logs` (OTLP/HTTP JSON)
+- **Endpoints:** `https://otlp.voltrum.co/v1/logs` and `/v1/traces` (OTLP/HTTP JSON)
 - **Auth:** `Authorization: <clickstack-otlp-token>` (RAW token — the
   standalone collector's bearertokenauth uses `scheme: ""`, no Bearer prefix)
   (the `clickstack-otlp-token` sops key == HyperDX `OTLP_AUTH_TOKEN`)
@@ -14,7 +14,8 @@ Luau SDK that ships logs from Roblox experiences into self-hosted ClickStack
 
 | File | Role |
 |---|---|
-| `src/OtelServer.luau` | Server module: queue, batch (5s / 120 rec), OTLP JSON POST, backoff, `BindToClose` final flush. Creates the `OtelLogSink` RemoteEvent. |
+| `src/OtelServer.luau` | Server module: independent log/span queues, batch (5s / 120 rec), OTLP JSON POST, backoff, `BindToClose` final flush. Creates the `OtelLogSink` RemoteEvent. |
+| `src/OtelTrace.luau` | Pure span lifecycle, OTLP encoding, parent context, status, and log-correlation helpers. |
 | `src/OtelClientBridge.client.luau` | LocalScript: forwards client `LogService.MessageOut` + `ScriptContext.ErrorDetailed` to the server RemoteEvent (throttled 20 msg / 5s). Clients can't call HttpService — relay only. |
 | `src/ExampleUsage.server.luau` | Drop-in wiring example (boot/join/leave events). |
 | `test-otlp.sh` | Smoke-test the public endpoint with curl. |
@@ -35,8 +36,8 @@ Luau SDK that ships logs from Roblox experiences into self-hosted ClickStack
    Get the token value: `sops --decrypt secrets/backbone-01.yaml | grep clickstack-otlp-token`
    (on the deploy machine). Never commit it.
 
-5. Smoke-test without Roblox: `OTLP_TOKEN=... ./test-otlp.sh` → expect `200`,
-   then search `otlp-smoketest` in HyperDX.
+5. Smoke-test without Roblox: `OTLP_TOKEN=... ./test-otlp.sh` → expect
+   `logs: 200` and `traces: 200`, then search `otlp-smoketest` in HyperDX.
 
 ## API
 
@@ -48,12 +49,15 @@ Otel.warn("Odd state", { state = state })
 Otel.error("Payment failed", { orderId = orderId })
 Otel.log("FATAL", "unrecoverable", { phase = "boot" })
 
--- correlation scaffolding (traces come later; ids already line up)
-local traceId = Otel.newTraceId()
-local spanId  = Otel.newSpanId()
-Otel.event("match.start", { traceId = traceId, spanId = spanId })
+-- Real OTLP traces. Correlated logs use the span's IDs.
+local span = Otel.startSpan("match.start", { mode = "ranked" }, nil, "SERVER")
+Otel.info("Allocating match", { traceId = span.traceId, spanId = span.spanId })
 
-Otel.flushNow() -- rarely needed; 5s loop + BindToClose cover it
+local child = Otel.startSpan("match.allocate", nil, span:context())
+child:finish("OK")
+span:finish("OK") -- or span:fail("allocation timeout")
+
+Otel.flushNow() -- flushes logs and completed spans; normally unnecessary
 ```
 
 Record attributes captured automatically:
@@ -70,5 +74,8 @@ Record attributes captured automatically:
 - Failed flushes requeue (backoff one cycle). `warn()`s from the module
   itself stay local-only by design (no loops).
 - Studio "Test → Start" sessions need HttpService enabled or POSTs no-op.
-- Traces: OTLP shape is already JSON; when needed, POST spans to
-  `/v1/traces` with the same token — HyperDX's Traces source is pre-wired.
+- Spans are queued only when finished. Always call `span:finish("OK")` or
+  `span:fail(message)`; unfinished spans are intentionally not exported.
+- Span kinds: `INTERNAL` (default), `SERVER`, `CLIENT`, `PRODUCER`, `CONSUMER`.
+- Pass `traceId` and `spanId` attributes from a span into log calls; the SDK
+  promotes valid IDs to native OTLP fields so HyperDX links logs and traces.

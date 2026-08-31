@@ -4,16 +4,16 @@
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
-local Otel = require(ServerScriptService.OtelServer)
-
--- One-time config (attributes win over constants in OtelServer.luau).
--- Set these per-place in Studio, or via Rojo/arg mapping in CI.
+-- Configure before requiring OtelServer; the module starts its exporters at
+-- require time. OtelTracesEndpoint is derived by replacing /v1/logs unless
+-- explicitly overridden.
 ServerScriptService:SetAttribute("OtelEndpoint", "https://otlp.voltrum.co/v1/logs")
 ServerScriptService:SetAttribute("OtelToken", "SET-ME-TO-clickstack-otlp-token")
 ServerScriptService:SetAttribute("OtelEnv", RunService:IsStudio() and "studio" or "prod")
 
-local RunService = game:GetService("RunService")
+local Otel = require(ServerScriptService.OtelServer)
 
 Otel.info("Server booted", {
 	fps = workspace:GetRealPhysicsFPS(),
@@ -34,15 +34,19 @@ Players.PlayerRemoving:Connect(function(player)
 	})
 end)
 
--- Example: correlate an operation with a trace id for future trace support
+-- Trace an operation and correlate its logs. Child spans inherit the trace ID
+-- by receiving the parent's context.
 local function handleMatchStart(matchId: string)
-	local traceId = Otel.newTraceId()
-	local spanId = Otel.newSpanId()
+	local span = Otel.startSpan("match.start", { matchId = matchId }, nil, "SERVER")
 	Otel.event("match.start", {
 		matchId = matchId,
-		traceId = traceId,
-		spanId = spanId,
+		traceId = span.traceId,
+		spanId = span.spanId,
 	})
+
+	local child = Otel.startSpan("match.allocate", { matchId = matchId }, span:context())
+	child:finish("OK")
+	span:finish("OK")
 end
 
 task.delay(3, function()

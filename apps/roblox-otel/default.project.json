@@ -7,6 +7,9 @@
       "OtelServer": {
         "$path": "src/OtelServer.luau"
       },
+      "OtelTrace": {
+        "$path": "src/OtelTrace.luau"
+      },
       "ExampleUsage": {
         "$path": "src/ExampleUsage.server.luau"
       }

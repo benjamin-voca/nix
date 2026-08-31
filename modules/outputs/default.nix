@@ -53,6 +53,8 @@
     orkestrMod = import ./bootstrap/orkestr.nix {inherit pkgs lib;};
     mosaicMod = import ./bootstrap/mosaic.nix {inherit pkgs lib;};
     n8nMod = import ./bootstrap/n8n.nix {inherit pkgs lib;};
+    nextcloudMod = import ./bootstrap/nextcloud.nix {inherit pkgs lib;};
+    clusttaMod = import ./bootstrap/clustta.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -92,7 +94,9 @@
       // appNamespacesMod.inlineFiles
       // orkestrMod.inlineFiles
       // mosaicMod.inlineFiles
-      // n8nMod.inlineFiles;
+      // n8nMod.inlineFiles
+      // nextcloudMod.inlineFiles
+      // clusttaMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -434,6 +438,30 @@
       cat $out/22d-n8n-service.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/22e-n8n-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23-nextcloud-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23a-nextcloud-pvc.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23b-nextcloud-cnpg.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23c-nextcloud-redis.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23d-nextcloud-deployment.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23e-nextcloud-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/23f-nextcloud-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/24-clustta-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/24a-clustta-pvcs.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/24b-clustta-deployment.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/24c-clustta-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/24d-clustta-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml

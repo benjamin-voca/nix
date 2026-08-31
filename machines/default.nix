@@ -160,6 +160,9 @@ in {
         # n8n
         "n8n-db-password"
         "n8n-encryption-key"
+        # Nextcloud
+        "nextcloud-db-password"
+        "nextcloud-admin-password"
         # Tailscale
         "tailscale-auth-key"
       ];

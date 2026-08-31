@@ -2,15 +2,16 @@
 -- OtelServer.luau
 -- Server-side OTLP log shipper for ClickStack (HyperDX).
 --
--- Batches logs from the Roblox server (plus client logs forwarded through
--- the OtelLogSink RemoteEvent) and POSTs them as OTLP/HTTP JSON to the
--- cluster's collector:
+-- Batches logs and completed spans from the Roblox server (plus client logs
+-- forwarded through the OtelLogSink RemoteEvent) and POSTs OTLP/HTTP JSON to:
 --     POST https://otlp.voltrum.co/v1/logs
+--     POST https://otlp.voltrum.co/v1/traces
 --     Authorization: <ingestion token>  (RAW token — the ClickStack
 --     standalone collector's bearertokenauth uses scheme="", no Bearer)
 --
 -- Configuration via ServerScriptService attributes (set once at startup):
 --   ServerScriptService:SetAttribute("OtelEndpoint", "https://otlp.voltrum.co/v1/logs")
+--   ServerScriptService:SetAttribute("OtelTracesEndpoint", "https://otlp.voltrum.co/v1/traces") -- optional
 --   ServerScriptService:SetAttribute("OtelToken", "<clickstack-otlp-token>")
 --   ServerScriptService:SetAttribute("OtelEnv", "prod")  -- or "dev", "studio"
 -- Attributes fall back to the CONFIG constants below when not set.
@@ -28,25 +29,32 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local ServerScriptService = game:GetService("ServerScriptService")
+local Trace = require(ServerScriptService.OtelTrace)
 
 --------------------------------------------------------------------
 -- Config
 --------------------------------------------------------------------
 local CONFIG = {
 	Endpoint = "https://otlp.voltrum.co/v1/logs",
+	TracesEndpoint = "https://otlp.voltrum.co/v1/traces",
 	Token = "", -- REQUIRED in live servers unless set via attribute
 	Environment = RunService:IsStudio() and "studio" or "prod",
 	ServiceName = "roblox",
 	FlushIntervalSeconds = 5,
 	MaxQueueSize = 500,
+	MaxTraceQueueSize = 500,
 	MaxBatchSize = 120,
-	MaxAttempts = 2,
 	RetryBackoffSeconds = 10,
 }
 
 local attrEndpoint = ServerScriptService:GetAttribute("OtelEndpoint")
 if typeof(attrEndpoint) == "string" then
 	CONFIG.Endpoint = attrEndpoint
+	CONFIG.TracesEndpoint = Trace.deriveTracesEndpoint(attrEndpoint, CONFIG.TracesEndpoint)
+end
+local attrTracesEndpoint = ServerScriptService:GetAttribute("OtelTracesEndpoint")
+if typeof(attrTracesEndpoint) == "string" then
+	CONFIG.TracesEndpoint = attrTracesEndpoint
 end
 local attrToken = ServerScriptService:GetAttribute("OtelToken")
 if typeof(attrToken) == "string" and #attrToken > 0 then
@@ -73,8 +81,11 @@ local SEVERITY = {
 -- State
 --------------------------------------------------------------------
 local queue: { any } = {}
+local traceQueue: { any } = {}
 local flushing = false
+local tracesFlushing = false
 local lastFailureAt = 0
+local lastTraceFailureAt = 0
 local remote: RemoteEvent? = nil
 
 local function nanoNow(): string
@@ -112,7 +123,7 @@ local function encodeAttributes(attrs: { [string]: any }?): { any }
 end
 
 local function makeRecord(sev, body: string, attrs: { [string]: any }?)
-	return {
+	local record = {
 		timeUnixNano = nanoNow(),
 		observedTimeUnixNano = nanoNow(),
 		severityText = sev.text,
@@ -120,6 +131,8 @@ local function makeRecord(sev, body: string, attrs: { [string]: any }?)
 		body = { stringValue = body },
 		attributes = encodeAttributes(attrs),
 	}
+	Trace.applyLogContext(record, attrs)
+	return record
 end
 
 --------------------------------------------------------------------
@@ -144,23 +157,27 @@ local function enqueue(record, priority: number)
 	table.insert(queue, { record = record, priority = priority })
 end
 
+local function resourceAttributes(): { [string]: any }
+	return {
+		["service.name"] = CONFIG.ServiceName,
+		["deployment.environment"] = CONFIG.Environment,
+		["roblox.place_id"] = game.PlaceId,
+		["roblox.universe_id"] = game.GameId,
+		["roblox.job_id"] = game.JobId ~= "" and game.JobId or "studio",
+		["roblox.server_type"] = RunService:IsStudio() and "studio" or "live",
+	}
+end
+
 local function resourceLogsPayload(records: { any }): { any }
 	return {
 		resourceLogs = {
 			{
 				resource = {
-					attributes = encodeAttributes({
-						["service.name"] = CONFIG.ServiceName,
-						["deployment.environment"] = CONFIG.Environment,
-						["roblox.place_id"] = game.PlaceId,
-						["roblox.universe_id"] = game.GameId,
-						["roblox.job_id"] = game.JobId ~= "" and game.JobId or "studio",
-						["roblox.server_type"] = RunService:IsStudio() and "studio" or "live",
-					}),
+					attributes = encodeAttributes(resourceAttributes()),
 				},
 				scopeLogs = {
 					{
-						scope = { name = "roblox-otel", version = "0.1.0" },
+						scope = { name = "roblox-otel", version = "0.2.0" },
 						logRecords = records,
 					},
 				},
@@ -215,12 +232,65 @@ local function flush(): boolean
 	return false
 end
 
+local function enqueueTrace(record: any)
+	if #traceQueue >= CONFIG.MaxTraceQueueSize then
+		table.remove(traceQueue, 1)
+	end
+	table.insert(traceQueue, record)
+end
+
+local function flushTraces(): boolean
+	if tracesFlushing or #traceQueue == 0 or #CONFIG.Token == 0 then
+		return false
+	end
+	tracesFlushing = true
+
+	local batch = {}
+	local n = math.min(#traceQueue, CONFIG.MaxBatchSize)
+	for _ = 1, n do
+		table.insert(batch, table.remove(traceQueue, 1))
+	end
+
+	local ok, err = pcall(function()
+		local response = HttpService:RequestAsync({
+			Url = CONFIG.TracesEndpoint,
+			Method = "POST",
+			Headers = {
+				["content-type"] = "application/json",
+				["authorization"] = CONFIG.Token,
+			},
+			Body = HttpService:JSONEncode(Trace.resourceSpansPayload(resourceAttributes(), batch)),
+		})
+		if not response.Success then
+			error(("OTLP trace ingest failed: %d %s"):format(response.StatusCode, response.StatusMessage))
+		end
+	end)
+
+	if ok then
+		tracesFlushing = false
+		return true
+	end
+
+	lastTraceFailureAt = os.clock()
+	warn(("[OtelServer] trace flush failed: %s (requeueing %d spans)"):format(tostring(err), #batch))
+	for i = #batch, 1, -1 do
+		table.insert(traceQueue, 1, batch[i])
+	end
+	while #traceQueue > CONFIG.MaxTraceQueueSize do
+		table.remove(traceQueue)
+	end
+	tracesFlushing = false
+	return false
+end
+
 local function flushLoop()
 	while true do
 		task.wait(CONFIG.FlushIntervalSeconds)
-		-- simple backoff: skip one cycle after a failure
 		if os.clock() - lastFailureAt > CONFIG.RetryBackoffSeconds then
 			pcall(flush)
+		end
+		if os.clock() - lastTraceFailureAt > CONFIG.RetryBackoffSeconds then
+			pcall(flushTraces)
 		end
 	end
 end
@@ -246,7 +316,10 @@ local function setupRemoteBridge()
 		local attrs = { ["roblox.player"] = player.Name, ["roblox.user_id"] = player.UserId }
 		if typeof(payload.attributes) == "table" then
 			for k, v in payload.attributes do
-				attrs[k] = v
+				-- Clients may not forge native correlation onto arbitrary traces.
+				if k ~= "traceId" and k ~= "spanId" then
+					attrs[k] = v
+				end
 			end
 		end
 		enqueue(makeRecord(sev, tostring(payload.body), attrs), sev.number)
@@ -261,10 +334,17 @@ if RunService:IsServer() then
 	task.spawn(flushLoop)
 
 	game:BindToClose(function()
-		-- Best-effort final flush (Roblox allows up to 30s)
+		-- Best-effort final flush (Roblox allows up to 30s).
 		local deadline = os.clock() + 5
-		while #queue > 0 and os.clock() < deadline do
-			if not flush() then
+		while (#queue > 0 or #traceQueue > 0) and os.clock() < deadline do
+			local progressed = false
+			if #queue > 0 then
+				progressed = flush() or progressed
+			end
+			if #traceQueue > 0 then
+				progressed = flushTraces() or progressed
+			end
+			if not progressed then
 				break
 			end
 		end
@@ -295,8 +375,8 @@ function Otel.error(body: string, attrs: { [string]: any }?)
 end
 
 -- Named event with trace/span correlation ids (hex, 32/16 chars).
--- Pass traceId/spanId yourself when the event belongs to an in-progress
--- operation so it lines up with future trace ingestion.
+-- Pass traceId/spanId from a span when the event belongs to an in-progress
+-- operation so HyperDX links the log to the exported trace.
 function Otel.event(name: string, attrs: { [string]: any }?)
 	local merged = attrs or {}
 	merged["event.name"] = name
@@ -310,8 +390,34 @@ function Otel.newSpanId(): string
 	return string.sub(HttpService:GenerateGUID(false):gsub("-", ""), 1, 16)
 end
 
+-- Start an OTLP span. Pass parentSpan:context() as parentContext for children.
+-- Finish with span:finish("OK") or span:fail(errorMessage).
+function Otel.startSpan(
+	name: string,
+	attrs: { [string]: any }?,
+	parentContext: Trace.TraceContext?,
+	kind: string?
+): Trace.Span
+	local traceId = if parentContext and Trace.isTraceId(parentContext.traceId)
+		then parentContext.traceId
+		else Otel.newTraceId()
+	local parentSpanId = if parentContext and Trace.isSpanId(parentContext.spanId) then parentContext.spanId else nil
+	return Trace.newSpan({
+		name = name,
+		traceId = traceId,
+		spanId = Otel.newSpanId(),
+		parentSpanId = parentSpanId,
+		kind = kind,
+		startTimeUnixNano = nanoNow(),
+		attributes = attrs,
+		nowNano = nanoNow,
+		onFinish = enqueueTrace,
+	})
+end
+
 function Otel.flushNow()
 	flush()
+	flushTraces()
 end
 
 return Otel
