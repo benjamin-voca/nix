@@ -52,11 +52,10 @@ Symptoms if wrong:
 - operator reports no valid storage nodes
 - no OSD prepare jobs created
 
-## Migration-Phase Notes
+## Storage Backend
 
-- Temporary OSD-on-PVC is enabled from Longhorn in `lib/helm/charts/rook-ceph-cluster.nix`.
-- This is only for bootstrap while Longhorn still owns the raw HDD mount.
-- After app/PVC migration, move OSDs to raw devices and remove Longhorn dependencies.
+Longhorn has been removed. Persistent application volumes use the Rook-Ceph
+storage classes, and Ceph owns the cluster storage lifecycle.
 
 ## Useful Debug Commands
 

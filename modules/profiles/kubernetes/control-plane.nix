@@ -77,13 +77,15 @@ in {
         "imagefs.available" = "2m";
       };
       evictionMinimumGracePeriod = "30s";
-      # Allow more CPU to be scheduled (overprovisioning)
+      # This internal single-node cluster intentionally overprovisions CPU.
+      # Keep 500m total reserved for the OS and Kubernetes components while
+      # leaving the remaining capacity available to application workloads.
       systemReserved = {
-        cpu = "500m";
+        cpu = "250m";
         memory = "1Gi";
       };
       kubeReserved = {
-        cpu = "500m";
+        cpu = "250m";
         memory = "1Gi";
       };
       nodeLabels = {

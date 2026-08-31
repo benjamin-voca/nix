@@ -554,13 +554,6 @@ ${separator}
   in
     composeChartValues [dbConfig extraValues];
 
-  presetWithLonghorn = {
-    persistence = {
-      enabled = true;
-      storageClass = "ceph-block";
-    };
-  };
-
   presetWithIngress = {
     ingress = {
       enabled = true;
@@ -577,5 +570,5 @@ in {
   inherit mkMetallbIPAddressPool mkMetallbL2Advertisement mkMetallbCRDs;
   inherit smallResources mediumResources largeResources defaultArgoSyncPolicy;
   inherit toYAMLString writeManifest writeManifests composeChartValues;
-  inherit presetWithCNPG presetWithLonghorn presetWithIngress;
+  inherit presetWithCNPG presetWithIngress;
 }

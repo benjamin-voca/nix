@@ -74,7 +74,7 @@ affinity:
 - **PostgreSQL**: 2 replicas (primary + standby)
 - **Redis**: 2 replicas (master + slave)
 - **Runners**: Distributed across backbone and frontline
-- **Persistence**: 50Gi Longhorn storage
+- **Persistence**: 50Gi Ceph-backed storage
 
 ### Grafana
 - **Replicas**: 3
@@ -183,7 +183,7 @@ Each service includes:
 ## Storage Considerations
 
 ### Persistent Storage
-- **Longhorn**: Default storage class for persistence
+- **Ceph**: Default storage backend for persistence
 - **Local Path**: For development/testing
 - **S3/GCS/Azure**: Optional for Loki/Tempo
 
