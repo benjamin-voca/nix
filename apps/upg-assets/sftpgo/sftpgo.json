@@ -1,0 +1,60 @@
+{
+  "common": {
+    "idle_timeout": 15,
+    "upload_mode": 0,
+    "setstat_mode": 0,
+    "temp_path": "",
+    "proxy_protocol": 0,
+    "defender": {
+      "enabled": true,
+      "driver": "memory",
+      "ban_time": 30,
+      "threshold": 15
+    }
+  },
+  "sftpd": {
+    "bindings": [
+      {
+        "port": 2022,
+        "address": "",
+        "apply_proxy_config": true
+      }
+    ],
+    "max_auth_tries": 5,
+    "host_keys": [],
+    "password_authentication": true,
+    "keyboard_interactive_authentication": false
+  },
+  "webdavd": {
+    "bindings": [
+      {
+        "port": 10080,
+        "address": "",
+        "enable_https": false,
+        "prefix": "",
+        "client_cache_size": 1000,
+        "client_cache_expiration": 1
+      }
+    ]
+  },
+  "httpd": {
+    "bindings": [
+      {
+        "port": 8080,
+        "address": "",
+        "enable_web_admin": true,
+        "enable_web_client": false,
+        "enable_rest_api": true,
+        "enabled_login_methods": 0
+      }
+    ],
+    "max_upload_file_size": 0
+  },
+  "data_provider": {
+    "driver": "sqlite",
+    "name": "/var/lib/sftpgo/sftpgo.db",
+    "create_default_admin": false,
+    "auto_migrate": true,
+    "naming_rules": 1
+  }
+}

@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta upg-assets; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -490,6 +490,29 @@ in {
               --from-literal=password="$NEXTCLOUD_ADMIN_PW" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected nextcloud-admin-secret"
+          fi
+
+          # UPG asset workspace: Forgejo token + SFTPGo portable users dump
+          if [ -f /run/secrets/upg-assets-git-token ]; then
+            UPG_GIT_TOKEN=$(cat /run/secrets/upg-assets-git-token)
+            UPG_GIT_USER=oauth2
+            if [ -f /run/secrets/upg-assets-git-username ]; then
+              UPG_GIT_USER=$(cat /run/secrets/upg-assets-git-username)
+            fi
+            $kubectl create secret generic upg-assets-git \
+              --namespace=upg-assets \
+              --from-literal=username="$UPG_GIT_USER" \
+              --from-literal=token="$UPG_GIT_TOKEN" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected upg-assets-git"
+          fi
+
+          if [ -f /run/secrets/upg-assets-sftpgo-users-json ]; then
+            $kubectl create secret generic upg-assets-sftpgo-users \
+              --namespace=upg-assets \
+              --from-file=users.json=/run/secrets/upg-assets-sftpgo-users-json \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected upg-assets-sftpgo-users"
           fi
 
           echo "K8s secrets injection complete."

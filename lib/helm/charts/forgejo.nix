@@ -147,6 +147,14 @@ in rec {
             SSH_LISTEN_PORT = 22;
             # SSH keys are relative to GITEA_ROOT, stored in persistent volume
             SSH_SERVER_HOST_KEYS = "forgejo/ssh/forgejo.rsa,forgejo/ssh/forgejo.ed25519";
+            # Required for authoring binaries (*.blend etc.) via upg-assets.
+            LFS_START_SERVER = true;
+          };
+
+          # Local LFS object store on the Forgejo shared PVC.
+          lfs = {
+            PATH = "/data/git/lfs";
+            STORAGE_TYPE = "local";
           };
           ssh = {
             create = true;

@@ -163,6 +163,9 @@ in {
         # Nextcloud
         "nextcloud-db-password"
         "nextcloud-admin-password"
+        # UPG asset workspace (SFTPGo + Git auto-commit)
+        "upg-assets-git-token"
+        "upg-assets-sftpgo-users-json"
         # Tailscale
         "tailscale-auth-key"
       ];

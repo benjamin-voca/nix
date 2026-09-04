@@ -55,6 +55,7 @@
     n8nMod = import ./bootstrap/n8n.nix {inherit pkgs lib;};
     nextcloudMod = import ./bootstrap/nextcloud.nix {inherit pkgs lib;};
     clusttaMod = import ./bootstrap/clustta.nix {inherit pkgs lib;};
+    upgAssetsMod = import ./bootstrap/upg-assets.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -96,7 +97,8 @@
       // mosaicMod.inlineFiles
       // n8nMod.inlineFiles
       // nextcloudMod.inlineFiles
-      // clusttaMod.inlineFiles;
+      // clusttaMod.inlineFiles
+      // upgAssetsMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -462,6 +464,18 @@
       cat $out/24c-clustta-service.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/24d-clustta-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/25-upg-assets-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/25a-upg-assets-pvcs.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/25b-upg-assets-configmaps.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/25c-upg-assets-statefulset.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/25d-upg-assets-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/25e-upg-assets-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml
