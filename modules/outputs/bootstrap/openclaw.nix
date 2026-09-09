@@ -30,8 +30,32 @@
     channels = {
       discord = {
         enabled = true;
-        groupPolicy = "open";
+        groupPolicy = "allowlist";
         historyLimit = 20;
+        guilds = {
+          # QuadCoreTech — all channels, mention-gated (unchanged behavior)
+          "1429150059932422315" = {
+            requireMention = true;
+          };
+          # Voltrum Studios — promptable only by Admin role or higher in hierarchy
+          "1542902554399219937" = {
+            requireMention = true;
+            roles = [
+              "1542987252618236085" # .
+              "1542986561510051911" # Director
+              "1544402051772190750" # Co Director
+              "1543419562987364362" # Server Management
+              "1542902756480917595" # Lead Developer
+              "1542986562617483355" # Dev
+              "1545320514568847460" # Dev | Builder
+              "1543419695909048340" # Head of Marketing
+              "1543975868081246230" # Community Manager
+              "1543418849737711677" # Head Admin
+              "1543698897036251306" # Personal Assistant
+              "1542986565800960110" # Admin
+            ];
+          };
+        };
       };
     };
     agents = {
@@ -53,6 +77,13 @@
           workspace = "~/.openclaw/workspace";
         }
       ];
+    };
+    plugins = {
+      entries = {
+        minimax = {
+          enabled = true;
+        };
+      };
     };
     cron = {enabled = false;};
   };
@@ -164,11 +195,14 @@
                   if [ ! -f /home/node/.openclaw/workspace/AGENTS.md ]; then
                     cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
                   fi
+                  # Repair any root-owned entries (historic drift) so the
+                  # non-root gateway can manage its own state dir perms.
+                  find /home/node/.openclaw -user 0 -exec chown 1000:1000 {} +
                 ''
               ];
               securityContext = {
-                runAsUser = 1000;
-                runAsGroup = 1000;
+                runAsUser = 0;
+                runAsGroup = 0;
               };
               resources = {
                 requests = {
@@ -195,7 +229,7 @@
           containers = [
             {
               name = "gateway";
-              image = "ghcr.io/openclaw/openclaw:2026.5.27";
+              image = "ghcr.io/openclaw/openclaw:2026.9.3";
               imagePullPolicy = "IfNotPresent";
               command = [
                 "node"
@@ -324,6 +358,10 @@
                   mountPath = "/home/node/.openclaw";
                 }
                 {
+                  name = "openclaw-cache";
+                  mountPath = "/home/node/.cache";
+                }
+                {
                   name = "npm-cache";
                   mountPath = "/home/node/.npm";
                 }
@@ -356,6 +394,10 @@
               configMap = {
                 name = "openclaw-config";
               };
+            }
+            {
+              name = "openclaw-cache";
+              emptyDir = {};
             }
             {
               name = "npm-cache";
