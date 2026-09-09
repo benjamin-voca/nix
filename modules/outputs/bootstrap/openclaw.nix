@@ -90,6 +90,11 @@
         minimax = {
           enabled = true;
         };
+        # Explicit trust/enable for the Discord channel plugin — without this
+        # the gateway installs it but leaves the channel runtime stopped.
+        discord = {
+          enabled = true;
+        };
       };
     };
     cron = {enabled = false;};
@@ -264,6 +269,10 @@
                 {
                   name = "NODE_ENV";
                   value = "production";
+                }
+                {
+                  name = "OPENCLAW_DEBUG";
+                  value = "1";
                 }
                 {
                   name = "OPENCLAW_GATEWAY_TOKEN";
