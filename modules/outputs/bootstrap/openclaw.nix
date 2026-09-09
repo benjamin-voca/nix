@@ -27,6 +27,13 @@
         dangerouslyDisableDeviceAuth = true;
       };
     };
+    messages = {
+      groupChat = {
+        # Discord's autocomplete lists Clawd's auto-managed bot role before the
+        # bot user, so role mentions (<@&ID>) must count as bot mentions too.
+        mentionPatterns = ["<@&1547195973363564669>"];
+      };
+    };
     channels = {
       discord = {
         enabled = true;
