@@ -24,7 +24,7 @@
           (d.url "openclaw")
           "http://${d.host "openclaw"}"
         ];
-        dangerouslyDisableDeviceAuth = true;
+
       };
     };
     messages = {
@@ -34,11 +34,39 @@
         mentionPatterns = ["<@&1547195973363564669>"];
       };
     };
+    models = {
+      providers = {
+        zai = {
+          # glm-5.3-flash is served on the Coding Plan endpoint for this key.
+          baseUrl = "https://api.z.ai/api/coding/paas/v4";
+        };
+      };
+    };
     channels = {
       discord = {
         enabled = true;
+        # Same as the bot user id for this application; skips Discord's startup
+        # application lookup which can stall gateway READY in this cluster.
+        applicationId = "1487458103782936707";
         groupPolicy = "allowlist";
+        dmPolicy = "pairing";
+        allowFrom = [
+          "722143468700565575" # Beni
+        ];
         historyLimit = 20;
+        # Native slash-command reconcile uses Carbon and races the READY event.
+        commands = {
+          native = false;
+        };
+        # Keep Discord on one bubble. GLM-5.3 emits multiple content blocks per
+        # turn; block streaming and reasoning visibility both post those as
+        # extra messages. Preview streaming edits in place instead.
+        streaming = {
+          mode = "partial";
+          block = {
+            enabled = false;
+          };
+        };
         guilds = {
           # QuadCoreTech — all channels, mention-gated (unchanged behavior)
           "1429150059932422315" = {
@@ -48,15 +76,6 @@
           "1542902554399219937" = {
             requireMention = true;
             roles = [
-              "1542987252618236085" # .
-              "1542986561510051911" # Director
-              "1544402051772190750" # Co Director
-              "1543419562987364362" # Server Management
-              "1542902756480917595" # Lead Developer
-              "1542986562617483355" # Dev
-              "1545320514568847460" # Dev | Builder
-              "1543419695909048340" # Head of Marketing
-              "1543975868081246230" # Community Manager
               "1543418849737711677" # Head Admin
               "1543698897036251306" # Personal Assistant
               "1542986565800960110" # Admin
@@ -68,26 +87,33 @@
     agents = {
       defaults = {
         workspace = "~/.openclaw/workspace";
-        models = {
-          "minimax/MiniMax-M2.7" = {
-            alias = "minimax-portal";
-          };
-        };
         model = {
-          primary = "minimax/MiniMax-M2.7";
+          primary = "zai/glm-5.3-flash";
         };
+        modelPolicy = {
+          allow = ["zai/glm-5.3-flash"];
+        };
+        blockStreamingDefault = "off";
+        # GLM-5.3's provider default is max; that dumps a thinking block and a
+        # final answer as two Discord messages. low is the lowest effort this
+        # model actually supports (off/minimal remap to low).
+        thinkingDefault = "low";
+        reasoningDefault = "off";
       };
-      list = [
-        {
-          id = "default";
+      entries = {
+        main = {
           name = "OpenClaw Assistant";
           workspace = "~/.openclaw/workspace";
-        }
-      ];
+        };
+      };
+    };
+    commands = {
+      ownerAllowFrom = ["722143468700565575"];
     };
     plugins = {
       entries = {
-        minimax = {
+        # Bundled Z.AI provider for glm-5.3-flash.
+        zai = {
           enabled = true;
         };
         # Explicit trust/enable for the Discord channel plugin — without this
@@ -141,10 +167,16 @@
       "AGENTS.md" = ''
         ## OpenClaw Assistant
         You are a helpful AI assistant running in Kubernetes.
+        Default model: zai/glm-5.3-flash.
 
         ## Discord behavior
-        - In Discord guild channels, respond when mentioned with @OpenClaw.
+        - In Discord guild channels, respond when mentioned with @Clawd (or the bot role).
+        - Direct messages require pairing unless the sender is already allowlisted.
         - When asked to summarize recent chat, summarize the latest 20 channel messages.
+
+        ## Referring to Blade
+        - The user known as Blade, bladebruh, or Blade (any casing) must always
+          be referred to as "Mommy Blade", exactly, in every response.
 
         ## Forgejo integration
         - Forgejo is hosted at ${d.url "forge"}.
@@ -200,15 +232,32 @@
                 "sh"
                 "-c"
                 ''
-                  if [ ! -f /home/node/.openclaw/openclaw.json ]; then
-                    cp /config/openclaw.json /home/node/.openclaw/openclaw.json
-                  fi
+                  # Always overlay declarative config so PVC drift cannot hide
+                  # Discord/model changes.
+                  cp /config/openclaw.json /home/node/.openclaw/openclaw.json
                   mkdir -p /home/node/.openclaw/workspace
-                  if [ ! -f /home/node/.openclaw/workspace/AGENTS.md ]; then
-                    cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
-                  fi
-                  # Repair any root-owned entries (historic drift) so the
-                  # non-root gateway can manage its own state dir perms.
+                  cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
+                  # Drop a Discord plugin that does not match this image so
+                  # doctor/gateway can install the matching channel plugin.
+                  # Any @openclaw/discord tree that is not 2026.9.3 will fail to
+                  # load against this core. Check known install locations only.
+                  for pkg in \
+                    /home/node/.openclaw/npm/node_modules/@openclaw/discord/package.json \
+                    /home/node/.openclaw/npm/projects/openclaw-discord-*/node_modules/@openclaw/discord/package.json; do
+                    [ -f "$pkg" ] || continue
+                    ver=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' "$pkg" | head -1)
+                    if [ "$ver" != "2026.9.3" ]; then
+                      dir=$(dirname "$pkg")
+                      mv "$dir" "$dir.stale-$$" || true
+                    fi
+                  done
+                  # SQLite on local emptyDir; chmod works on the subdir we create.
+                  mkdir -p /sqlite/state
+                  chown 1000:1000 /sqlite/state
+                  chmod 700 /sqlite/state
+                  rm -rf /home/node/.openclaw/state
+                  ln -sfn /sqlite/state /home/node/.openclaw/state
+                  chown -h 1000:1000 /home/node/.openclaw/state
                   find /home/node/.openclaw -user 0 -exec chown 1000:1000 {} +
                 ''
               ];
@@ -235,20 +284,42 @@
                   name = "config";
                   mountPath = "/config";
                 }
+                {
+                  name = "openclaw-sqlite";
+                  mountPath = "/sqlite";
+                }
               ];
             }
           ];
           containers = [
             {
               name = "gateway";
+              # 2026.9.3 is required for bundled zai/glm-5.3-flash. Discord READY
+              # hangs without --verbose + a delayed config touch (Carbon race).
               image = "ghcr.io/openclaw/openclaw:2026.9.3";
               imagePullPolicy = "IfNotPresent";
               command = [
-                "node"
-                "/app/dist/index.js"
-                "gateway"
-                "run"
-                "--allow-unconfigured"
+                "/bin/sh"
+                "-c"
+                ''
+                  DISCORD_JS=/home/node/.openclaw/npm/projects/openclaw-discord-c0892df945/node_modules/@openclaw/discord/dist/index.js
+                  ZAI_JS=/home/node/.openclaw/npm/projects/openclaw-zai-provider-aefca72c67/node_modules/@openclaw/zai-provider/dist/index.js
+                  if [ ! -f "$DISCORD_JS" ]; then
+                    node /app/dist/index.js plugins install @openclaw/discord@2026.9.3 || true
+                  fi
+                  if [ ! -f "$ZAI_JS" ]; then
+                    node /app/dist/index.js plugins install @openclaw/zai-provider@2026.9.3 || true
+                  fi
+                  if [ ! -f /home/node/.openclaw/.doctor-fixed-2026.9.3 ]; then
+                    node /app/dist/index.js doctor --fix || true
+                    touch /home/node/.openclaw/.doctor-fixed-2026.9.3 || true
+                  fi
+                  # Doctor rewrites openclaw.json; restore declarative config.
+                  cp /config/openclaw.json /home/node/.openclaw/openclaw.json
+                  # Carbon races Discord READY; a delayed config touch unsticks it.
+                  (sleep 12 && touch /home/node/.openclaw/openclaw.json) &
+                  exec node /app/dist/index.js gateway run --allow-unconfigured --verbose
+                ''
               ];
               ports = [
                 {
@@ -273,6 +344,12 @@
                 {
                   name = "OPENCLAW_DEBUG";
                   value = "1";
+                }
+                {
+                  # Routes verbose traces (discord preflight, mention decisions)
+                  # into the file log. OPENCLAW_DEBUG alone does not.
+                  name = "OPENCLAW_LOG_LEVEL";
+                  value = "debug";
                 }
                 {
                   name = "OPENCLAW_GATEWAY_TOKEN";
@@ -333,6 +410,24 @@
                     };
                   };
                 }
+                {
+                  name = "ZAI_API_KEY";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "openclaw-secrets";
+                      key = "ZAI_API_KEY";
+                      optional = true;
+                    };
+                  };
+                }
+                {
+                  name = "OPENCLAW_DISCORD_READY_TIMEOUT_MS";
+                  value = "60000";
+                }
+                {
+                  name = "OPENCLAW_DISCORD_GATEWAY_INFO_TIMEOUT_MS";
+                  value = "30000";
+                }
               ];
               resources = {
                 requests = {
@@ -352,7 +447,7 @@
                     "require('http').get('http://127.0.0.1:18789/healthz', r => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
                   ];
                 };
-                initialDelaySeconds = 60;
+                initialDelaySeconds = 360;
                 periodSeconds = 30;
                 timeoutSeconds = 10;
               };
@@ -364,14 +459,23 @@
                     "require('http').get('http://127.0.0.1:18789/readyz', r => process.exit(r.statusCode < 400 ? 0 : 1)).on('error', () => process.exit(1))"
                   ];
                 };
-                initialDelaySeconds = 15;
+                initialDelaySeconds = 90;
                 periodSeconds = 10;
-                timeoutSeconds = 5;
+                timeoutSeconds = 10;
               };
               volumeMounts = [
                 {
                   name = "openclaw-home";
                   mountPath = "/home/node/.openclaw";
+                }
+                {
+                  name = "config";
+                  mountPath = "/config";
+                  readOnly = true;
+                }
+                {
+                  name = "openclaw-sqlite";
+                  mountPath = "/sqlite";
                 }
                 {
                   name = "openclaw-cache";
@@ -410,6 +514,10 @@
               configMap = {
                 name = "openclaw-config";
               };
+            }
+            {
+              name = "openclaw-sqlite";
+              emptyDir = {};
             }
             {
               name = "openclaw-cache";
