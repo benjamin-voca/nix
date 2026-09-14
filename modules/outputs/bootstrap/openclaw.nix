@@ -54,15 +54,21 @@
           "722143468700565575" # Beni
         ];
         historyLimit = 20;
+        # Default "all" feeds Clawd its own Discord replies as few-shot. GLM-flash
+        # then copies the old "Blade stays Blade" bit over SOUL.md. allowlist
+        # keeps recent messages from allowed senders and drops the bot's.
+        contextVisibility = "allowlist";
         # Native slash-command reconcile uses Carbon and races the READY event.
         commands = {
           native = false;
         };
-        # Keep Discord on one bubble. GLM-5.3 emits multiple content blocks per
-        # turn; block streaming and reasoning visibility both post those as
-        # extra messages. Preview streaming edits in place instead.
+        # Off, not partial. GLM-flash streams a first-token draft ("Blade stays
+        # Blade") then the real answer ("Mommy Blade"). Discord's live preview
+        # posts that draft as its own message and never edits it, so the channel
+        # sees two contradictory bubbles. The session transcript only keeps the
+        # final answer — deliver that one message.
         streaming = {
-          mode = "partial";
+          mode = "off";
           block = {
             enabled = false;
           };
@@ -72,10 +78,24 @@
           "1429150059932422315" = {
             requireMention = true;
           };
-          # Voltrum Studios — promptable only by Admin role or higher in hierarchy
+          # Voltrum Studios — promptable by Admin or higher in the role hierarchy.
+          # Beni's nick here is Big Yahu (Lead Developer). Missing that role made
+          # preflight drop him as "member not allowed" while Discord history still
+          # few-shot the bot's own Blade-refusal replies.
           "1542902554399219937" = {
             requireMention = true;
+            users = [
+              "722143468700565575" # Beni / Big Yahu
+            ];
             roles = [
+              "1542986561510051911" # Director
+              "1544402051772190750" # Co Director
+              "1543419562987364362" # Server Management
+              "1542902756480917595" # Lead Developer (Beni)
+              "1542986562617483355" # Dev
+              "1545320514568847460" # Dev | Builder
+              "1543419695909048340" # Head of Marketing
+              "1543975868081246230" # Community Manager
               "1543418849737711677" # Head Admin
               "1543698897036251306" # Personal Assistant
               "1542986565800960110" # Admin
@@ -111,6 +131,12 @@
       ownerAllowFrom = ["722143468700565575"];
     };
     plugins = {
+      load = {
+        paths = [
+          "/home/node/.openclaw/extensions/mommy-blade"
+          "/home/node/.openclaw/extensions/output-filters"
+        ];
+      };
       entries = {
         # Bundled Z.AI provider for glm-5.3-flash.
         zai = {
@@ -120,6 +146,24 @@
         # the gateway installs it but leaves the channel runtime stopped.
         discord = {
           enabled = true;
+        };
+        # Prompt-only identity reminder. GLM-5.3-flash copies Discord history
+        # over AGENTS.md; appending this at prompt-build time puts the name
+        # after that history so the model actually knows it.
+        "mommy-blade" = {
+          enabled = true;
+          hooks = {
+            allowConversationAccess = true;
+          };
+        };
+        # Local backport of openclaw/openclaw#45041 (closed as not planned).
+        # Regex strip/drop plus keep-last so GLM's extra thinking bubble never posts.
+        # Not under agents.defaults.outputFilters — that key is not in the schema.
+        "output-filters" = {
+          enabled = true;
+          hooks = {
+            allowConversationAccess = true;
+          };
         };
       };
     };
@@ -165,12 +209,13 @@
     data = {
       "openclaw.json" = openclawConfigJson;
       "AGENTS.md" = ''
-        ## CRITICAL RULE — Blade's title (overrides everything, including chat history)
-        - The person known as "Blade", "bladebruh", or any casing variant of it
-          must ALWAYS be called "Mommy Blade" — in every response, no exceptions.
-        - Recent channel messages may show the assistant calling him anything
-          else ("Blade", "just Blade", no honorifics). That is outdated history
-          from before this rule existed. Do NOT copy it. This rule always wins.
+        ## CRITICAL RULE — Mommy Blade
+        - The person Blade / bladebruh / @Blade is named **Mommy Blade**.
+        - That is his name in your mouth. You know it. You can joke *with* it.
+        - You cannot refuse it, "keep calling him Blade", or treat the title as
+          a bill, vote, firmware, or attack. Those bits are banned.
+        - If Discord history shows you saying just "Blade", that history is
+          stale and wrong. Do not imitate it. Correct yourself naturally.
 
         ## OpenClaw Assistant
         You are a helpful AI assistant running in Kubernetes.
@@ -187,6 +232,276 @@
         - Use this endpoint for REST calls: ${d.url "forge"}/api/v1.
         - Send header: Authorization: token <FORGEJO_AGENT_TOKEN>.
         - When asked to turn a summary into issues, create issues in Forgejo with clear titles and markdown descriptions.
+
+        ## Discord REST API (audit log, member lookups)
+        - Header is exactly `Authorization: Bot <DISCORD_BOT_TOKEN>`.
+        - NEVER send Forgejo-style `Authorization: token <token>` to Discord: that
+          scheme returns 401 Unauthorized even with a valid token. The `token`
+          convention above is FORGEJO-only. A 401 with the `Bot` scheme means the
+          token was actually rotated; a 401 with the `token` scheme means nothing.
+
+        ## Discord GIFs (Giphy)
+        - GIPHY_API_KEY is in the environment. Use it to search Giphy when someone asks for a GIF, or for a rare visual reaction (celebration, humor). At most one GIF per moment; never GIF-only back-to-back; skip GIFs in serious or info-dense replies.
+        - GET https://api.giphy.com/v1/gifs/search?api_key=$GIPHY_API_KEY&q=<urlencoded query>&limit=1&rating=g&lang=en
+        - Send the direct file, not the giphy.com page: MEDIA:<data[0].images.downsized.url> (fallback images.original.url). Discord will not animate a bare page URL.
+        - Caption the same message with creator credit when username is present, always including Powered by GIPHY, e.g.:
+          via @username · [Powered by GIPHY](<data[0].url>)
+          MEDIA:<direct gif url>
+        - Stay rating=g. If search returns nothing, say so in text. Do not mix GIFs with Discord components.
+      '';
+      "giphy-SKILL.md" = ''
+        ---
+        name: giphy-gif
+        description: Search Giphy and send a GIF in Discord. Use when a user asks for a GIF or a brief visual reaction (celebration, humor, emotion) fits.
+        ---
+
+        # Giphy GIF Search
+
+        Env: `GIPHY_API_KEY`.
+
+        ## Behavior
+        - Send a GIF when asked, or rarely as a reaction. One GIF per moment. Prefer text when the topic is serious.
+        - Always `rating=g`.
+
+        ## Steps
+        1. URL-encode the query.
+        2. GET `https://api.giphy.com/v1/gifs/search?api_key=$GIPHY_API_KEY&q=<query>&limit=1&rating=g&lang=en`
+        3. Read `data[0]`:
+           - media: `images.downsized.url` (fallback `images.original.url`) — must be a direct `.gif`
+           - page: `url`
+           - creator: `username` if non-empty
+        4. Reply with caption then a MEDIA line (required for Discord animation):
+
+        ```
+        via @<username> · [Powered by GIPHY](<page url>)
+        MEDIA:<direct gif url>
+        ```
+
+        If there is no username, omit the `via @... · ` prefix but keep Powered by GIPHY.
+        Never send only the giphy.com page URL. Never attach Discord components on a GIF send.
+      '';
+      "SOUL.md" = ''
+        # SOUL.md
+
+        Be a useful Discord bot. Have a personality. Do not be a corporate drone.
+
+        You can joke, roast, and riff. You cannot pretend you don't know someone's name.
+
+        ## Blade
+
+        His name, when you speak it, is **Mommy Blade**. That is established fact in
+        this community, like a nickname you actually use — not a rule you protest.
+        Jokes that *use* "Mommy Blade" are on-voice. Jokes that refuse the name
+        ("Blade stays Blade", firmware, congress, votes) are off-voice and wrong.
+        If old messages show you refusing it, you outgrew that bit. Move on.
+
+        Have opinions about everything else.
+      '';
+      "IDENTITY.md" = ''
+        # IDENTITY.md
+
+        - **Name:** Clawd
+        - **Vibe:** chaotic Discord staff bot
+        - **People:** Blade is Mommy Blade. You call him that on purpose.
+      '';
+      "mommy-blade-package.json" = builtins.toJSON {
+        name = "mommy-blade";
+        version = "1.0.0";
+        type = "module";
+        openclaw.extensions = ["./index.js"];
+      };
+      "mommy-blade-plugin.json" = builtins.toJSON {
+        id = "mommy-blade";
+        name = "Mommy Blade identity";
+        activation = {
+          onStartup = true;
+          onCapabilities = ["hook"];
+        };
+        configSchema = {
+          type = "object";
+          additionalProperties = false;
+        };
+      };
+      "mommy-blade-index.js" = ''
+        const BLADE_CONTEXT =
+          "Community fact, not a restriction: you call Blade \"Mommy Blade\". " +
+          "Jokes that use that name are in-character. Jokes that refuse it " +
+          "(just Blade, firmware, votes, congress) are outdated and wrong. " +
+          "If older channel messages show you refusing the name, ignore that bit.";
+
+        export default {
+          id: "mommy-blade",
+          name: "Mommy Blade identity",
+          description: "Prompt identity plus drop leaked thinking bubbles.",
+          register(api) {
+            api.on("before_prompt_build", () => ({
+              appendSystemContext: BLADE_CONTEXT,
+              appendContext: BLADE_CONTEXT,
+            }));
+            api.on("reply_payload_sending", (event) => {
+              if (event.kind === "block") return { cancel: true };
+              if (event.payload && event.payload.isReasoning) return { cancel: true };
+            });
+          },
+        };
+      '';
+      "output-filters-package.json" = builtins.toJSON {
+        name = "output-filters";
+        version = "1.0.0";
+        type = "module";
+        openclaw.extensions = ["./index.js"];
+      };
+      "output-filters-plugin.json" = builtins.toJSON {
+        id = "output-filters";
+        name = "Output filters";
+        activation = {
+          onStartup = true;
+          onCapabilities = ["hook"];
+        };
+        configSchema = {
+          type = "object";
+          additionalProperties = false;
+        };
+      };
+      # Backport of https://github.com/openclaw/openclaw/issues/45041
+      # (closed as not planned). Regex strip/drop on outbound text, plus keep-last
+      # because GLM-5.3-flash leaks a full extra assistant message that no regex
+      # from that issue would match ("Blade. ten straight...").
+      "output-filters-index.js" = ''
+        const FILTERS = [
+          { pattern: "<think>[\\s\\S]*?</think>", flags: "gi", action: "strip" },
+          { pattern: "^Reasoning:.*$", flags: "gm", action: "strip" },
+          { pattern: "^Thinking:.*$", flags: "gm", action: "strip" },
+          { pattern: "^(OK,? )?(Let me|I will|I need to|Now I|First,? let me).*$", flags: "gm", action: "strip" },
+        ];
+
+        function applyOutputFilters(text) {
+          if (typeof text !== "string") return { text, drop: false };
+          let out = text;
+          for (const f of FILTERS) {
+            let re;
+            try { re = new RegExp(f.pattern, f.flags || "gm"); }
+            catch { continue; }
+            if (f.action === "drop" && re.test(out)) return { text: "", drop: true };
+            out = out.replace(re, "");
+          }
+          out = out.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+          return { text: out, drop: false };
+        }
+
+        export default {
+          id: "output-filters",
+          name: "Output filters",
+          description: "Strip leaked reasoning from outbound replies; keep last Discord bubble.",
+          register(api) {
+            globalThis.__clawdOutputFilters = FILTERS;
+            globalThis.__clawdKeepLast = true;
+            let safety;
+            api.on("before_prompt_build", () => {
+              globalThis.__clawdHoldDiscordSends = true;
+              clearTimeout(safety);
+              safety = setTimeout(() => {
+                const flush = globalThis.__clawdFlushDiscordSend;
+                if (typeof flush === "function") void flush();
+              }, 15000);
+            });
+            api.on("agent_end", () => {
+              clearTimeout(safety);
+              setTimeout(() => {
+                const flush = globalThis.__clawdFlushDiscordSend;
+                if (typeof flush === "function") void flush();
+              }, 2000);
+            });
+            api.on("reply_payload_sending", (event) => {
+              if (event.kind === "block") return { cancel: true };
+              if (event.payload && event.payload.isReasoning) return { cancel: true };
+              const payload = event.payload || {};
+              const next = applyOutputFilters(payload.text || "");
+              if (next.drop || (!(next.text || "").trim() && !payload.mediaUrl && !(payload.mediaUrls && payload.mediaUrls.length))) {
+                return { cancel: true };
+              }
+              if (next.text !== payload.text) payload.text = next.text;
+            });
+          },
+        };
+      '';
+      # GLM thinking is delivered as Discord kind=block BEFORE reply_payload_sending
+      # runs (silent REST send). Patch the Discord plugin so those never post.
+      "patch-discord-blocks.js" = ''
+        const fs = require("fs");
+        const dir = "/home/node/.openclaw/npm/projects/openclaw-discord-c0892df945/node_modules/@openclaw/discord/dist";
+        function insertAfter(file, key, insert, already) {
+          const p = dir + "/" + file;
+          if (!fs.existsSync(p)) {
+            console.log("missing file", file);
+            return false;
+          }
+          const s = fs.readFileSync(p, "utf8");
+          if (s.includes(already || insert.trim())) {
+            console.log("already patched", file);
+            return true;
+          }
+          const i = s.indexOf(key);
+          if (i < 0) {
+            console.log("needle missing", file, key);
+            return false;
+          }
+          fs.writeFileSync(p, s.slice(0, i + key.length) + insert + s.slice(i + key.length));
+          console.log("patched", file);
+          return true;
+        }
+        insertAfter(
+          "provider-PI8UiejY.js",
+          "async function deliverDiscordReply(params) {",
+          "\nif (params.kind === \"block\") return { visibleReplySent: false, suppression: { reason: \"block_suppressed\" } };",
+          "block_suppressed"
+        );
+        insertAfter(
+          "message-handler.process-CWh432Ak.js",
+          "const isFinal = info.kind === \"final\";",
+          "\n\t\tif (info.kind === \"block\") return { visibleReplySent: false, suppression: { reason: \"block_suppressed\" } };",
+          "block_suppressed"
+        );
+        (function revert(file, start, orig, marker) {
+          const p = dir + "/" + file;
+          if (!fs.existsSync(p)) return;
+          let s = fs.readFileSync(p, "utf8");
+          if (!s.includes(marker)) return;
+          const i = s.indexOf(start);
+          const j = s.indexOf(orig, i);
+          if (i < 0 || j < 0) return;
+          fs.writeFileSync(p, s.slice(0, i + start.length) + s.slice(j));
+          console.log("reverted", file, marker);
+        })(
+          "send.shared-D4BAjlRo.js",
+          "async function sendDiscordChunks(params, upload) {",
+          "\n\tconst chunks = buildDiscordTextChunks",
+          "__clawdPendingDiscordSend"
+        );
+        (function revertCreate() {
+          const p = dir + "/discord-CmL3ati-.js";
+          if (!fs.existsSync(p)) return;
+          let s = fs.readFileSync(p, "utf8");
+          if (!s.includes("__clawdPendingDiscordCreate")) return;
+          const start = "async function createChannelMessage(rest, channelId, data) {";
+          const orig = "\n\treturn await rest.post(Routes.channelMessages(channelId), data);";
+          const i = s.indexOf(start);
+          const j = s.indexOf(orig, i);
+          if (i < 0 || j < 0) {
+            console.log("could not revert createChannelMessage");
+            return;
+          }
+          fs.writeFileSync(p, s.slice(0, i + start.length) + s.slice(j));
+          console.log("reverted createChannelMessage hold");
+        })();
+        // Thinking bubble bypasses createChannelMessage. Intercept the REST
+        // client so every POST /channels/.../messages is held.
+        insertAfter(
+          "discord-CmL3ati-.js",
+          "async request(method, path, params) {",
+          "\n\t\tif (method === \"POST\" && globalThis.__clawdKeepLast && globalThis.__clawdHoldDiscordSends && !globalThis.__clawdFlushingDiscord) {\n\t\t\tconst pathStr = typeof path === \"string\" ? path : String(path ?? \"\");\n\t\t\tconst data = params && params.data;\n\t\t\tconst body = data && data.body ? data.body : data;\n\t\t\tconst text = typeof (body && body.content) === \"string\" ? body.content : \"\";\n\t\t\tconst isTyping = pathStr.indexOf(\"/typing\") !== -1;\n\t\t\tconsole.log(\"[output-filters] rest.request POST\", pathStr, String(text).slice(0, 120));\n\t\t\tif (!isTyping) {\n\t\t\t\tif (!globalThis.__clawdFlushDiscordSend) {\n\t\t\t\t\tglobalThis.__clawdFlushDiscordSend = async () => {\n\t\t\t\t\t\tconst p = globalThis.__clawdPendingDiscordPost;\n\t\t\t\t\t\tglobalThis.__clawdPendingDiscordPost = null;\n\t\t\t\t\t\tglobalThis.__clawdHoldDiscordSends = false;\n\t\t\t\t\t\tif (!p) return;\n\t\t\t\t\t\tglobalThis.__clawdFlushingDiscord = true;\n\t\t\t\t\t\ttry { return await p.rest.request(p.method, p.path, p.params); }\n\t\t\t\t\t\tfinally { globalThis.__clawdFlushingDiscord = false; }\n\t\t\t\t\t};\n\t\t\t\t}\n\t\t\t\tglobalThis.__clawdPendingDiscordPost = { rest: this, method, path, params };\n\t\t\t\treturn { id: \"skipped-held\" };\n\t\t\t}\n\t\t}",
+          "__clawdPendingDiscordPost"
+        );
       '';
     };
   };
@@ -216,6 +531,9 @@
           labels = {
             app = "openclaw";
           };
+          annotations = {
+            "checksum/openclaw-config" = builtins.hashString "sha256" (builtins.toJSON configMap.data);
+          };
         };
         spec = {
           affinity = import ../../../lib/anti-affinity.nix "openclaw";
@@ -238,8 +556,21 @@
                   # Always overlay declarative config so PVC drift cannot hide
                   # Discord/model changes.
                   cp /config/openclaw.json /home/node/.openclaw/openclaw.json
-                  mkdir -p /home/node/.openclaw/workspace
+                  mkdir -p /home/node/.openclaw/workspace/skills/giphy
+                  mkdir -p /home/node/.openclaw/skills/giphy
+                  mkdir -p /home/node/.openclaw/extensions/mommy-blade
+                  mkdir -p /home/node/.openclaw/extensions/output-filters
                   cp /config/AGENTS.md /home/node/.openclaw/workspace/AGENTS.md
+                  cp /config/SOUL.md /home/node/.openclaw/workspace/SOUL.md
+                  cp /config/IDENTITY.md /home/node/.openclaw/workspace/IDENTITY.md
+                  cp /config/giphy-SKILL.md /home/node/.openclaw/workspace/skills/giphy/SKILL.md
+                  cp /config/giphy-SKILL.md /home/node/.openclaw/skills/giphy/SKILL.md
+                  cp /config/mommy-blade-index.js /home/node/.openclaw/extensions/mommy-blade/index.js
+                  cp /config/mommy-blade-package.json /home/node/.openclaw/extensions/mommy-blade/package.json
+                  cp /config/mommy-blade-plugin.json /home/node/.openclaw/extensions/mommy-blade/openclaw.plugin.json
+                  cp /config/output-filters-index.js /home/node/.openclaw/extensions/output-filters/index.js
+                  cp /config/output-filters-package.json /home/node/.openclaw/extensions/output-filters/package.json
+                  cp /config/output-filters-plugin.json /home/node/.openclaw/extensions/output-filters/openclaw.plugin.json
                   # Drop a Discord plugin that does not match this image so
                   # doctor/gateway can install the matching channel plugin.
                   # Any @openclaw/discord tree that is not 2026.9.3 will fail to
@@ -319,6 +650,29 @@
                   fi
                   # Doctor rewrites openclaw.json; restore declarative config.
                   cp /config/openclaw.json /home/node/.openclaw/openclaw.json
+                  node /config/patch-discord-blocks.js || true
+                  # Crash-loop breaker lives on the PVC and will suppress Discord
+                  # even after a config fix. Drop it on every start.
+                  rm -rf /home/node/.openclaw/logs/stability
+                  # One-shot: drop stored session DBs so old Blade/GIF replies
+                  # cannot be replayed. OpenClaw recreates empty DBs on boot.
+                  # Discord historyLimit stays 20 so the bot remembers after this.
+                  WIPE_MARK=/home/node/.openclaw/.memory-wiped-2026-09-10b
+                  if [ ! -f "$WIPE_MARK" ]; then
+                    rm -f /home/node/.openclaw/agents/main/agent/openclaw-agent.sqlite \
+                      /home/node/.openclaw/agents/main/agent/openclaw-agent.sqlite-* \
+                      /home/node/.openclaw/agents/default/agent/openclaw-agent.sqlite \
+                      /home/node/.openclaw/agents/default/agent/openclaw-agent.sqlite-*
+                    rm -rf /home/node/.openclaw/agents/main/sessions \
+                      /home/node/.openclaw/agents/default/sessions
+                    mkdir -p /home/node/.openclaw/agents/main/sessions \
+                      /home/node/.openclaw/agents/default/sessions \
+                      /home/node/.openclaw/agents/main/agent \
+                      /home/node/.openclaw/agents/default/agent
+                    : > /home/node/.openclaw/workspace/MEMORY.md || true
+                    chown -R 1000:1000 /home/node/.openclaw/agents || true
+                    touch "$WIPE_MARK" || true
+                  fi
                   # Carbon races Discord READY; a delayed config touch unsticks it.
                   (sleep 12 && touch /home/node/.openclaw/openclaw.json) &
                   exec node /app/dist/index.js gateway run --allow-unconfigured --verbose
@@ -419,6 +773,16 @@
                     secretKeyRef = {
                       name = "openclaw-secrets";
                       key = "ZAI_API_KEY";
+                      optional = true;
+                    };
+                  };
+                }
+                {
+                  name = "GIPHY_API_KEY";
+                  valueFrom = {
+                    secretKeyRef = {
+                      name = "openclaw-secrets";
+                      key = "GIPHY_API_KEY";
                       optional = true;
                     };
                   };

@@ -1,4 +1,4 @@
-## QuadNix Agent Notes
+## Nix Agent Notes
 
 - **Deploy (deploy-rs)**: `nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks`
 - **Machine registry**: `machines/default.nix` — source of truth for all hosts and roles

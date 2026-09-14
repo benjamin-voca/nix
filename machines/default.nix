@@ -147,9 +147,11 @@ in {
         # OpenClaw
         "openclaw-gateway-token"
         "openclaw-minimax-api-key"
+        "openclaw-zai-api-key"
         "openclaw-discord-id"
         "openclaw-server-id"
         "openclaw-beni-discord-id"
+        "GIPHY_API_KEY"
         # Orkestr
         "orkestr-db-password"
         "orkestr-secret-key-base"

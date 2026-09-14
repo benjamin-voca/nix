@@ -315,6 +315,17 @@ in {
               OC_FORGEJO_AGENT_TOKEN=$(cat /run/secrets/forgejo-agent-token)
               OC_ARGS="$OC_ARGS --from-literal=FORGEJO_AGENT_TOKEN=$OC_FORGEJO_AGENT_TOKEN"
             fi
+            if [ -f /run/secrets/openclaw-zai-api-key ]; then
+              OC_ZAI_KEY=$(cat /run/secrets/openclaw-zai-api-key)
+              OC_ARGS="$OC_ARGS --from-literal=ZAI_API_KEY=$OC_ZAI_KEY"
+            elif [ -f /run/secrets/librechat-zhipu-api-key ]; then
+              OC_ZAI_KEY=$(cat /run/secrets/librechat-zhipu-api-key)
+              OC_ARGS="$OC_ARGS --from-literal=ZAI_API_KEY=$OC_ZAI_KEY"
+            fi
+            if [ -f /run/secrets/GIPHY_API_KEY ]; then
+              OC_GIPHY_KEY=$(cat /run/secrets/GIPHY_API_KEY)
+              OC_ARGS="$OC_ARGS --from-literal=GIPHY_API_KEY=$OC_GIPHY_KEY"
+            fi
             # shellcheck disable=SC2086
             $kubectl create secret generic openclaw-secrets \
               --namespace=openclaw \
