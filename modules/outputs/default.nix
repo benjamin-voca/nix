@@ -56,6 +56,7 @@
     nextcloudMod = import ./bootstrap/nextcloud.nix {inherit pkgs lib;};
     clusttaMod = import ./bootstrap/clustta.nix {inherit pkgs lib;};
     upgAssetsMod = import ./bootstrap/upg-assets.nix {inherit pkgs lib;};
+    teamspeakMod = import ./bootstrap/teamspeak.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -98,7 +99,8 @@
       // n8nMod.inlineFiles
       // nextcloudMod.inlineFiles
       // clusttaMod.inlineFiles
-      // upgAssetsMod.inlineFiles;
+      // upgAssetsMod.inlineFiles
+      // teamspeakMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -476,6 +478,14 @@
       cat $out/25d-upg-assets-service.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/25e-upg-assets-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/26-teamspeak-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/26a-teamspeak-pvc.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/26b-teamspeak-deployment.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/26c-teamspeak-service.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml
