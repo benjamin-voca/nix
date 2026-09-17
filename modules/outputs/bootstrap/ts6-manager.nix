@@ -73,6 +73,36 @@ ${tolerations}
         # node:20-slim has a uid-1000 `node` user; fsGroup chowns the PVC
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        # The pinned upstream image ships yt-dlp 2026.03.03, which YouTube
+        # breaks within ~90 days. Deliberately floating download: freshness
+        # is the point — yt-dlp is the one artifact that MUST stay current.
+        # The zipapp replaces the pip script on PATH (bare `yt-dlp` spawn).
+        - name: yt-dlp-update
+          image: curlimages/curl:latest@sha256:43366cd60f226c7655181a0f7e85c468a41d182fdd2dc2c1c3b872a2b9d05d7a
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - curl -fsSL --retry 3 -o /out/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp && chmod +x /out/yt-dlp
+          volumeMounts:
+            - name: yt-dlp-bin
+              mountPath: /out
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       containers:
         - name: backend
           image: clusterzx/ts6-manager:backend@sha256:ff47f4066e834b1050401e873af2a603a777d592973abd90822a1d4e6931e126
@@ -82,6 +112,10 @@ ${tolerations}
               containerPort: 3001
               protocol: TCP
           env:
+            # Prepend the initContainer-fetched yt-dlp (zipapp needs the
+            # image's /usr/bin/python3, hence PATH override not a bind)
+            - name: PATH
+              value: /opt/yt-dlp-override:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
             - name: NODE_ENV
               value: production
             - name: PORT
@@ -111,6 +145,9 @@ ${tolerations}
             - name: JWT_REFRESH_EXPIRY
               value: 7d
           volumeMounts:
+            - name: yt-dlp-bin
+              mountPath: /opt/yt-dlp-override
+              readOnly: true
             # One PVC, two subPath mounts (DB dir + music library)
             - name: data
               mountPath: /app/packages/backend/data
@@ -155,6 +192,8 @@ ${tolerations}
         - name: data
           persistentVolumeClaim:
             claimName: ts6-manager-data
+        - name: yt-dlp-bin
+          emptyDir: {}
 '';
 
   frontend = ''
