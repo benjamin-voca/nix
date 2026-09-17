@@ -103,6 +103,35 @@ ${tolerations}
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+        # yt-dlp's YouTube challenge solver (ejs) dropped Node <22 support
+        # ('JS runtimes: node-20.20.1 (unsupported)'); deno is its default
+        # and recommended runtime. Copy the static binary into the same
+        # PATH-override dir as yt-dlp so it lands first on PATH.
+        - name: deno-bin
+          image: denoland/deno:latest@sha256:869d374bdaddda4fde029c492d7219199b0e821c2c53cca5357b3a6f5b9336fc
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - cp /usr/bin/deno /out/deno && chmod 0755 /out/deno && /out/deno --version
+          volumeMounts:
+            - name: yt-dlp-bin
+              mountPath: /out
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
       containers:
         - name: backend
           image: clusterzx/ts6-manager:backend@sha256:ff47f4066e834b1050401e873af2a603a777d592973abd90822a1d4e6931e126
@@ -147,6 +176,10 @@ ${tolerations}
           volumeMounts:
             - name: yt-dlp-bin
               mountPath: /opt/yt-dlp-override
+              readOnly: true
+            - name: ytdlp-config
+              mountPath: /etc/yt-dlp/config
+              subPath: config
               readOnly: true
             # One PVC, two subPath mounts (DB dir + music library)
             - name: data
@@ -194,6 +227,9 @@ ${tolerations}
             claimName: ts6-manager-data
         - name: yt-dlp-bin
           emptyDir: {}
+        - name: ytdlp-config
+          configMap:
+            name: ts6-ytdlp-config
 '';
 
   frontend = ''
@@ -366,6 +402,24 @@ spec:
       protocol: TCP
 '';
 
+  # yt-dlp system config: new YouTube extraction needs a JS runtime; only
+  # 'deno' is enabled by default and the image has no deno, but it does have
+  # node. Upstream bakes this into /root/.config which our uid-1000 runtime
+  # can't read — /etc/yt-dlp/config is the user-independent location.
+  ytdlpConfigMap = ''
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ts6-ytdlp-config
+  namespace: teamspeak
+  labels:
+    app.kubernetes.io/name: ts6-manager
+    app.kubernetes.io/component: backend
+data:
+  config: |
+    --js-runtimes node
+'';
+
   ingress = ''
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -407,6 +461,7 @@ in {
     "27c-ts6-manager-sidecar.yaml" = sidecar;
     "27d-ts6-manager-services.yaml" = services;
     "27e-ts6-manager-ingress.yaml" = ingress;
+    "27f-ts6-manager-ytdlp-configmap.yaml" = ytdlpConfigMap;
   };
 
   order = [
@@ -416,5 +471,6 @@ in {
     "27c-ts6-manager-sidecar.yaml"
     "27d-ts6-manager-services.yaml"
     "27e-ts6-manager-ingress.yaml"
+    "27f-ts6-manager-ytdlp-configmap.yaml"
   ];
 }
