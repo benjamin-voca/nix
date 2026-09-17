@@ -69,6 +69,10 @@ spec:
     spec:
 ${tolerations}
       automountServiceAccountToken: false
+      # Harbor (10.0.0.56:5000) requires auth for pulls; same convention as
+      # edukurs/forgejo/mosaic namespaces (dockerconfigjson pull secret)
+      imagePullSecrets:
+        - name: harbor-registry
       securityContext:
         # node:20-slim has a uid-1000 `node` user; fsGroup chowns the PVC
         fsGroup: 1000
@@ -134,7 +138,10 @@ ${tolerations}
               drop: ["ALL"]
       containers:
         - name: backend
-          image: clusterzx/ts6-manager:backend-dev@sha256:50169ab1990e0a3867bfccb5ca8230577e73bc3149c31583596cc0f0f9fdb5ed
+          # Custom build: adds !playlist chat commands — patch + build script
+          # in docker/ts6-manager/ (this repo). Tag is a pinned release build.
+          # Base: upstream backend-dev (queue chat subcommands) + patch.
+          image: 10.0.0.56:5000/library/ts6-manager-backend:0.4.0
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

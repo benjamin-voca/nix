@@ -1,0 +1,98 @@
+# Kaniko in-cluster build job for the patched ts6-manager backend.
+#
+# Rendered by build-in-cluster.sh (never apply this file raw — it contains
+# a __FORGE_TOKEN__ placeholder resolved from sops at runtime). Builds from
+# the Forgejo git context over the cluster-internal service and pushes to
+# Harbor. No local Docker, no Mac -> Harbor upload path needed.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ts6-manager-build
+  namespace: teamspeak
+  labels:
+    app.kubernetes.io/name: ts6-manager
+    app.kubernetes.io/component: image-build
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 7200
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ts6-manager
+        app.kubernetes.io/component: image-build
+    spec:
+      restartPolicy: Never
+      # Backbone nodes are tainted
+      tolerations:
+        - key: role
+          operator: Equal
+          value: backbone
+          effect: NoSchedule
+        - key: infra
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      initContainers:
+        # Kaniko's git-context support mangles http URLs — clone ourselves
+        # into the shared /workspace and build from the plain dir instead.
+        - name: git-clone
+          image: alpine/git:latest@sha256:52be47b4d5ffd7e65439b4872d498897426c41afa38fde44d6c2f2f3249aaa97
+          command:
+            - sh
+            - -c
+            - git clone --depth 1 "__FORGE_GIT_URL__" /workspace && git -C /workspace log --oneline -1
+          env:
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            runAsUser: 0
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2@sha256:8a4f9af8ef55ef8bfaf4cfd7b15dc956609e14a4402efefd5fb2e49a0c06e2c8
+          args:
+            - --dockerfile=/workspace/Dockerfile.backend
+            - --context=/workspace
+            - --destination=__IMAGE_TAG__
+            - --snapshot-mode=redo
+            - --cache=true
+            - --cache-repo=10.0.0.56:5000/library/ts6-manager-buildcache
+            - --verbosity=info
+          env:
+            - name: DOCKER_CONFIG
+              value: /kaniko-secrets
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: harbor-auth
+              mountPath: /kaniko-secrets
+              readOnly: true
+          resources:
+            # backbone-01 CPU requests are ~95% allocated — keep the request
+            # token; bursts use the limit (limits don't affect scheduling)
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "4"
+              memory: 4Gi
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: harbor-auth
+          secret:
+            secretName: harbor-registry
+            items:
+              # kaniko reads $DOCKER_CONFIG/config.json — the secret key is
+              # .dockerconfigjson, so project it under the expected name
+              - key: .dockerconfigjson
+                path: config.json

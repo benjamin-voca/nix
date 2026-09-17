@@ -1,0 +1,243 @@
+diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
+index 379ee96..ea839ab 100644
+--- a/packages/backend/src/voice/music-command-handler.ts
++++ b/packages/backend/src/voice/music-command-handler.ts
+@@ -2,7 +2,7 @@ import type { PrismaClient } from '../../generated/prisma/index.js';
+ import { VoiceBotManager } from './voice-bot-manager.js';
+ import type { VoiceBot } from './voice-bot.js';
+ import type { QueueItem } from './playlist/queue.js';
+-import { downloadYouTube } from './audio/youtube.js';
++import { downloadYouTube, searchYouTube } from './audio/youtube.js';
+ 
+ const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
+ const CMD_PREFIX = '!';
+@@ -10,7 +10,7 @@ const CMD_PREFIX = '!';
+ const MUSIC_COMMANDS = new Set([
+   'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
+   'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
+-  'stream', 'stopstream', 'viewers',
++  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
+ ]);
+ 
+ /**
+@@ -108,6 +108,13 @@ export class MusicCommandHandler {
+         case 'viewers':
+           this.handleViewers(bot, userClid);
+           break;
++        case 'playlist':
++        case 'playlists':
++          await this.handlePlaylist(bot, userClid, args);
++          break;
++        case 'help':
++          this.handleHelp(bot, userClid);
++          break;
+       }
+     } catch (err: any) {
+       console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
+@@ -183,19 +190,28 @@ export class MusicCommandHandler {
+         this.reply(bot, userClid, 'Resumed.');
+         return;
+       }
+-      this.reply(bot, userClid, 'Usage: !play <youtube-url>');
++      this.reply(bot, userClid, 'Usage: !play <url|search query>');
+       return;
+     }
+ 
++    // URL → play as-is; anything else is treated as a YouTube search query
++    // and the first result is played.
++    let url = args;
+     if (!args.startsWith('http://') && !args.startsWith('https://')) {
+-      this.reply(bot, userClid, 'Please provide a valid URL. Usage: !play <url>');
+-      return;
++      this.reply(bot, userClid, `Searching: ${args}...`);
++      const results = await searchYouTube(args, 1);
++      if (!results || results.length === 0) {
++        this.reply(bot, userClid, `No results found for "${args}".`);
++        return;
++      }
++      url = `https://www.youtube.com/watch?v=${results[0].id}`;
++      this.reply(bot, userClid, `Found: ${results[0].title} — loading...`);
++    } else {
++      this.reply(bot, userClid, 'Loading...');
+     }
+ 
+-    this.reply(bot, userClid, 'Loading...');
+-
+     try {
+-      const { filePath, info } = await downloadYouTube(args, MUSIC_DIR);
++      const { filePath, info } = await downloadYouTube(url, MUSIC_DIR);
+ 
+       const queueItem: QueueItem = {
+         id: `yt_${info.id}`,
+@@ -204,7 +220,7 @@ export class MusicCommandHandler {
+         duration: info.duration,
+         filePath,
+         source: 'youtube',
+-        sourceUrl: args,
++        sourceUrl: url,
+       };
+ 
+       bot.queue.add(queueItem);
+@@ -487,4 +503,162 @@ export class MusicCommandHandler {
+       console.error('[MusicCmd] Failed to save music request history:', err.message);
+     });
+   }
++
++  // ─── Help ──────────────────────────────────────────────
++
++  private handleHelp(bot: VoiceBot, userClid: number): void {
++    const lines = [
++      'Music bot commands:',
++      '!play <url|query> — play now (searches YouTube) · !play resumes',
++      '!pause · !stop · !skip · !prev',
++      '!queue — show queue · !queue <url> — append',
++      '!queue play <n> · !queue remove <n> · !queue clear',
++      '!radio [id] — list / play a radio station',
++      '!playlist [list] — list playlists',
++      '!playlist play <id|name> — replace queue & play',
++      '!playlist queue <id|name> — append · !playlist add <id|name> — add current',
++      '!vol [0-100] — show / set volume · !np — now playing',
++      '!stream <url> [480p|720p|1080p] · !stopstream · !viewers',
++    ];
++    this.reply(bot, userClid, lines.join('\n'));
++  }
++
++  // ─── Playlist Commands ─────────────────────────────────
++
++  private async handlePlaylist(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    const playlists = await this.prisma.playlist.findMany({
++      include: { _count: { select: { songs: true } } },
++      orderBy: { id: 'asc' },
++    });
++
++    if (playlists.length === 0) {
++      this.reply(bot, userClid, 'No playlists. Create one in the web UI (Music Bots → Playlists).');
++      return;
++    }
++
++    const parts = args.trim().split(/\s+/);
++    const sub = (parts[0] || '').toLowerCase();
++    const target = parts.slice(1).join(' ').trim();
++
++    if (!sub || sub === 'list') {
++      const lines = playlists.map((p) => `[${p.id}] ${p.name} (${p._count.songs} tracks)`);
++      this.reply(bot, userClid, `Playlists:\n${lines.join('\n')}\n!playlist play <id|name> — replace queue & play\n!playlist queue <id|name> — append to queue\n!playlist add <id|name> — add current track`);
++      return;
++    }
++
++    if (sub !== 'play' && sub !== 'queue' && sub !== 'add') {
++      this.reply(bot, userClid, 'Usage: !playlist [list|play <id|name>|queue <id|name>|add <id|name>]');
++      return;
++    }
++
++    if (!target) {
++      this.reply(bot, userClid, `Usage: !playlist ${sub} <id|name>`);
++      return;
++    }
++
++    const asId = parseInt(target);
++    const summary = !isNaN(asId)
++      ? playlists.find((p) => p.id === asId)
++      : (playlists.find((p) => p.name.toLowerCase() === target.toLowerCase())
++        ?? playlists.find((p) => p.name.toLowerCase().startsWith(target.toLowerCase())));
++
++    if (!summary) {
++      this.reply(bot, userClid, `Playlist "${target}" not found. Use !playlist to list.`);
++      return;
++    }
++
++    if (sub === 'add') {
++      // Add the currently playing track to the playlist. YouTube/URL tracks
++      // are already downloaded to MUSIC_DIR — they just lack a Song row.
++      const np = bot.nowPlaying;
++      if (!np) {
++        this.reply(bot, userClid, 'Nothing is playing right now.');
++        return;
++      }
++      const serverConfigId = bot.currentConfig.serverConfigId;
++      if (!serverConfigId) {
++        this.reply(bot, userClid, 'Error: bot has no server config.');
++        return;
++      }
++      let song = await this.prisma.song.findFirst({
++        where: { filePath: np.filePath, serverConfigId },
++      });
++      if (!song) {
++        song = await this.prisma.song.create({
++          data: {
++            title: np.title || 'Unknown Title',
++            artist: np.artist ?? null,
++            duration: np.duration ?? null,
++            filePath: np.filePath,
++            source: (np.source as string) ?? 'local',
++            sourceUrl: np.sourceUrl ?? null,
++            serverConfigId,
++          },
++        });
++      }
++      const last = await this.prisma.playlistSong.findFirst({
++        where: { playlistId: summary.id },
++        orderBy: { position: 'desc' },
++        select: { position: true },
++      });
++      const position = (last?.position ?? -1) + 1;
++      try {
++        await this.prisma.playlistSong.create({
++          data: { playlistId: summary.id, songId: song.id, position },
++        });
++        this.reply(bot, userClid, `Added "${song.title}" to "${summary.name}" (position ${position + 1}).`);
++      } catch {
++        this.reply(bot, userClid, `"${song.title}" is already in "${summary.name}".`);
++      }
++      return;
++    }
++
++    const playlist = await this.prisma.playlist.findUnique({
++      where: { id: summary.id },
++      include: { songs: { include: { song: true }, orderBy: { position: 'asc' } } },
++    });
++
++    if (!playlist || playlist.songs.length === 0) {
++      this.reply(bot, userClid, `Playlist "${summary.name}" is empty.`);
++      return;
++    }
++
++    // Same mapping as the /queue/playlist API route
++    const items = playlist.songs.map((ps: any) => ({
++      id: String(ps.song.id),
++      title: ps.song.title,
++      artist: ps.song.artist ?? undefined,
++      duration: ps.song.duration ?? undefined,
++      filePath: ps.song.filePath,
++      source: ps.song.source as any,
++      sourceUrl: ps.song.sourceUrl ?? undefined,
++    }));
++
++    if (sub === 'play') {
++      bot.queue.clear();
++      bot.queue.addMany(items);
++      const first = bot.queue.playAt(0);
++      if (first) {
++        if (first.streamUrl) {
++          await bot.playStream(first);
++        } else {
++          await bot.play(first);
++        }
++      }
++      this.reply(bot, userClid, `Playing playlist "${playlist.name}" (${items.length} tracks).`);
++    } else {
++      bot.queue.addMany(items);
++      if (bot.status !== 'playing' && bot.status !== 'paused') {
++        const first = bot.queue.playAt(0);
++        if (first) {
++          if (first.streamUrl) {
++            await bot.playStream(first);
++          } else {
++            await bot.play(first);
++          }
++        }
++      }
++      this.reply(bot, userClid, `Queued ${items.length} tracks from "${playlist.name}" (queue: ${bot.queue.length}).`);
++    }
++  }
+ }
