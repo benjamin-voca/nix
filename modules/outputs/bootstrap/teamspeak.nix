@@ -220,6 +220,13 @@ spec:
       port: 10022
       targetPort: query-ssh
       protocol: TCP
+    # Voice port for in-cluster TS3-protocol clients — ts6-manager music
+    # bots dial serverConfig.host:9987/UDP with host = this Service, so the
+    # voice port must be reachable under the same name.
+    - name: voice
+      port: 9987
+      targetPort: voice
+      protocol: UDP
 '';
 in {
   chartFiles = {};
