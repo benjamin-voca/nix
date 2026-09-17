@@ -134,7 +134,7 @@ ${tolerations}
               drop: ["ALL"]
       containers:
         - name: backend
-          image: clusterzx/ts6-manager:backend@sha256:ff47f4066e834b1050401e873af2a603a777d592973abd90822a1d4e6931e126
+          image: clusterzx/ts6-manager:backend-dev@sha256:50169ab1990e0a3867bfccb5ca8230577e73bc3149c31583596cc0f0f9fdb5ed
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -257,7 +257,7 @@ ${tolerations}
       automountServiceAccountToken: false
       containers:
         - name: frontend
-          image: clusterzx/ts6-manager:frontend@sha256:aadbca641e507a9cc9ef1cfda788a7fb9b3456feecb0f36c05381620b37da707
+          image: clusterzx/ts6-manager:frontend-dev@sha256:0e97a9e6d999c3693773b84cdb74bb8ab99bcd86d8236ac4d2e5ba1efa832bee
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
