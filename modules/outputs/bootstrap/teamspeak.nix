@@ -14,8 +14,15 @@
 #   - Exposed as a MetalLB LoadBalancer on 192.168.1.246 (LAN VIP, free in
 #     the 192.168.1.240-250 pool; .240 ingress, .245 parked minecraft).
 #     Voice is UDP 9987 so Cloudflare tunnel/ingress is not an option.
-#   - Only voice + file transfer ports are published. Web query (10080) and
-#     SSH query (10022) stay disabled, matching upstream's compose example.
+#   - Only voice + file transfer ports are published on the LAN LB.
+#     Query ports (10080 web / 10022 ssh) live on a separate ClusterIP-only
+#     Service (`teamspeak-query`) so only in-cluster consumers (ts6-manager)
+#     can reach them. The serveradmin query password comes from the injected
+#     ts6-query-secret (sops).
+#
+# ts6-manager: https://ts6.voltrum.co — web UI that drives this server via
+#   WebQuery HTTP. Its WebQuery API key is generated once (apikeyadd
+#   scope=manage lifetime=0) and pasted into the manager UI.
 #
 # First-boot admin:
 #   The ServerAdmin privilege key is printed to the container log on the
@@ -102,9 +109,28 @@ ${tolerations}
             - name: filetransfer
               containerPort: 30033
               protocol: TCP
+            - name: webquery
+              containerPort: 10080
+              protocol: TCP
+            - name: query-ssh
+              containerPort: 10022
+              protocol: TCP
           env:
             - name: TSSERVER_LICENSE_ACCEPTED
               value: accept
+            # Web Query HTTP API — required by ts6-manager
+            - name: TSSERVER_QUERY_HTTP_ENABLED
+              value: "1"
+            # SSH query — used by ts6-manager bot flow event triggers
+            - name: TSSERVER_QUERY_SSH_ENABLED
+              value: "1"
+            # serveradmin query password (sops-injected; deterministic so
+            # ts6-manager SSH/HTTP auth survives pod recreation)
+            - name: TSSERVER_QUERY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ts6-query-secret
+                  key: query-admin-password
           volumeMounts:
             - name: data
               mountPath: /var/tsserver
@@ -170,6 +196,31 @@ spec:
       targetPort: filetransfer
       protocol: TCP
 '';
+
+  # Cluster-internal query service — NOT on the LoadBalancer. Only pods in
+  # the cluster (ts6-manager backend) talk to the WebQuery/SSH interfaces.
+  queryService = ''
+apiVersion: v1
+kind: Service
+metadata:
+  name: teamspeak-query
+  namespace: teamspeak
+  labels:
+    app.kubernetes.io/name: teamspeak
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: teamspeak
+  ports:
+    - name: webquery
+      port: 10080
+      targetPort: webquery
+      protocol: TCP
+    - name: query-ssh
+      port: 10022
+      targetPort: query-ssh
+      protocol: TCP
+'';
 in {
   chartFiles = {};
 
@@ -178,6 +229,7 @@ in {
     "26a-teamspeak-pvc.yaml" = pvc;
     "26b-teamspeak-deployment.yaml" = deployment;
     "26c-teamspeak-service.yaml" = service;
+    "26d-teamspeak-query-service.yaml" = queryService;
   };
 
   order = [
@@ -185,5 +237,6 @@ in {
     "26a-teamspeak-pvc.yaml"
     "26b-teamspeak-deployment.yaml"
     "26c-teamspeak-service.yaml"
+    "26d-teamspeak-query-service.yaml"
   ];
 }

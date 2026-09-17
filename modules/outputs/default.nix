@@ -57,6 +57,7 @@
     clusttaMod = import ./bootstrap/clustta.nix {inherit pkgs lib;};
     upgAssetsMod = import ./bootstrap/upg-assets.nix {inherit pkgs lib;};
     teamspeakMod = import ./bootstrap/teamspeak.nix {inherit pkgs lib;};
+    ts6ManagerMod = import ./bootstrap/ts6-manager.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -100,7 +101,8 @@
       // nextcloudMod.inlineFiles
       // clusttaMod.inlineFiles
       // upgAssetsMod.inlineFiles
-      // teamspeakMod.inlineFiles;
+      // teamspeakMod.inlineFiles
+      // ts6ManagerMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -486,6 +488,20 @@
       cat $out/26b-teamspeak-deployment.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/26c-teamspeak-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/26d-teamspeak-query-service.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/27-ts6-manager-pvc.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/27a-ts6-manager-backend.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/27b-ts6-manager-frontend.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/27c-ts6-manager-sidecar.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/27d-ts6-manager-services.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/27e-ts6-manager-ingress.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml

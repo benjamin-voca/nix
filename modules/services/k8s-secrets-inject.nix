@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta upg-assets; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta upg-assets teamspeak; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -284,6 +284,33 @@ in {
               --from-literal=rcon-password="$MC_RCON" \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected minecraft-rcon-secret"
+          fi
+
+          
+          # TeamSpeak 6 serveradmin query password
+          if [ -f /run/secrets/ts6-query-admin-password ]; then
+            TS_QAP=$(cat /run/secrets/ts6-query-admin-password)
+            $kubectl create secret generic ts6-query-secret \
+              --namespace=teamspeak \
+              --from-literal=query-admin-password="$TS_QAP" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected ts6-query-secret"
+          fi
+
+          
+          # TS6 Manager JWT + credential-encryption keys
+          if [ -f /run/secrets/ts6-manager-jwt-secret ]; then
+            TS6_JWT=$(cat /run/secrets/ts6-manager-jwt-secret)
+            TS6_ARGS="--from-literal=JWT_SECRET=$TS6_JWT"
+            if [ -f /run/secrets/ts6-manager-encryption-key ]; then
+              TS6_ENC=$(cat /run/secrets/ts6-manager-encryption-key)
+              TS6_ARGS="$TS6_ARGS --from-literal=ENCRYPTION_KEY=$TS6_ENC"
+            fi
+            $kubectl create secret generic ts6-manager-secret \
+              --namespace=teamspeak \
+              $TS6_ARGS \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected ts6-manager-secret"
           fi
 
           
