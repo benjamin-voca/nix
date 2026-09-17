@@ -1,26 +1,60 @@
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..ea839ab 100644
+index 379ee96..a446151 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -2,7 +2,7 @@ import type { PrismaClient } from '../../generated/prisma/index.js';
+@@ -1,8 +1,8 @@
+ import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
- import type { QueueItem } from './playlist/queue.js';
+-import type { QueueItem } from './playlist/queue.js';
 -import { downloadYouTube } from './audio/youtube.js';
++import type { QueueItem, RepeatMode } from './playlist/queue.js';
 +import { downloadYouTube, searchYouTube } from './audio/youtube.js';
  
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
-@@ -10,7 +10,7 @@ const CMD_PREFIX = '!';
+@@ -10,7 +10,8 @@ const CMD_PREFIX = '!';
  const MUSIC_COMMANDS = new Set([
    'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
    'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
 -  'stream', 'stopstream', 'viewers',
 +  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
++  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
  ]);
  
  /**
-@@ -108,6 +108,13 @@ export class MusicCommandHandler {
+@@ -22,6 +23,16 @@ const MUSIC_COMMANDS = new Set([
+  */
+ export class MusicCommandHandler {
+   private registeredBots = new Set<number>();
++  // !search → !pick state, per invoker (3 minute expiry)
++  private pendingSearches = new Map<number, {
++    results: Array<{ id: string; title: string; artist?: string; duration?: number }>;
++    expires: number;
++  }>();
++  // !sleep timers per bot
++  private sleepTimers = new Map<number, { timer: ReturnType<typeof setTimeout>; endsAt: number; invokerClid: number }>();
++  // AutoDJ state per bot (runtime only — default off after restart)
++  private autoDjEnabled = new Map<number, boolean>();
++  private recentAutoDj = new Map<number, string[]>();
+ 
+   constructor(
+     private prisma: PrismaClient,
+@@ -42,6 +53,13 @@ export class MusicCommandHandler {
+       });
+     });
+ 
++    // AutoDJ: keep the music going when the queue runs dry
++    bot.on('trackEnd', () => {
++      this.maybeAutoDj(botId, bot).catch((err) => {
++        console.error(`[MusicCmd] AutoDJ error on bot ${botId}: ${err.message}`);
++      });
++    });
++
+     console.log(`[MusicCmd] Registered text command listener on bot ${botId}`);
+   }
+ 
+@@ -108,6 +126,35 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -31,10 +65,32 @@ index 379ee96..ea839ab 100644
 +        case 'help':
 +          this.handleHelp(bot, userClid);
 +          break;
++        case 'repeat':
++        case 'loop':
++          this.handleRepeat(bot, userClid, args);
++          break;
++        case 'shuffle':
++          this.handleShuffle(bot, userClid, args);
++          break;
++        case 'search':
++          await this.handleSearch(bot, userClid, args);
++          break;
++        case 'pick':
++          await this.handlePick(bot, userClid, args);
++          break;
++        case 'seek':
++          this.handleSeek(bot, userClid, args);
++          break;
++        case 'sleep':
++          this.handleSleep(botId, bot, userClid, args);
++          break;
++        case 'autodj':
++          this.handleAutoDj(botId, bot, userClid, args);
++          break;
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -183,19 +190,28 @@ export class MusicCommandHandler {
+@@ -183,19 +230,33 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -62,14 +118,18 @@ index 379ee96..ea839ab 100644
      }
  
 -    this.reply(bot, userClid, 'Loading...');
--
++    await this.downloadAndPlay(bot, userClid, url);
++  }
+ 
++  /** Download (if needed) and play/queue a YouTube URL — shared by !play and !pick. */
++  private async downloadAndPlay(bot: VoiceBot, userClid: number, url: string): Promise<void> {
      try {
 -      const { filePath, info } = await downloadYouTube(args, MUSIC_DIR);
 +      const { filePath, info } = await downloadYouTube(url, MUSIC_DIR);
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +220,7 @@ export class MusicCommandHandler {
+@@ -204,7 +265,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -78,7 +138,7 @@ index 379ee96..ea839ab 100644
        };
  
        bot.queue.add(queueItem);
-@@ -487,4 +503,162 @@ export class MusicCommandHandler {
+@@ -487,4 +548,378 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -89,17 +149,233 @@ index 379ee96..ea839ab 100644
 +    const lines = [
 +      'Music bot commands:',
 +      '!play <url|query> — play now (searches YouTube) · !play resumes',
++      '!search <query> → !pick <1-5> — pick from results',
 +      '!pause · !stop · !skip · !prev',
-+      '!queue — show queue · !queue <url> — append',
-+      '!queue play <n> · !queue remove <n> · !queue clear',
++      '!queue — show · !queue <url> — append · !queue clear',
++      '!queue play <n> · !queue remove <n>',
++      '!repeat [off|one|all] · !shuffle [on|off]',
++      '!seek <m:ss|+s|-s> · !np — position / now playing',
 +      '!radio [id] — list / play a radio station',
-+      '!playlist [list] — list playlists',
-+      '!playlist play <id|name> — replace queue & play',
-+      '!playlist queue <id|name> — append · !playlist add <id|name> — add current',
-+      '!vol [0-100] — show / set volume · !np — now playing',
++      '!playlist [list|play|queue|add] <id|name>',
++      '!sleep <min|off> — stop timer · !autodj [on|off]',
++      '!vol [0-100] — volume',
 +      '!stream <url> [480p|720p|1080p] · !stopstream · !viewers',
 +    ];
 +    this.reply(bot, userClid, lines.join('\n'));
++  }
++
++  // ─── Repeat / Shuffle / Seek / Sleep / AutoDJ ─────────
++
++  private handleRepeat(bot: VoiceBot, userClid: number, args: string): void {
++    const MODES: Record<string, RepeatMode> = {
++      off: 'off', none: 'off', stop: 'off',
++      one: 'track', track: 'track', single: 'track',
++      all: 'queue', queue: 'queue',
++    };
++    const label = (m: RepeatMode) => (m === 'off' ? 'off' : m === 'queue' ? 'whole queue' : 'current track');
++    if (!args) {
++      const order: RepeatMode[] = ['off', 'queue', 'track'];
++      const next = order[(order.indexOf(bot.queue.repeat) + 1) % order.length];
++      bot.queue.setRepeat(next);
++      this.reply(bot, userClid, `Repeat: ${label(next)}`);
++      return;
++    }
++    const mode = MODES[args.toLowerCase()];
++    if (!mode) {
++      this.reply(bot, userClid, 'Usage: !repeat [off|one|all]');
++      return;
++    }
++    bot.queue.setRepeat(mode);
++    this.reply(bot, userClid, `Repeat: ${label(mode)}`);
++  }
++
++  private handleShuffle(bot: VoiceBot, userClid: number, args: string): void {
++    if (args === 'on' || args === 'off') {
++      bot.queue.setShuffle(args === 'on');
++    } else {
++      bot.queue.setShuffle(!bot.queue.shuffle);
++    }
++    this.reply(bot, userClid, `Shuffle: ${bot.queue.shuffle ? 'on' : 'off'}`);
++  }
++
++  private handleSearch(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    if (!args) {
++      this.reply(bot, userClid, 'Usage: !search <query> — then !pick <1-5>');
++      return Promise.resolve();
++    }
++    this.reply(bot, userClid, `Searching: ${args}...`);
++    return searchYouTube(args, 5).then((results) => {
++      if (!results || results.length === 0) {
++        this.reply(bot, userClid, `No results found for "${args}".`);
++        return;
++      }
++      this.pendingSearches.set(userClid, { results, expires: Date.now() + 3 * 60_000 });
++      const fmtDur = (d?: number) => (d ? ` [${Math.floor(d / 60)}:${String(Math.floor(d % 60)).padStart(2, '0')}]` : '');
++      const lines = results.map((r, i) => `[${i + 1}] ${r.title}${r.artist ? ` — ${r.artist}` : ''}${fmtDur(r.duration)}`);
++      this.reply(bot, userClid, `Results for "${args}":\n${lines.join('\n')}\n!pick <1-${results.length}> within 3 minutes.`);
++    }).catch((err: any) => {
++      this.reply(bot, userClid, `Search failed: ${err.message}`);
++    });
++  }
++
++  private async handlePick(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    const pending = this.pendingSearches.get(userClid);
++    if (!pending || pending.expires < Date.now()) {
++      this.pendingSearches.delete(userClid);
++      this.reply(bot, userClid, 'No active search. Use !search <query> first.');
++      return;
++    }
++    const n = parseInt(args);
++    if (isNaN(n) || n < 1 || n > pending.results.length) {
++      this.reply(bot, userClid, `Usage: !pick <1-${pending.results.length}>`);
++      return;
++    }
++    const r = pending.results[n - 1];
++    this.pendingSearches.delete(userClid);
++    this.reply(bot, userClid, `Picked [${n}]: ${r.title} — loading...`);
++    await this.downloadAndPlay(bot, userClid, `https://www.youtube.com/watch?v=${r.id}`);
++  }
++
++  private parseDurationSeconds(text: string): number | null {
++    const t = text.trim().toLowerCase();
++    if (/^\d+$/.test(t)) return parseInt(t);
++    const m = t.match(/^(\d+):([0-5]?\d)$/);
++    if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
++    return null;
++  }
++
++  private handleSeek(bot: VoiceBot, userClid: number, args: string): void {
++    const prog = bot.playbackProgress;
++    if (!prog) {
++      this.reply(bot, userClid, 'Nothing playing (live streams cannot seek).');
++      return;
++    }
++    const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
++    if (!args) {
++      this.reply(bot, userClid, `Position: ${fmt(prog.position)} / ${fmt(prog.duration)}. Usage: !seek <sec|m:ss|+s|-s>`);
++      return;
++    }
++    let target: number | null = null;
++    if (/^\+\d+/.test(args)) {
++      const d = this.parseDurationSeconds(args.slice(1));
++      target = d === null ? null : prog.position + d;
++    } else if (/^-\d+/.test(args)) {
++      const d = this.parseDurationSeconds(args.slice(1));
++      target = d === null ? null : prog.position - d;
++    } else {
++      target = this.parseDurationSeconds(args);
++    }
++    if (target === null || isNaN(target)) {
++      this.reply(bot, userClid, 'Usage: !seek <sec|m:ss|+s|-s>');
++      return;
++    }
++    const max = prog.duration > 0 ? prog.duration - 1 : target;
++    const clamped = Math.max(0, Math.min(target, Math.max(0, max)));
++    bot.seek(clamped);
++    this.reply(bot, userClid, `Seeked to ${fmt(clamped)}.`);
++  }
++
++  private handleSleep(botId: number, bot: VoiceBot, userClid: number, args: string): void {
++    const existing = this.sleepTimers.get(botId);
++    if (!args) {
++      if (existing) {
++        const left = Math.max(0, Math.ceil((existing.endsAt - Date.now()) / 60000));
++        this.reply(bot, userClid, `Sleep timer: stopping in ${left} min.`);
++      } else {
++        this.reply(bot, userClid, 'Usage: !sleep <minutes> · !sleep off');
++      }
++      return;
++    }
++    if (args.toLowerCase() === 'off' || args === '0') {
++      if (existing) {
++        clearTimeout(existing.timer);
++        this.sleepTimers.delete(botId);
++      }
++      this.reply(bot, userClid, 'Sleep timer cancelled.');
++      return;
++    }
++    const mins = parseFloat(args);
++    if (isNaN(mins) || mins <= 0 || mins > 720) {
++      this.reply(bot, userClid, 'Usage: !sleep <1-720 minutes|off>');
++      return;
++    }
++    if (existing) clearTimeout(existing.timer);
++    const endsAt = Date.now() + mins * 60_000;
++    const timer = setTimeout(() => {
++      this.sleepTimers.delete(botId);
++      try {
++        bot.stopAudio();
++        bot.queue.clear();
++      } catch { }
++      this.reply(bot, userClid, 'Sleep timer finished — playback stopped.');
++    }, mins * 60_000);
++    this.sleepTimers.set(botId, { timer, endsAt, invokerClid: userClid });
++    this.reply(bot, userClid, `Sleep timer set: stopping in ${mins} min.`);
++  }
++
++  private handleAutoDj(botId: number, bot: VoiceBot, userClid: number, args: string): void {
++    if (!args || args === 'status') {
++      const on = this.autoDjEnabled.get(botId);
++      this.reply(bot, userClid, `AutoDJ: ${on ? 'on — plays random library tracks when the queue runs dry' : 'off'}. Usage: !autodj on|off`);
++      return;
++    }
++    if (args === 'on') {
++      this.autoDjEnabled.set(botId, true);
++      this.reply(bot, userClid, "AutoDJ on — I'll keep the music going from the library.");
++      this.maybeAutoDj(botId, bot).catch(() => { });
++      return;
++    }
++    if (args === 'off') {
++      this.autoDjEnabled.set(botId, false);
++      this.reply(bot, userClid, 'AutoDJ off.');
++      return;
++    }
++    this.reply(bot, userClid, 'Usage: !autodj [on|off]');
++  }
++
++  /** AutoDJ: queue empty + idle → play a weighted-random library track. */
++  private async maybeAutoDj(botId: number, bot: VoiceBot): Promise<void> {
++    if (!this.autoDjEnabled.get(botId)) return;
++    if (bot.queue.length > 0 || bot.nowPlaying || bot.status === 'stopped') return;
++    const dbBot = await this.prisma.musicBot.findUnique({ where: { id: botId }, select: { serverConfigId: true } });
++    if (!dbBot) return;
++    const songs = await this.prisma.song.findMany({ where: { serverConfigId: dbBot.serverConfigId } });
++    if (songs.length === 0) return;
++
++    // Weight by play history — favourites come up more often
++    const history = await this.prisma.musicRequest.findMany({
++      where: { serverConfigId: dbBot.serverConfigId },
++      select: { url: true },
++    });
++    const weights = new Map<string, number>();
++    for (const h of history) weights.set(h.url, (weights.get(h.url) ?? 0) + 1);
++
++    const recent = new Set(this.recentAutoDj.get(botId) ?? []);
++    const fresh = songs.filter((s) => !recent.has(s.sourceUrl ?? s.filePath));
++    const candidates = fresh.length > 0 ? fresh : songs;
++    const weightOf = (s: any) => 1 + (weights.get(s.sourceUrl ?? '') ?? 0);
++    const total = candidates.reduce((acc, s) => acc + weightOf(s), 0);
++    let roll = Math.random() * total;
++    let picked = candidates[candidates.length - 1];
++    for (const s of candidates) {
++      roll -= weightOf(s);
++      if (roll <= 0) { picked = s; break; }
++    }
++    this.recentAutoDj.set(botId, (this.recentAutoDj.get(botId) ?? []).concat(picked.sourceUrl ?? picked.filePath).slice(-5));
++
++    const item: QueueItem = {
++      id: `lib_${picked.id}_${Date.now()}`,
++      title: picked.title,
++      artist: picked.artist ?? undefined,
++      duration: picked.duration ?? undefined,
++      filePath: picked.filePath,
++      source: picked.source as any,
++      sourceUrl: picked.sourceUrl ?? undefined,
++    };
++    bot.queue.add(item);
++    const first = bot.queue.playAt(bot.queue.length - 1);
++    if (first) await bot.play(first);
++    console.log(`[MusicCmd] AutoDJ bot ${botId}: ${picked.title}`);
 +  }
 +
 +  // ─── Playlist Commands ─────────────────────────────────
@@ -241,3 +517,51 @@ index 379ee96..ea839ab 100644
 +    }
 +  }
  }
+diff --git a/packages/backend/src/voice/tslib/client.ts b/packages/backend/src/voice/tslib/client.ts
+index eb9f18a..1b86927 100644
+--- a/packages/backend/src/voice/tslib/client.ts
++++ b/packages/backend/src/voice/tslib/client.ts
+@@ -122,6 +122,11 @@ export class Ts3Client extends EventEmitter {
+   // Channel map (populated during init sequence for auto-move)
+   private channelMap = new Map<string, number>(); // channel_name → cid
+ 
++  /** cid for a channel name (populated from channellist during join). */
++  getChannelCid(name: string): number | undefined {
++    return this.channelMap.get(name);
++  }
++
+   constructor() {
+     super();
+   }
+diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
+index 1af2ba9..1913d13 100644
+--- a/packages/backend/src/voice/voice-bot.ts
++++ b/packages/backend/src/voice/voice-bot.ts
+@@ -251,6 +251,19 @@ export class VoiceBot extends EventEmitter {
+     }
+     try {
+       this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
++      this.updateNowPlayingChannelTopic(title);
++    } catch { }
++  }
++
++  /** Mirror now playing into the bot channel's description (topic). */
++  updateNowPlayingChannelTopic(title: string | null): void {
++    const channel = this.config.defaultChannel;
++    if (!channel) return;
++    const cid = this.client.getChannelCid(channel);
++    if (!cid) return;
++    const desc = title ? `\u266A ${title}` : 'Music bot idle';
++    try {
++      this.client.sendCommand(buildCommand('channeledit', { cid, channel_description: desc }));
+     } catch { }
+   }
+ 
+@@ -259,6 +272,7 @@ export class VoiceBot extends EventEmitter {
+     if (this._status === 'stopped') return;
+     try {
+       this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
++      this.updateNowPlayingChannelTopic(null);
+     } catch { }
+   }
+ 
