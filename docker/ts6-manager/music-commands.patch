@@ -36,7 +36,7 @@ index b4d5eb5..4cf3b67 100644
 +  }
  }
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..468c96a 100644
+index 379ee96..be72016 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
 @@ -1,8 +1,8 @@
@@ -57,7 +57,7 @@ index 379ee96..468c96a 100644
 -  'stream', 'stopstream', 'viewers',
 +  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
 +  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
-+  'duck', 'crossfade', 'xfade',
++  'duck', 'crossfade', 'xfade', 'duckdelay',
  ]);
  
  /**
@@ -92,7 +92,7 @@ index 379ee96..468c96a 100644
      console.log(`[MusicCmd] Registered text command listener on bot ${botId}`);
    }
  
-@@ -108,6 +127,42 @@ export class MusicCommandHandler {
+@@ -108,6 +127,45 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -128,6 +128,9 @@ index 379ee96..468c96a 100644
 +        case 'duck':
 +          this.handleDuck(bot, userClid, args);
 +          break;
++        case 'duckdelay':
++          this.handleDuckDelay(bot, userClid, args);
++          break;
 +        case 'crossfade':
 +        case 'xfade':
 +          this.handleCrossfade(bot, userClid, args);
@@ -135,7 +138,7 @@ index 379ee96..468c96a 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -183,19 +238,33 @@ export class MusicCommandHandler {
+@@ -183,19 +241,33 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -174,7 +177,7 @@ index 379ee96..468c96a 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +273,7 @@ export class MusicCommandHandler {
+@@ -204,7 +276,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -183,7 +186,7 @@ index 379ee96..468c96a 100644
        };
  
        bot.queue.add(queueItem);
-@@ -487,4 +556,407 @@ export class MusicCommandHandler {
+@@ -487,4 +559,422 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -204,6 +207,7 @@ index 379ee96..468c96a 100644
 +      '!playlist [list|play|queue|add] <id|name>',
 +      '!sleep <min|off> — stop timer · !autodj [on|off]',
 +      '!duck on|off — volume ducks while others speak',
++      '!duckdelay <ms> — require sustained speech before ducking',
 +      '!crossfade <0-15s> — blend between tracks',
 +      '!vol [0-100] — volume',
 +      '!stream <url> [480p|720p|1080p] · !stopstream · !viewers',
@@ -378,6 +382,20 @@ index 379ee96..468c96a 100644
 +      return;
 +    }
 +    this.reply(bot, userClid, 'Usage: !autodj [on|off]');
++  }
++
++  private handleDuckDelay(bot: VoiceBot, userClid: number, args: string): void {
++    if (!args) {
++      this.reply(bot, userClid, `Duck delay: ${bot.duckDelay}ms of sustained speech before ducking. Usage: !duckdelay <0-5000 ms>`);
++      return;
++    }
++    const ms = parseInt(args);
++    if (isNaN(ms) || ms < 0 || ms > 5000) {
++      this.reply(bot, userClid, 'Usage: !duckdelay <0-5000 ms>');
++      return;
++    }
++    bot.setDuckDelay(ms);
++    this.reply(bot, userClid, ms === 0 ? 'Duck delay off — instant ducking.' : `Duck delay set: ducking after ${ms}ms of sustained speech.`);
 +  }
 +
 +  private handleDuck(bot: VoiceBot, userClid: number, args: string): void {
@@ -635,10 +653,10 @@ index eb9f18a..1b86927 100644
      super();
    }
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..c7e4207 100644
+index 1af2ba9..6a795e2 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
-@@ -85,6 +85,15 @@ export class VoiceBot extends EventEmitter {
+@@ -85,6 +85,18 @@ export class VoiceBot extends EventEmitter {
    private _lastError: string = '';
    private identity: IdentityData | null = null;
    private playbackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -651,10 +669,13 @@ index 1af2ba9..c7e4207 100644
 +  private duckGain = 1;
 +  private lastVoiceAt = 0;
 +  private duckDebugCount = 0;
++  // Duck attack delay: only duck once voice is sustained this long (ms)
++  private duckDelayMs = 0;
++  private voiceStartAt = 0;
    private _nowPlaying: QueueItem | null = null;
  
    // PCM-level playback state
-@@ -137,6 +146,8 @@ export class VoiceBot extends EventEmitter {
+@@ -137,6 +149,8 @@ export class VoiceBot extends EventEmitter {
      this.config = config;
      this._originalNickname = config.nickname;
      this.client = new Ts3Client();
@@ -663,7 +684,7 @@ index 1af2ba9..c7e4207 100644
      this.pipeline = new AudioPipeline();
      this.queue = new PlayQueue();
  
-@@ -251,6 +262,19 @@ export class VoiceBot extends EventEmitter {
+@@ -251,6 +265,19 @@ export class VoiceBot extends EventEmitter {
      }
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
@@ -683,7 +704,7 @@ index 1af2ba9..c7e4207 100644
      } catch { }
    }
  
-@@ -259,6 +283,7 @@ export class VoiceBot extends EventEmitter {
+@@ -259,6 +286,7 @@ export class VoiceBot extends EventEmitter {
      if (this._status === 'stopped') return;
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
@@ -691,7 +712,7 @@ index 1af2ba9..c7e4207 100644
      } catch { }
    }
  
-@@ -536,6 +561,56 @@ export class VoiceBot extends EventEmitter {
+@@ -536,6 +564,72 @@ export class VoiceBot extends EventEmitter {
      this.emit('volumeChange', this.config.volume);
    }
  
@@ -712,6 +733,15 @@ index 1af2ba9..c7e4207 100644
 +
 +  get ducking(): boolean {
 +    return this.duckEnabled;
++  }
++
++  /** Require voice sustained this long (ms) before ducking engages. */
++  setDuckDelay(ms: number): void {
++    this.duckDelayMs = Math.max(0, Math.min(5000, ms));
++  }
++
++  get duckDelay(): number {
++    return this.duckDelayMs;
 +  }
 +
 +  /**
@@ -738,23 +768,34 @@ index 1af2ba9..c7e4207 100644
 +      sum += v * v;
 +    }
 +    const rms = Math.sqrt(sum / Math.max(1, samples));
-+    if (rms > 500) this.lastVoiceAt = Date.now();
++    const now = Date.now();
++    if (rms > 500) {
++      // Voice episode starts on first loud packet; gaps > 300ms reset it
++      if (this.voiceStartAt === 0 || now - this.lastVoiceAt > 300) this.voiceStartAt = now;
++      this.lastVoiceAt = now;
++    } else if (this.voiceStartAt !== 0 && now - this.lastVoiceAt > 300) {
++      this.voiceStartAt = 0;
++    }
 +    this.duckDebugCount++;
 +    if (this.duckDebugCount <= 6 || this.duckDebugCount % 2000 === 0) {
-+      console.log(`[DuckDebug] sender=${senderId} rms=${Math.round(rms)} duckGain=${this.duckGain.toFixed(2)} pkts=${this.duckDebugCount}`);
++      console.log(`[DuckDebug] sender=${senderId} rms=${Math.round(rms)} duckGain=${this.duckGain.toFixed(2)} voiceStartAge=${this.voiceStartAt ? now - this.voiceStartAt : -1}ms pkts=${this.duckDebugCount}`);
 +    }
 +  }
 +
    skip(): void {
      this.stopIcyPolling();
      this.stopPlayback();
-@@ -666,13 +741,80 @@ export class VoiceBot extends EventEmitter {
+@@ -666,13 +760,84 @@ export class VoiceBot extends EventEmitter {
          nextDue = now + FRAME_MS;
        }
  
-+      // Talk-ducking gain smoothing (drop to 25% while others speak)
++      // Talk-ducking gain smoothing (drop to 25% once voice is sustained)
 +      if (this.duckEnabled) {
-+        const target = Date.now() - this.lastVoiceAt < 1200 ? 0.25 : 1;
++        const speaking =
++          this.voiceStartAt !== 0 &&
++          Date.now() - this.voiceStartAt >= this.duckDelayMs &&
++          Date.now() - this.lastVoiceAt < 1200;
++        const target = speaking ? 0.25 : 1;
 +        this.duckGain += (target - this.duckGain) * 0.3;
 +      }
 +
@@ -830,7 +871,7 @@ index 1af2ba9..c7e4207 100644
        // End-of-track handling
        if (this.frameIndex >= this.pcmFrames.length) {
          this.client.sendVoiceStop();
-@@ -729,6 +871,8 @@ export class VoiceBot extends EventEmitter {
+@@ -729,6 +894,8 @@ export class VoiceBot extends EventEmitter {
      this.pcmFrames = [];
      this.frameIndex = 0;
      this.pausedAtFrame = 0;
