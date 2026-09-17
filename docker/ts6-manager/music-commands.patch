@@ -635,7 +635,7 @@ index eb9f18a..1b86927 100644
      super();
    }
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..1ebcd8f 100644
+index 1af2ba9..c7e4207 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
 @@ -85,6 +85,15 @@ export class VoiceBot extends EventEmitter {
@@ -691,7 +691,7 @@ index 1af2ba9..1ebcd8f 100644
      } catch { }
    }
  
-@@ -536,6 +561,62 @@ export class VoiceBot extends EventEmitter {
+@@ -536,6 +561,56 @@ export class VoiceBot extends EventEmitter {
      this.emit('volumeChange', this.config.volume);
    }
  
@@ -719,24 +719,18 @@ index 1af2ba9..1ebcd8f 100644
 +   * energy; speech above a threshold ducks the music (see playback loop).
 +   * Payload layout varies by server build — try both offsets.
 +   */
++  /**
++   * Incoming voice packets from the bot's channel. TS6 S2C voice payload:
++   * [packetId:2][clientId:2][codec:1][opus...]. Decodes and measures RMS;
++   * speech above a threshold ducks the music (see playback loop). Our own
++   * packets (the music itself — the server echoes them back) are skipped.
++   */
 +  private handleIncomingVoice(buf: Buffer): void {
-+    if (!this.duckEnabled || buf.length < 5) return;
-+    const senderId = buf.readUInt16BE(0);
-+    if (this.duckDebugCount < 3) {
-+      this.duckDebugCount++;
-+      console.log(`[DuckDebug] pkt: len=${buf.length} sender=${senderId} ts3id=${this.ts3ClientId} head=${buf.subarray(0, 10).toString('hex')}`);
-+    }
++    if (!this.duckEnabled || buf.length < 6) return;
++    const senderId = buf.readUInt16BE(2);
 +    if (senderId === this.ts3ClientId) return;
-+    let pcm = this.pipeline.decodeVoicePacket(buf.subarray(3));
-+    const off3 = !!pcm;
-+    if (!pcm) pcm = this.pipeline.decodeVoicePacket(buf.subarray(4));
-+    if (!pcm) {
-+      if (this.duckDebugCount < 12) {
-+        this.duckDebugCount++;
-+        console.log(`[DuckDebug] decode FAILED: len=${buf.length} sender=${senderId} head=${buf.subarray(0, 10).toString('hex')}`);
-+      }
-+      return;
-+    }
++    const pcm = this.pipeline.decodeVoicePacket(buf.subarray(5));
++    if (!pcm) return;
 +    let sum = 0;
 +    const samples = Math.floor(pcm.length / 2);
 +    for (let i = 0; i < samples; i++) {
@@ -745,16 +739,16 @@ index 1af2ba9..1ebcd8f 100644
 +    }
 +    const rms = Math.sqrt(sum / Math.max(1, samples));
 +    if (rms > 500) this.lastVoiceAt = Date.now();
-+    if (this.duckDebugCount < 20) {
-+      this.duckDebugCount++;
-+      console.log(`[DuckDebug] ok sender=${senderId} rms=${Math.round(rms)} age=${Date.now() - this.lastVoiceAt}ms`);
++    this.duckDebugCount++;
++    if (this.duckDebugCount <= 6 || this.duckDebugCount % 2000 === 0) {
++      console.log(`[DuckDebug] sender=${senderId} rms=${Math.round(rms)} duckGain=${this.duckGain.toFixed(2)} pkts=${this.duckDebugCount}`);
 +    }
 +  }
 +
    skip(): void {
      this.stopIcyPolling();
      this.stopPlayback();
-@@ -666,13 +747,80 @@ export class VoiceBot extends EventEmitter {
+@@ -666,13 +741,80 @@ export class VoiceBot extends EventEmitter {
          nextDue = now + FRAME_MS;
        }
  
@@ -836,7 +830,7 @@ index 1af2ba9..1ebcd8f 100644
        // End-of-track handling
        if (this.frameIndex >= this.pcmFrames.length) {
          this.client.sendVoiceStop();
-@@ -729,6 +877,8 @@ export class VoiceBot extends EventEmitter {
+@@ -729,6 +871,8 @@ export class VoiceBot extends EventEmitter {
      this.pcmFrames = [];
      this.frameIndex = 0;
      this.pausedAtFrame = 0;
