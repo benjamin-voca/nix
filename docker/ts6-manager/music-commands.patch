@@ -1,3 +1,31 @@
+diff --git a/packages/backend/prisma/schema.prisma b/packages/backend/prisma/schema.prisma
+index eed1d64..a9f8413 100644
+--- a/packages/backend/prisma/schema.prisma
++++ b/packages/backend/prisma/schema.prisma
+@@ -66,6 +66,23 @@ model TsServerConfig {
+   radioStations RadioStation[]
+   widgets       Widget[]
+   musicRequests MusicRequest[]
++  playedTracks  PlayedTrack[]
++}
++
++/// Every track aired by a music bot (QuadNix custom — powers !history)
++model PlayedTrack {
++  id             Int            @id @default(autoincrement())
++  title          String
++  artist         String?
++  duration       Float?
++  filePath       String?
++  source         String         @default("local")
++  sourceUrl      String?
++  serverConfigId Int
++  serverConfig   TsServerConfig @relation(fields: [serverConfigId], references: [id], onDelete: Cascade)
++  playedAt       DateTime       @default(now())
++
++  @@index([serverConfigId, playedAt])
+ }
+ 
+ model BotFlow {
 diff --git a/packages/backend/src/voice/audio/pipeline.ts b/packages/backend/src/voice/audio/pipeline.ts
 index b4d5eb5..4cf3b67 100644
 --- a/packages/backend/src/voice/audio/pipeline.ts
@@ -36,32 +64,33 @@ index b4d5eb5..4cf3b67 100644
 +  }
  }
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..be72016 100644
+index 379ee96..eb7e027 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -1,8 +1,8 @@
+@@ -1,8 +1,9 @@
  import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
 -import type { QueueItem } from './playlist/queue.js';
 -import { downloadYouTube } from './audio/youtube.js';
++import fs from "fs";
 +import type { QueueItem, RepeatMode } from './playlist/queue.js';
 +import { downloadYouTube, searchYouTube } from './audio/youtube.js';
  
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
-@@ -10,7 +10,9 @@ const CMD_PREFIX = '!';
+@@ -10,7 +11,9 @@ const CMD_PREFIX = '!';
  const MUSIC_COMMANDS = new Set([
    'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
    'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
 -  'stream', 'stopstream', 'viewers',
 +  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
 +  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
-+  'duck', 'crossfade', 'xfade', 'duckdelay',
++  'duck', 'crossfade', 'xfade', 'duckdelay', 'duckrelease', 'history',
  ]);
  
  /**
-@@ -22,6 +24,16 @@ const MUSIC_COMMANDS = new Set([
+@@ -22,6 +25,16 @@ const MUSIC_COMMANDS = new Set([
   */
  export class MusicCommandHandler {
    private registeredBots = new Set<number>();
@@ -78,7 +107,7 @@ index 379ee96..be72016 100644
  
    constructor(
      private prisma: PrismaClient,
-@@ -42,6 +54,13 @@ export class MusicCommandHandler {
+@@ -42,6 +55,20 @@ export class MusicCommandHandler {
        });
      });
  
@@ -89,10 +118,17 @@ index 379ee96..be72016 100644
 +      });
 +    });
 +
++    // Played-track history: log every track that gets aired
++    bot.on('nowPlaying', (item: QueueItem) => {
++      this.recordHistory(botId, bot, item).catch((err) => {
++        console.error(`[MusicCmd] history write failed on bot ${botId}: ${err.message}`);
++      });
++    });
++
      console.log(`[MusicCmd] Registered text command listener on bot ${botId}`);
    }
  
-@@ -108,6 +127,45 @@ export class MusicCommandHandler {
+@@ -108,6 +135,51 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -131,6 +167,12 @@ index 379ee96..be72016 100644
 +        case 'duckdelay':
 +          this.handleDuckDelay(bot, userClid, args);
 +          break;
++        case 'duckrelease':
++          this.handleDuckRelease(bot, userClid, args);
++          break;
++        case 'history':
++          await this.handleHistory(botId, bot, userClid, args);
++          break;
 +        case 'crossfade':
 +        case 'xfade':
 +          this.handleCrossfade(bot, userClid, args);
@@ -138,7 +180,7 @@ index 379ee96..be72016 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -183,19 +241,33 @@ export class MusicCommandHandler {
+@@ -183,19 +255,33 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -177,7 +219,7 @@ index 379ee96..be72016 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +276,7 @@ export class MusicCommandHandler {
+@@ -204,7 +290,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -186,7 +228,7 @@ index 379ee96..be72016 100644
        };
  
        bot.queue.add(queueItem);
-@@ -487,4 +559,422 @@ export class MusicCommandHandler {
+@@ -487,4 +573,538 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -206,8 +248,10 @@ index 379ee96..be72016 100644
 +      '!radio [id] — list / play a radio station',
 +      '!playlist [list|play|queue|add] <id|name>',
 +      '!sleep <min|off> — stop timer · !autodj [on|off]',
++      '!history [play <n>] — recently played',
 +      '!duck on|off — volume ducks while others speak',
 +      '!duckdelay <ms> — require sustained speech before ducking',
++      '!duckrelease <ms> — hold after speech stops',
 +      '!crossfade <0-15s> — blend between tracks',
 +      '!vol [0-100] — volume',
 +      '!stream <url> [480p|720p|1080p] · !stopstream · !viewers',
@@ -398,6 +442,20 @@ index 379ee96..be72016 100644
 +    this.reply(bot, userClid, ms === 0 ? 'Duck delay off — instant ducking.' : `Duck delay set: ducking after ${ms}ms of sustained speech.`);
 +  }
 +
++  private handleDuckRelease(bot: VoiceBot, userClid: number, args: string): void {
++    if (!args) {
++      this.reply(bot, userClid, `Duck release: music recovers ${bot.duckRelease}ms after speech stops. Usage: !duckrelease <100-10000 ms>`);
++      return;
++    }
++    const ms = parseInt(args);
++    if (isNaN(ms) || ms < 100 || ms > 10000) {
++      this.reply(bot, userClid, 'Usage: !duckrelease <100-10000 ms>');
++      return;
++    }
++    bot.setDuckRelease(ms);
++    this.reply(bot, userClid, `Duck release set: music recovers ${ms}ms after speech stops.`);
++  }
++
 +  private handleDuck(bot: VoiceBot, userClid: number, args: string): void {
 +    if (!args || args === 'status') {
 +      this.reply(bot, userClid, `Talk-ducking: ${bot.ducking ? 'on — volume drops to 25% while others speak' : 'off'}. Usage: !duck on|off`);
@@ -423,6 +481,106 @@ index 379ee96..be72016 100644
 +    }
 +    bot.setCrossfade(s);
 +    this.reply(bot, userClid, s === 0 ? 'Crossfade off — hard cuts.' : `Crossfade set to ${s}s.`);
++  }
++
++  /** Log every aired track (all sources) to the PlayedTrack history. */
++  private async recordHistory(botId: number, bot: VoiceBot, item: QueueItem): Promise<void> {
++    const serverConfigId = bot.currentConfig.serverConfigId;
++    if (!serverConfigId) return;
++    await this.prisma.playedTrack.create({
++      data: {
++        title: item.title || 'Unknown Title',
++        artist: item.artist ?? null,
++        duration: item.duration ?? null,
++        filePath: item.filePath ?? null,
++        source: (item.source as string) ?? 'local',
++        sourceUrl: item.sourceUrl ?? null,
++        serverConfigId,
++      },
++    });
++  }
++
++  private async handleHistory(botId: number, bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    const dbBot = await this.prisma.musicBot.findUnique({ where: { id: botId }, select: { serverConfigId: true } });
++    if (!dbBot) {
++      this.reply(bot, userClid, 'Bot config not found.');
++      return;
++    }
++    const entries = await this.prisma.playedTrack.findMany({
++      where: { serverConfigId: dbBot.serverConfigId },
++      orderBy: { playedAt: 'desc' },
++      take: 10,
++    });
++    if (entries.length === 0) {
++      this.reply(bot, userClid, 'No history yet — play something first.');
++      return;
++    }
++
++    if (!args) {
++      const lines = entries.map((e, i) => {
++        const artist = e.artist ? `${e.artist} - ` : '';
++        const when = e.playedAt.toISOString().substring(11, 16);
++        return `[${i + 1}] ${artist}${e.title} (${when} UTC)`;
++      });
++      this.reply(bot, userClid, `Recently played:\n${lines.join('\n')}\n!history play <n> — play again`);
++      return;
++    }
++
++    // !history play <n> — replay an entry
++    if (args.toLowerCase().startsWith('play')) {
++      const n = parseInt(args.split(/\s+/)[1]);
++      if (isNaN(n) || n < 1 || n > entries.length) {
++        this.reply(bot, userClid, `Usage: !history play <1-${entries.length}>`);
++        return;
++      }
++      const e = entries[n - 1];
++      this.reply(bot, userClid, `Replaying: ${e.title}...`);
++      if (e.source === 'radio' && e.sourceUrl) {
++        const item: QueueItem = {
++          id: `hist_radio_${Date.now()}`,
++          title: e.title,
++          artist: e.artist ?? undefined,
++          duration: e.duration ?? undefined,
++          filePath: '',
++          source: 'radio',
++          streamUrl: e.sourceUrl,
++        };
++        bot.queue.add(item);
++        if (bot.status !== 'playing' && bot.status !== 'paused') {
++          await bot.playStream(item);
++          this.reply(bot, userClid, `Now playing: ${e.title}`);
++        }
++        return;
++      }
++      if (e.filePath && fs.existsSync(e.filePath)) {
++        const item: QueueItem = {
++          id: `hist_${e.id}_${Date.now()}`,
++          title: e.title,
++          artist: e.artist ?? undefined,
++          duration: e.duration ?? undefined,
++          filePath: e.filePath,
++          source: (e.source as any),
++          sourceUrl: e.sourceUrl ?? undefined,
++        };
++        bot.queue.add(item);
++        if (bot.status !== 'playing' && bot.status !== 'paused') {
++          bot.queue.playAt(bot.queue.length - 1);
++          await bot.play(item);
++          this.reply(bot, userClid, `Now playing: ${e.title}`);
++        } else {
++          this.reply(bot, userClid, `Queued: ${e.title} (position #${bot.queue.length})`);
++        }
++        return;
++      }
++      if (e.sourceUrl) {
++        await this.downloadAndPlay(bot, userClid, e.sourceUrl);
++        return;
++      }
++      this.reply(bot, userClid, 'Original file is gone and there is no URL to re-fetch.');
++      return;
++    }
++
++    this.reply(bot, userClid, 'Usage: !history [play <n>]');
 +  }
 +
 +  /** AutoDJ: queue empty + idle → play a weighted-random library track. */
@@ -653,10 +811,10 @@ index eb9f18a..1b86927 100644
      super();
    }
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..6a795e2 100644
+index 1af2ba9..e6db44c 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
-@@ -85,6 +85,18 @@ export class VoiceBot extends EventEmitter {
+@@ -85,6 +85,20 @@ export class VoiceBot extends EventEmitter {
    private _lastError: string = '';
    private identity: IdentityData | null = null;
    private playbackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -672,10 +830,12 @@ index 1af2ba9..6a795e2 100644
 +  // Duck attack delay: only duck once voice is sustained this long (ms)
 +  private duckDelayMs = 0;
 +  private voiceStartAt = 0;
++  // Hold time after speech stops before music returns to full (ms)
++  private duckReleaseMs = 1200;
    private _nowPlaying: QueueItem | null = null;
  
    // PCM-level playback state
-@@ -137,6 +149,8 @@ export class VoiceBot extends EventEmitter {
+@@ -137,6 +151,8 @@ export class VoiceBot extends EventEmitter {
      this.config = config;
      this._originalNickname = config.nickname;
      this.client = new Ts3Client();
@@ -684,7 +844,7 @@ index 1af2ba9..6a795e2 100644
      this.pipeline = new AudioPipeline();
      this.queue = new PlayQueue();
  
-@@ -251,6 +265,19 @@ export class VoiceBot extends EventEmitter {
+@@ -251,6 +267,19 @@ export class VoiceBot extends EventEmitter {
      }
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
@@ -704,7 +864,7 @@ index 1af2ba9..6a795e2 100644
      } catch { }
    }
  
-@@ -259,6 +286,7 @@ export class VoiceBot extends EventEmitter {
+@@ -259,6 +288,7 @@ export class VoiceBot extends EventEmitter {
      if (this._status === 'stopped') return;
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
@@ -712,7 +872,7 @@ index 1af2ba9..6a795e2 100644
      } catch { }
    }
  
-@@ -536,6 +564,72 @@ export class VoiceBot extends EventEmitter {
+@@ -536,6 +566,81 @@ export class VoiceBot extends EventEmitter {
      this.emit('volumeChange', this.config.volume);
    }
  
@@ -742,6 +902,15 @@ index 1af2ba9..6a795e2 100644
 +
 +  get duckDelay(): number {
 +    return this.duckDelayMs;
++  }
++
++  /** How long after speech stops the music stays ducked (ms). */
++  setDuckRelease(ms: number): void {
++    this.duckReleaseMs = Math.max(100, Math.min(10000, ms));
++  }
++
++  get duckRelease(): number {
++    return this.duckReleaseMs;
 +  }
 +
 +  /**
@@ -785,16 +954,17 @@ index 1af2ba9..6a795e2 100644
    skip(): void {
      this.stopIcyPolling();
      this.stopPlayback();
-@@ -666,13 +760,84 @@ export class VoiceBot extends EventEmitter {
+@@ -666,13 +771,85 @@ export class VoiceBot extends EventEmitter {
          nextDue = now + FRAME_MS;
        }
  
-+      // Talk-ducking gain smoothing (drop to 25% once voice is sustained)
++      // Talk-ducking gain smoothing (drop to 25% once voice is sustained,
++      // hold for duckReleaseMs after speech stops, then recover)
 +      if (this.duckEnabled) {
 +        const speaking =
 +          this.voiceStartAt !== 0 &&
 +          Date.now() - this.voiceStartAt >= this.duckDelayMs &&
-+          Date.now() - this.lastVoiceAt < 1200;
++          Date.now() - this.lastVoiceAt < this.duckReleaseMs;
 +        const target = speaking ? 0.25 : 1;
 +        this.duckGain += (target - this.duckGain) * 0.3;
 +      }
@@ -871,7 +1041,7 @@ index 1af2ba9..6a795e2 100644
        // End-of-track handling
        if (this.frameIndex >= this.pcmFrames.length) {
          this.client.sendVoiceStop();
-@@ -729,6 +894,8 @@ export class VoiceBot extends EventEmitter {
+@@ -729,6 +906,8 @@ export class VoiceBot extends EventEmitter {
      this.pcmFrames = [];
      this.frameIndex = 0;
      this.pausedAtFrame = 0;
