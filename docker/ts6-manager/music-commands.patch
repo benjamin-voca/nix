@@ -1,5 +1,42 @@
+diff --git a/packages/backend/src/voice/audio/pipeline.ts b/packages/backend/src/voice/audio/pipeline.ts
+index b4d5eb5..4cf3b67 100644
+--- a/packages/backend/src/voice/audio/pipeline.ts
++++ b/packages/backend/src/voice/audio/pipeline.ts
+@@ -158,4 +158,32 @@ export class AudioPipeline {
+       });
+     });
+   }
++
++  private duckDecoder: OpusScript | null = null;
++
++  /** Blend two PCM frames: a fades out, b fades in (t = 0..1 weight of b). */
++  static mixPcm(a: Buffer, b: Buffer, t: number): Buffer {
++    const len = Math.max(a.length, b.length);
++    const out = Buffer.alloc(len);
++    for (let i = 0; i + 1 < len; i += 2) {
++      const sa = i < a.length ? a.readInt16LE(i) : 0;
++      const sb = i < b.length ? b.readInt16LE(i) : 0;
++      const v = Math.round(sa * (1 - t) + sb * t);
++      out.writeInt16LE(Math.max(-32768, Math.min(32767, v)), i);
++    }
++    return out;
++  }
++
++  /** Decode an incoming Opus voice packet for energy analysis (talk-ducking). */
++  decodeVoicePacket(opusData: Buffer): Buffer | null {
++    try {
++      if (!this.duckDecoder) {
++        this.duckDecoder = new OpusScript(SAMPLE_RATE, CHANNELS, OpusScript.Application.AUDIO);
++      }
++      const pcm = this.duckDecoder.decode(opusData);
++      return Buffer.isBuffer(pcm) ? pcm : Buffer.from(pcm);
++    } catch {
++      return null;
++    }
++  }
+ }
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..a446151 100644
+index 379ee96..108c425 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
 @@ -1,8 +1,8 @@
@@ -138,7 +175,7 @@ index 379ee96..a446151 100644
        };
  
        bot.queue.add(queueItem);
-@@ -487,4 +548,378 @@ export class MusicCommandHandler {
+@@ -487,4 +548,405 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -333,6 +370,33 @@ index 379ee96..a446151 100644
 +    this.reply(bot, userClid, 'Usage: !autodj [on|off]');
 +  }
 +
++  private handleDuck(bot: VoiceBot, userClid: number, args: string): void {
++    if (!args || args === 'status') {
++      this.reply(bot, userClid, `Talk-ducking: ${bot.ducking ? 'on — volume drops to 25% while others speak' : 'off'}. Usage: !duck on|off`);
++      return;
++    }
++    if (args === 'on' || args === 'off') {
++      bot.setDucking(args === 'on');
++      this.reply(bot, userClid, `Talk-ducking ${args}.`);
++      return;
++    }
++    this.reply(bot, userClid, 'Usage: !duck [on|off]');
++  }
++
++  private handleCrossfade(bot: VoiceBot, userClid: number, args: string): void {
++    if (!args) {
++      this.reply(bot, userClid, `Crossfade: ${bot.crossfade}s. Usage: !crossfade <0-15 seconds>`);
++      return;
++    }
++    const s = parseFloat(args);
++    if (isNaN(s) || s < 0 || s > 15) {
++      this.reply(bot, userClid, 'Usage: !crossfade <0-15 seconds>');
++      return;
++    }
++    bot.setCrossfade(s);
++    this.reply(bot, userClid, s === 0 ? 'Crossfade off — hard cuts.' : `Crossfade set to ${s}s.`);
++  }
++
 +  /** AutoDJ: queue empty + idle → play a weighted-random library track. */
 +  private async maybeAutoDj(botId: number, bot: VoiceBot): Promise<void> {
 +    if (!this.autoDjEnabled.get(botId)) return;
@@ -517,6 +581,33 @@ index 379ee96..a446151 100644
 +    }
 +  }
  }
+diff --git a/packages/backend/src/voice/playlist/queue.ts b/packages/backend/src/voice/playlist/queue.ts
+index f289123..bc36a38 100644
+--- a/packages/backend/src/voice/playlist/queue.ts
++++ b/packages/backend/src/voice/playlist/queue.ts
+@@ -114,6 +114,22 @@ export class PlayQueue {
+     return this.current;
+   }
+ 
++  /** Look at what next() would return, without advancing. */
++  peekNext(): QueueItem | null {
++    if (this.items.length === 0) return null;
++    let idx = this._shuffle
++      ? this.shuffleOrder[this.currentIndex + 1]
++      : this.currentIndex + 1;
++    if (idx === undefined || idx < 0 || idx >= this.items.length) {
++      if (this._repeat === "queue") {
++        idx = this._shuffle ? this.shuffleOrder[0] : 0;
++      } else {
++        return null;
++      }
++    }
++    return this.items[idx] ?? null;
++  }
++
+   playAt(index: number): QueueItem | null {
+     if (index < 0 || index >= this.items.length) return null;
+     this.currentIndex = index;
 diff --git a/packages/backend/src/voice/tslib/client.ts b/packages/backend/src/voice/tslib/client.ts
 index eb9f18a..1b86927 100644
 --- a/packages/backend/src/voice/tslib/client.ts
@@ -534,10 +625,34 @@ index eb9f18a..1b86927 100644
      super();
    }
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..1913d13 100644
+index 1af2ba9..59e4898 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
-@@ -251,6 +251,19 @@ export class VoiceBot extends EventEmitter {
+@@ -85,6 +85,14 @@ export class VoiceBot extends EventEmitter {
+   private _lastError: string = '';
+   private identity: IdentityData | null = null;
+   private playbackTimer: ReturnType<typeof setTimeout> | null = null;
++  // Crossfade (chat-configurable, runtime only)
++  private crossfadeSeconds = 0;
++  private fadePrefetch: { item: QueueItem; frames: Buffer[] } | null = null;
++  private fadeMix: { pos: number; frames: number } | null = null;
++  // Talk ducking (chat-configurable, runtime only)
++  private duckEnabled = false;
++  private duckGain = 1;
++  private lastVoiceAt = 0;
+   private _nowPlaying: QueueItem | null = null;
+ 
+   // PCM-level playback state
+@@ -137,6 +145,8 @@ export class VoiceBot extends EventEmitter {
+     this.config = config;
+     this._originalNickname = config.nickname;
+     this.client = new Ts3Client();
++    // Talk-ducking: measure incoming voice energy from other users
++    this.client.on('voice', (buf: Buffer) => this.handleIncomingVoice(buf));
+     this.pipeline = new AudioPipeline();
+     this.queue = new PlayQueue();
+ 
+@@ -251,6 +261,19 @@ export class VoiceBot extends EventEmitter {
      }
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
@@ -557,7 +672,7 @@ index 1af2ba9..1913d13 100644
      } catch { }
    }
  
-@@ -259,6 +272,7 @@ export class VoiceBot extends EventEmitter {
+@@ -259,6 +282,7 @@ export class VoiceBot extends EventEmitter {
      if (this._status === 'stopped') return;
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
@@ -565,3 +680,142 @@ index 1af2ba9..1913d13 100644
      } catch { }
    }
  
+@@ -536,6 +560,47 @@ export class VoiceBot extends EventEmitter {
+     this.emit('volumeChange', this.config.volume);
+   }
+ 
++  /** Crossfade length in seconds (0 = hard cuts). Applies to file tracks. */
++  setCrossfade(seconds: number): void {
++    this.crossfadeSeconds = Math.max(0, Math.min(15, seconds));
++  }
++
++  get crossfade(): number {
++    return this.crossfadeSeconds;
++  }
++
++  /** Talk-ducking: drop volume while others are speaking in the channel. */
++  setDucking(enabled: boolean): void {
++    this.duckEnabled = enabled;
++    if (!enabled) this.duckGain = 1;
++  }
++
++  get ducking(): boolean {
++    return this.duckEnabled;
++  }
++
++  /**
++   * Incoming voice packets from the bot's channel. Decodes and measures RMS
++   * energy; speech above a threshold ducks the music (see playback loop).
++   * Payload layout varies by server build — try both offsets.
++   */
++  private handleIncomingVoice(buf: Buffer): void {
++    if (!this.duckEnabled || buf.length < 5) return;
++    const senderId = buf.readUInt16BE(0);
++    if (senderId === this.ts3ClientId) return;
++    let pcm = this.pipeline.decodeVoicePacket(buf.subarray(3));
++    if (!pcm) pcm = this.pipeline.decodeVoicePacket(buf.subarray(4));
++    if (!pcm) return;
++    let sum = 0;
++    const samples = Math.floor(pcm.length / 2);
++    for (let i = 0; i < samples; i++) {
++      const v = pcm.readInt16LE(i * 2);
++      sum += v * v;
++    }
++    const rms = Math.sqrt(sum / Math.max(1, samples));
++    if (rms > 500) this.lastVoiceAt = Date.now();
++  }
++
+   skip(): void {
+     this.stopIcyPolling();
+     this.stopPlayback();
+@@ -666,13 +731,80 @@ export class VoiceBot extends EventEmitter {
+         nextDue = now + FRAME_MS;
+       }
+ 
++      // Talk-ducking gain smoothing (drop to 25% while others speak)
++      if (this.duckEnabled) {
++        const target = Date.now() - this.lastVoiceAt < 1200 ? 0.25 : 1;
++        this.duckGain += (target - this.duckGain) * 0.3;
++      }
++
+       // Send exactly ONE frame (if available)
+       if (this.frameIndex < this.pcmFrames.length) {
+-        const opusFrame = this.pipeline.encodeFrame(this.pcmFrames[this.frameIndex], this.config.volume);
++        const opusFrame = this.pipeline.encodeFrame(this.pcmFrames[this.frameIndex], this.config.volume * this.duckGain);
+         this.sendVoiceFrame(opusFrame);
+         this.frameIndex++;
+       }
+ 
++      // ── Crossfade: prefetch the next track, then mix inside the window ──
++      const canFade =
++        this.crossfadeSeconds > 0 &&
++        this.queue.repeat !== 'track' &&
++        this.pcmFrames.length > 0;
++      const fadeFrames = canFade ? Math.floor((this.crossfadeSeconds * 1000) / FRAME_MS) : 0;
++      const framesRemaining = this.pcmFrames.length - this.frameIndex;
++
++      if (canFade && !this.fadePrefetch && !this.fadeMix && framesRemaining <= fadeFrames + 75 && framesRemaining > fadeFrames) {
++        // Start decoding the upcoming track ahead of the fade window
++        const nextItem = this.queue.peekNext();
++        if (nextItem && !nextItem.streamUrl) {
++          this.pipeline.toPcm(nextItem.filePath).then((pcm) => {
++            this.fadePrefetch = { item: nextItem, frames: this.pipeline.splitFrames(pcm) };
++          }).catch(() => { });
++        }
++      }
++
++      if (canFade && this.fadePrefetch && !this.fadeMix && framesRemaining <= fadeFrames) {
++        // Decode ready and we're inside the window — consume next and mix
++        const prefetch = this.fadePrefetch;
++        const consumed = this.queue.next();
++        if (consumed && consumed.id === prefetch.item.id) {
++          this.fadeMix = { pos: 0, frames: Math.min(fadeFrames, prefetch.frames.length) };
++        } else {
++          this.fadePrefetch = null; // queue changed under us — hard cut
++        }
++      }
++
++      // ── Crossfade mixing: blend current (out) with next (in) ──
++      if (this.fadeMix && this.fadePrefetch) {
++        const prefetch = this.fadePrefetch;
++        const m = this.fadeMix;
++        const cur = this.frameIndex < this.pcmFrames.length ? this.pcmFrames[this.frameIndex] : null;
++        const nxt = m.pos < prefetch.frames.length ? prefetch.frames[m.pos] : null;
++        const gain = m.frames > 0 ? Math.min(1, m.pos / m.frames) : 1;
++        const mixed = cur && nxt
++          ? AudioPipeline.mixPcm(cur, nxt, gain)
++          : (nxt ?? cur)!;
++        const vol = this.config.volume * this.duckGain;
++        this.sendVoiceFrame(this.pipeline.encodeFrame(mixed, vol));
++        this.frameIndex++;
++        m.pos++;
++        nextDue += FRAME_MS;
++        if (now - nextDue > 5 * FRAME_MS) nextDue = now + FRAME_MS;
++        this.playbackTimer = setTimeout(tick, Math.max(1, nextDue - performance.now()));
++        if (m.pos >= m.frames) {
++          // Fade done — swap in the next track seamlessly
++          const finished = this._nowPlaying;
++          this._nowPlaying = prefetch.item;
++          this.pcmFrames = prefetch.frames;
++          this.frameIndex = m.pos;
++          this.fadeMix = null;
++          this.fadePrefetch = null;
++          if (finished) this.emit('trackEnd', finished);
++          this.emit('nowPlaying', this._nowPlaying);
++          this.updateNowPlayingNickname(this._nowPlaying.title);
++        }
++        return;
++      }
++
+       // End-of-track handling
+       if (this.frameIndex >= this.pcmFrames.length) {
+         this.client.sendVoiceStop();
+@@ -729,6 +861,8 @@ export class VoiceBot extends EventEmitter {
+     this.pcmFrames = [];
+     this.frameIndex = 0;
+     this.pausedAtFrame = 0;
++    this.fadeMix = null;
++    this.fadePrefetch = null;
+ 
+     // Kill streaming FFmpeg if active
+     if (this.streamKill) {
