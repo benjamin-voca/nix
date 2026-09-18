@@ -297,6 +297,24 @@ in {
             echo "Injected ts6-query-secret"
           fi
 
+          # TeamSpeak bot avatar (base64 PNG). The teamspeak deployment's
+          # bot-avatar initContainer stamps this into the server's avatar
+          # slot on every boot (file + client_flag_avatar DB flag).
+          if [ -f /run/secrets/ts6-bot-avatar-png ]; then
+            TS6_AVATAR_B64=$(tr -d '\n' < /run/secrets/ts6-bot-avatar-png)
+            $kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: ts6-bot-avatar
+            namespace: teamspeak
+          type: Opaque
+          data:
+            avatar.png: "$TS6_AVATAR_B64"
+          EOF
+            echo "Injected ts6-bot-avatar"
+          fi
+
           
           # TS6 Manager JWT + credential-encryption keys
           if [ -f /run/secrets/ts6-manager-jwt-secret ]; then
@@ -306,6 +324,7 @@ in {
               TS6_ENC=$(cat /run/secrets/ts6-manager-encryption-key)
               TS6_ARGS="$TS6_ARGS --from-literal=ENCRYPTION_KEY=$TS6_ENC"
             fi
+            # shellcheck disable=SC2086
             $kubectl create secret generic ts6-manager-secret \
               --namespace=teamspeak \
               $TS6_ARGS \

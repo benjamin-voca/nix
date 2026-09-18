@@ -98,6 +98,60 @@ ${tolerations}
         runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
+      # Stamp the bot's avatar before the server starts: copies the PNG from
+      # the ts6-bot-avatar secret into the avatar slot (avatar_<hash of the
+      # bot's uid>) and sets client_flag_avatar in tsserver.sqlitedb — the
+      # server only advertises an avatar when that DB flag is set. TS6 beta
+      # cannot do this via filetransfer (cid=0 uploads return 2565), so it
+      # is provisioned out-of-band, declaratively.
+      # NOTE: the client_properties UPDATE is a no-op on a fresh DB until
+      # the bot has connected once (row created on first connect).
+      initContainers:
+        - name: bot-avatar
+          image: python:3.12-alpine@sha256:c4634f578a412db396771b61b064c6e546c9d6414c7fb5b1b05d5871f1885f7b
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - python3
+            - -c
+            - |
+              import os, shutil, sqlite3
+              avatar_hash = "lgnpoleijfekncppbjnfcniiandgfaaajphjlemgipaehlngkbaibncpalklehbj"
+              bot_uid = "tt/rSJVK0v8Z1S2IDTZQAJ95tMaPBHvWoQgdLwurRxk="
+              dst_dir = "/data/files/virtualserver_1/internal"
+              dst = os.path.join(dst_dir, "avatar_" + avatar_hash)
+              os.makedirs(dst_dir, exist_ok=True)
+              shutil.copyfile("/avatar/avatar.png", dst)
+              db_path = "/data/tsserver.sqlitedb"
+              if os.path.exists(db_path):
+                  con = sqlite3.connect(db_path)
+                  con.execute(
+                      "UPDATE client_properties SET value=? "
+                      "WHERE server_id=1 AND ident='client_flag_avatar' "
+                      "AND id=(SELECT client_id FROM clients WHERE client_unique_id=?)",
+                      (avatar_hash, bot_uid),
+                  )
+                  con.commit()
+                  con.close()
+              print("bot avatar stamped: " + dst)
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: avatar
+              mountPath: /avatar
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
       containers:
         - name: teamspeak
           image: teamspeaksystems/teamspeak6-server:6.0.0-beta12.1
@@ -169,6 +223,9 @@ ${tolerations}
         - name: data
           persistentVolumeClaim:
             claimName: teamspeak-data
+        - name: avatar
+          secret:
+            secretName: ts6-bot-avatar
 '';
 
   service = ''

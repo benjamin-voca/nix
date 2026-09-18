@@ -170,6 +170,11 @@ in {
         "upg-assets-sftpgo-users-json"
         # Tailscale
         "tailscale-auth-key"
+        # TeamSpeak 6 (query password, manager keys, bot avatar PNG)
+        "ts6-query-admin-password"
+        "ts6-manager-jwt-secret"
+        "ts6-manager-encryption-key"
+        "ts6-bot-avatar-png"
       ];
     };
 

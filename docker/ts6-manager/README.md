@@ -57,11 +57,27 @@ the tarball over SSH to backbone-01 and pushes to Harbor from there
 Could be upstreamed — the handler mirrors the `/queue/playlist` API route.
 Candidate for a PR to clusterzx/ts6-manager if we feel like it.
 
-## Known limitation: avatar uploads (TS6 beta server)
+## Avatar provisioning (TS6 beta server)
 
-`!avatar` is implemented (SSH ftinitupload + file-transfer push) but the
-TS6 server **beta** rejects avatar-slot uploads from the query interface:
-`ftinitupload cid=0` returns `2565 invalid ssize`. The bot CAN initialize
-its avatar slot via the voice-protocol ftinitupload, but TS6 does not
-return an ftkey over the voice protocol — so the transfer can't complete.
-This will work once upstream fixes cid=0 uploads; the code is ready.
+The bot's avatar is provisioned **declaratively** — the TS6 beta cannot do
+avatar uploads properly:
+- WebQuery API keys are scope-blocked from all `ft*` commands
+- Voice-protocol `ftinitupload` allocates the avatar slot but returns no
+  ftkey, so the transfer can never complete
+- SSH-query `ftinitupload cid=0` returns `2565 invalid ssize` (beta bug)
+
+Mechanism (all in `modules/outputs/bootstrap/teamspeak.nix`):
+1. The PNG lives sops-encrypted (`ts6-bot-avatar-png` in
+   `secrets/roles/backbone.yaml`); `k8s-secrets-inject` creates the
+   `ts6-bot-avatar` Secret.
+2. The `bot-avatar` initContainer (python:3.12-alpine, digest-pinned) runs
+   before the server on every boot: copies the PNG to
+   `files/virtualserver_1/internal/avatar_<hash>` on the PVC AND sets
+   `client_flag_avatar` in `tsserver.sqlitedb` — the server only advertises
+   an avatar when that DB flag is non-empty.
+
+To change the avatar: re-encrypt the new PNG's base64 into the sops key,
+`sudo systemctl restart k8s-secrets-inject` on backbone-01, and restart the
+teamspeak deployment. Note the hash/uid constants in the initContainer are
+the valon bot's identity and stay stable across TS server reinstalls (the
+uid comes from the manager bot's identity key).
