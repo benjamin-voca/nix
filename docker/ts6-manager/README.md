@@ -56,3 +56,12 @@ the tarball over SSH to backbone-01 and pushes to Harbor from there
 
 Could be upstreamed — the handler mirrors the `/queue/playlist` API route.
 Candidate for a PR to clusterzx/ts6-manager if we feel like it.
+
+## Known limitation: avatar uploads (TS6 beta server)
+
+`!avatar` is implemented (SSH ftinitupload + file-transfer push) but the
+TS6 server **beta** rejects avatar-slot uploads from the query interface:
+`ftinitupload cid=0` returns `2565 invalid ssize`. The bot CAN initialize
+its avatar slot via the voice-protocol ftinitupload, but TS6 does not
+return an ftkey over the voice protocol — so the transfer can't complete.
+This will work once upstream fixes cid=0 uploads; the code is ready.
