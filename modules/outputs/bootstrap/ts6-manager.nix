@@ -141,7 +141,7 @@ ${tolerations}
           # Custom build: adds !playlist chat commands — patch + build script
           # in docker/ts6-manager/ (this repo). Tag is a pinned release build.
           # Base: upstream backend-dev (queue chat subcommands) + patch.
-          image: 10.0.0.56:5000/library/ts6-manager-backend:0.8.0
+          image: 10.0.0.56:5000/library/ts6-manager-backend:0.14.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
