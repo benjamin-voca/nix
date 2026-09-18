@@ -5,8 +5,10 @@ music bots (upstream only loads playlists through the web UI).
 
 - Upstream: https://github.com/clusterzx/ts6-manager
 - Base commit: see `UPSTREAM_COMMIT` (main at time of patching)
-- Patch: `music-commands.patch` — touches only
-  `packages/backend/src/voice/music-command-handler.ts`
+- Patch: `music-commands.patch` — the cumulative diff vs upstream (command
+  handler, prisma schema, voice bot/queue/pipeline). NOTE: `main` on the
+  Forgejo fork rejects plain `git push --force`; use the `+work:main`
+  refspec syntax instead.
 
 ## Commands added
 
@@ -16,7 +18,8 @@ music bots (upstream only loads playlists through the web UI).
 | `!playlist play <id\|name>` | Replace queue, start playing the playlist |
 | `!playlist queue <id|name>` | Append the playlist to the current queue (auto-starts if idle) |
 | `!playlist add <id\|name>` | Add the **currently playing track** to the playlist (creates the library Song row if missing) |
-| `!play <url\|query>` | Non-URL args are treated as a YouTube search — first result plays |
+| `!play <url\|query>` | Non-URL args are treated as a YouTube search — first result plays. Ad-hoc tracks land in the library automatically (deduped on `filePath`) |
+| `!lib [play <id\|name>]` | List the library (up to 100 tracks) / queue a library track |
 | `!help` | Command reference, in-chat |
 
 Resolution: numeric id, case-insensitive full name, then name prefix.

@@ -81,7 +81,7 @@ index b4d5eb5..4cf3b67 100644
 +  }
  }
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..6b4a2ca 100644
+index 379ee96..999d374 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
 @@ -1,8 +1,12 @@
@@ -279,7 +279,27 @@ index 379ee96..6b4a2ca 100644
        };
  
        bot.queue.add(queueItem);
-@@ -345,6 +456,12 @@ export class MusicCommandHandler {
+@@ -212,6 +323,9 @@ export class MusicCommandHandler {
+       // Save to MusicRequest history
+       this.saveMusicRequest(bot, queueItem);
+ 
++      // Ad-hoc plays land in the library (deduped on filePath)
++      this.saveToLibrary(bot, queueItem);
++
+       // If something is already playing, queue it instead of interrupting
+       if (bot.status === 'playing' || bot.status === 'paused') {
+         this.reply(bot, userClid, `Queued: ${info.artist} - ${info.title} (position #${bot.queue.length})`);
+@@ -314,6 +428,9 @@ export class MusicCommandHandler {
+       // Save to MusicRequest history
+       this.saveMusicRequest(bot, queueItem);
+ 
++      // Ad-hoc plays land in the library (deduped on filePath)
++      this.saveToLibrary(bot, queueItem);
++
+       // If nothing is playing, start playing the queued item
+       if (bot.status !== 'playing' && bot.status !== 'paused') {
+         bot.queue.playAt(bot.queue.length - 1);
+@@ -345,6 +462,12 @@ export class MusicCommandHandler {
    }
  
    private async handleSkip(bot: VoiceBot, userClid: number): Promise<void> {
@@ -292,7 +312,7 @@ index 379ee96..6b4a2ca 100644
      const next = bot.queue.next();
      if (next) {
        if (next.streamUrl) {
-@@ -487,4 +604,741 @@ export class MusicCommandHandler {
+@@ -487,4 +610,772 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -303,7 +323,7 @@ index 379ee96..6b4a2ca 100644
 +    const lines = [
 +      'Music bot commands:',
 +      '!play <url|query> — play now (searches YouTube) · !play resumes',
-+      '!search <query> → !pick <1-5> — pick from results',
++      '!search <query> → !pick <1-10> — pick multiple from results',
 +      '!pause · !stop · !skip · !prev',
 +      '!queue — show · !queue <url> — append · !queue clear',
 +      '!queue play <n> · !queue remove <n>',
@@ -361,11 +381,11 @@ index 379ee96..6b4a2ca 100644
 +
 +  private handleSearch(bot: VoiceBot, userClid: number, args: string): Promise<void> {
 +    if (!args) {
-+      this.reply(bot, userClid, 'Usage: !search <query> — then !pick <1-5>');
++      this.reply(bot, userClid, 'Usage: !search <query> — then !pick <1-10>');
 +      return Promise.resolve();
 +    }
 +    this.reply(bot, userClid, `Searching: ${args}...`);
-+    return searchYouTube(args, 5).then((results) => {
++    return searchYouTube(args, 10).then((results) => {
 +      if (!results || results.length === 0) {
 +        this.reply(bot, userClid, `No results found for "${args}".`);
 +        return;
@@ -392,7 +412,7 @@ index 379ee96..6b4a2ca 100644
 +      return;
 +    }
 +    const r = pending.results[n - 1];
-+    this.pendingSearches.delete(userClid);
++    // Search stays active until it expires (3 min) — !pick can run repeatedly
 +    this.reply(bot, userClid, `Picked [${n}]: ${r.title} — loading...`);
 +    await this.downloadAndPlay(bot, userClid, `https://www.youtube.com/watch?v=${r.id}`);
 +  }
@@ -587,14 +607,15 @@ index 379ee96..6b4a2ca 100644
 +    const rest = args ? args.substring(sub.length).trim() : '';
 +
 +    if (!sub || sub === 'list') {
-+      const songs = await this.prisma.song.findMany({ where: { serverConfigId }, orderBy: { id: 'asc' }, take: 10 });
++      const songs = await this.prisma.song.findMany({ where: { serverConfigId }, orderBy: { id: 'asc' }, take: 100 });
 +      const total = await this.prisma.song.count({ where: { serverConfigId } });
 +      if (songs.length === 0) {
-+        this.reply(bot, userClid, 'Library is empty. Upload songs in the web UI (Library tab).');
++        this.reply(bot, userClid, 'Library is empty. Tracks you !play land here automatically; you can also upload songs in the web UI (Library tab).');
 +        return;
 +      }
 +      const lines = songs.map((sg) => `[${sg.id}] ${sg.artist ? sg.artist + ' - ' : ''}${sg.title}`);
-+      this.reply(bot, userClid, `Library (${total} tracks):\n${lines.join('\n')}\n!lib play <id|name> — queue a track`);
++      const more = total > songs.length ? `\n... and ${total - songs.length} more` : '';
++      this.reply(bot, userClid, `Library (${total} tracks):\n${lines.join('\n')}${more}\n!lib play <id|name> — queue a track`);
 +      return;
 +    }
 +
@@ -652,6 +673,36 @@ index 379ee96..6b4a2ca 100644
 +        serverConfigId,
 +      },
 +    });
++  }
++
++  /**
++   * Fire-and-forget: persist an ad-hoc track into the library so it shows up
++   * in !lib / AutoDJ. Deduped on filePath + serverConfigId (same rule as
++   * !playlist add).
++   */
++  private saveToLibrary(bot: VoiceBot, item: QueueItem): void {
++    const serverConfigId = bot.currentConfig.serverConfigId;
++    if (!serverConfigId || !item.filePath) return;
++    this.prisma.song
++      .findFirst({ where: { filePath: item.filePath, serverConfigId } })
++      .then(async (existing) => {
++        if (existing) return;
++        await this.prisma.song.create({
++          data: {
++            title: item.title || 'Unknown Title',
++            artist: item.artist ?? null,
++            duration: item.duration ?? null,
++            filePath: item.filePath!,
++            source: (item.source as string) ?? 'local',
++            sourceUrl: item.sourceUrl ?? null,
++            serverConfigId,
++          },
++        });
++        console.log(`[MusicCmd] Added "${item.title}" to library (bot ${bot.id})`);
++      })
++      .catch((err: any) => {
++        console.error(`[MusicCmd] library save failed: ${err.message}`);
++      });
 +  }
 +
 +  private async handleHistory(botId: number, bot: VoiceBot, userClid: number, args: string): Promise<void> {
@@ -1095,7 +1146,7 @@ index 377a36b..bdef77b 100644
  
        const bot = this.createBotInstance(config);
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..ab9ea4b 100644
+index 1af2ba9..bd2c956 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
 @@ -1,4 +1,5 @@
@@ -1117,7 +1168,7 @@ index 1af2ba9..ab9ea4b 100644
  }
  
  export class VoiceBot extends EventEmitter {
-@@ -85,6 +92,23 @@ export class VoiceBot extends EventEmitter {
+@@ -85,6 +92,24 @@ export class VoiceBot extends EventEmitter {
    private _lastError: string = '';
    private identity: IdentityData | null = null;
    private playbackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1130,9 +1181,10 @@ index 1af2ba9..ab9ea4b 100644
 +  private duckGain = 1;
 +  private lastVoiceAt = 0;
 +  private duckDebugCount = 0;
-+  // Duck attack delay: only duck once voice is sustained this long (ms)
++  // Duck attack delay: only duck once this much actual talk has accumulated
 +  private duckDelayMs = 0;
-+  private voiceStartAt = 0;
++  private voiceTalkMs = 0;
++  private duckEngaged = false;
 +  // Hold time after speech stops before music returns to full (ms)
 +  private duckReleaseMs = 1200;
 +  private duckHoldUntil = 0;
@@ -1141,7 +1193,7 @@ index 1af2ba9..ab9ea4b 100644
    private _nowPlaying: QueueItem | null = null;
  
    // PCM-level playback state
-@@ -136,7 +160,14 @@ export class VoiceBot extends EventEmitter {
+@@ -136,7 +161,14 @@ export class VoiceBot extends EventEmitter {
      super();
      this.config = config;
      this._originalNickname = config.nickname;
@@ -1156,7 +1208,7 @@ index 1af2ba9..ab9ea4b 100644
      this.pipeline = new AudioPipeline();
      this.queue = new PlayQueue();
  
-@@ -251,6 +282,19 @@ export class VoiceBot extends EventEmitter {
+@@ -251,6 +283,19 @@ export class VoiceBot extends EventEmitter {
      }
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
@@ -1176,7 +1228,7 @@ index 1af2ba9..ab9ea4b 100644
      } catch { }
    }
  
-@@ -259,6 +303,7 @@ export class VoiceBot extends EventEmitter {
+@@ -259,6 +304,7 @@ export class VoiceBot extends EventEmitter {
      if (this._status === 'stopped') return;
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
@@ -1184,7 +1236,7 @@ index 1af2ba9..ab9ea4b 100644
      } catch { }
    }
  
-@@ -536,6 +581,192 @@ export class VoiceBot extends EventEmitter {
+@@ -536,6 +582,205 @@ export class VoiceBot extends EventEmitter {
      this.emit('volumeChange', this.config.volume);
    }
  
@@ -1358,26 +1410,39 @@ index 1af2ba9..ab9ea4b 100644
 +    const rms = Math.sqrt(sum / Math.max(1, samples));
 +    const now = Date.now();
 +    if (rms > 500) {
-+      // Voice episode starts on first loud packet; gaps > 300ms reset it
-+      if (this.voiceStartAt === 0 || now - this.lastVoiceAt > 300) this.voiceStartAt = now;
++      if (this.lastVoiceAt === 0 || now - this.lastVoiceAt > 450) {
++        // New voice episode — pauses under 450ms (natural inter-word gaps)
++        // don't break it. Talk time accumulates across the episode, so the
++        // attack delay measures actual speech rather than unbroken phonation
++        // — short-phrase speakers duck too.
++        this.voiceTalkMs = 0;
++        this.duckEngaged = false;
++      } else {
++        this.voiceTalkMs += Math.min(now - this.lastVoiceAt, 100);
++      }
 +      this.lastVoiceAt = now;
-+      // Once sustained past the attack delay, extend the release hold
-+      if (now - this.voiceStartAt >= this.duckDelayMs) {
++      // Once accumulated talk passes the attack delay, extend the release hold
++      if (this.voiceTalkMs >= this.duckDelayMs) {
++        if (!this.duckEngaged) {
++          this.duckEngaged = true;
++          console.log(`[DuckDebug] sender=${senderId} duck ENGAGED after ${this.voiceTalkMs}ms talk (delay=${this.duckDelayMs}ms)`);
++        }
 +        this.duckHoldUntil = Math.max(this.duckHoldUntil, now + this.duckReleaseMs);
 +      }
-+    } else if (this.voiceStartAt !== 0 && now - this.lastVoiceAt > 300) {
-+      this.voiceStartAt = 0;
++    } else if (this.lastVoiceAt !== 0 && now - this.lastVoiceAt > 450) {
++      this.voiceTalkMs = 0;
++      this.duckEngaged = false;
 +    }
 +    this.duckDebugCount++;
 +    if (this.duckDebugCount <= 6 || this.duckDebugCount % 2000 === 0) {
-+      console.log(`[DuckDebug] sender=${senderId} rms=${Math.round(rms)} duckGain=${this.duckGain.toFixed(2)} voiceStartAge=${this.voiceStartAt ? now - this.voiceStartAt : -1}ms pkts=${this.duckDebugCount}`);
++      console.log(`[DuckDebug] sender=${senderId} rms=${Math.round(rms)} duckGain=${this.duckGain.toFixed(2)} talkMs=${this.voiceTalkMs} pkts=${this.duckDebugCount}`);
 +    }
 +  }
 +
    skip(): void {
      this.stopIcyPolling();
      this.stopPlayback();
-@@ -666,13 +897,81 @@ export class VoiceBot extends EventEmitter {
+@@ -666,13 +911,81 @@ export class VoiceBot extends EventEmitter {
          nextDue = now + FRAME_MS;
        }
  
@@ -1460,7 +1525,7 @@ index 1af2ba9..ab9ea4b 100644
        // End-of-track handling
        if (this.frameIndex >= this.pcmFrames.length) {
          this.client.sendVoiceStop();
-@@ -729,6 +1028,8 @@ export class VoiceBot extends EventEmitter {
+@@ -729,6 +1042,8 @@ export class VoiceBot extends EventEmitter {
      this.pcmFrames = [];
      this.frameIndex = 0;
      this.pausedAtFrame = 0;
