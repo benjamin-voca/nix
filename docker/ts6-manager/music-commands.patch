@@ -1,5 +1,5 @@
 diff --git a/packages/backend/prisma/schema.prisma b/packages/backend/prisma/schema.prisma
-index eed1d64..a9f8413 100644
+index eed1d64..8421d96 100644
 --- a/packages/backend/prisma/schema.prisma
 +++ b/packages/backend/prisma/schema.prisma
 @@ -66,6 +66,23 @@ model TsServerConfig {
@@ -26,6 +26,23 @@ index eed1d64..a9f8413 100644
  }
  
  model BotFlow {
+@@ -151,8 +168,14 @@ model MusicBot {
+   autoStart       Boolean   @default(false)
+   streamPreset    String    @default("720p")
+   sidecarPort     Int       @default(9800)
+-  createdAt       DateTime  @default(now())
+-  updatedAt       DateTime  @updatedAt
++  // QuadNix custom: persisted music-bot runtime settings (chat-configurable)
++  crossfadeSeconds Int?
++  duckEnabled      Boolean?
++  duckDelayMs      Int?
++  duckReleaseMs    Int?
++  autoDjEnabled    Boolean?
++  createdAt        DateTime  @default(now())
++  updatedAt        DateTime  @updatedAt
+ 
+   playlists Playlist[]
+ }
 diff --git a/packages/backend/src/voice/audio/pipeline.ts b/packages/backend/src/voice/audio/pipeline.ts
 index b4d5eb5..4cf3b67 100644
 --- a/packages/backend/src/voice/audio/pipeline.ts
@@ -64,33 +81,37 @@ index b4d5eb5..4cf3b67 100644
 +  }
  }
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..eb7e027 100644
+index 379ee96..6b4a2ca 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -1,8 +1,9 @@
+@@ -1,8 +1,12 @@
  import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
 -import type { QueueItem } from './playlist/queue.js';
 -import { downloadYouTube } from './audio/youtube.js';
 +import fs from "fs";
++import http from "http";
++import { decrypt } from '../utils/crypto.js';
++import { SshQueryClient } from '../bot-engine/ssh-query-client.js';
 +import type { QueueItem, RepeatMode } from './playlist/queue.js';
 +import { downloadYouTube, searchYouTube } from './audio/youtube.js';
  
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
-@@ -10,7 +11,9 @@ const CMD_PREFIX = '!';
+@@ -10,7 +14,10 @@ const CMD_PREFIX = '!';
  const MUSIC_COMMANDS = new Set([
    'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
    'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
 -  'stream', 'stopstream', 'viewers',
 +  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
 +  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
-+  'duck', 'crossfade', 'xfade', 'duckdelay', 'duckrelease', 'history',
++  'duck', 'crossfade', 'xfade', 'duckdelay', 'duckrelease', 'history', 'avatar',
++  'skipto', 'lib', 'library',
  ]);
  
  /**
-@@ -22,6 +25,16 @@ const MUSIC_COMMANDS = new Set([
+@@ -22,6 +29,17 @@ const MUSIC_COMMANDS = new Set([
   */
  export class MusicCommandHandler {
    private registeredBots = new Set<number>();
@@ -104,14 +125,18 @@ index 379ee96..eb7e027 100644
 +  // AutoDJ state per bot (runtime only — default off after restart)
 +  private autoDjEnabled = new Map<number, boolean>();
 +  private recentAutoDj = new Map<number, string[]>();
++  private lastSkipAt = 0;
  
    constructor(
      private prisma: PrismaClient,
-@@ -42,6 +55,20 @@ export class MusicCommandHandler {
+@@ -42,6 +60,23 @@ export class MusicCommandHandler {
        });
      });
  
-+    // AutoDJ: keep the music going when the queue runs dry
++    // AutoDJ: keep the music going when the queue runs dry; seed persisted state
++    if (bot.currentConfig.autoDjEnabled !== undefined) {
++      this.autoDjEnabled.set(botId, bot.currentConfig.autoDjEnabled);
++    }
 +    bot.on('trackEnd', () => {
 +      this.maybeAutoDj(botId, bot).catch((err) => {
 +        console.error(`[MusicCmd] AutoDJ error on bot ${botId}: ${err.message}`);
@@ -128,7 +153,7 @@ index 379ee96..eb7e027 100644
      console.log(`[MusicCmd] Registered text command listener on bot ${botId}`);
    }
  
-@@ -108,6 +135,51 @@ export class MusicCommandHandler {
+@@ -108,6 +143,61 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -173,6 +198,16 @@ index 379ee96..eb7e027 100644
 +        case 'history':
 +          await this.handleHistory(botId, bot, userClid, args);
 +          break;
++        case 'avatar':
++          await this.handleAvatar(bot, userClid, args);
++          break;
++        case 'skipto':
++          await this.handleSkipto(bot, userClid, args);
++          break;
++        case 'lib':
++        case 'library':
++          await this.handleLib(bot, userClid, args);
++          break;
 +        case 'crossfade':
 +        case 'xfade':
 +          this.handleCrossfade(bot, userClid, args);
@@ -180,7 +215,23 @@ index 379ee96..eb7e027 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -183,19 +255,33 @@ export class MusicCommandHandler {
+@@ -115,8 +205,15 @@ export class MusicCommandHandler {
+     }
+   }
+ 
++  private lastReplyAt = 0;
++
+   private reply(bot: VoiceBot, targetClid: number, msg: string): void {
+     try {
++      // Antiflood: throttle outgoing replies (server drops bursts silently).
++      // Commands still execute — only the text feedback gets thinned.
++      const now = Date.now();
++      if (now - this.lastReplyAt < 600) return;
++      this.lastReplyAt = now;
+       bot.sendTextMessage(targetClid, msg);
+     } catch (err: any) {
+       console.error(`[MusicCmd] Failed to send reply: ${err.message}`);
+@@ -183,19 +280,33 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -219,7 +270,7 @@ index 379ee96..eb7e027 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +290,7 @@ export class MusicCommandHandler {
+@@ -204,7 +315,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -228,7 +279,20 @@ index 379ee96..eb7e027 100644
        };
  
        bot.queue.add(queueItem);
-@@ -487,4 +573,538 @@ export class MusicCommandHandler {
+@@ -345,6 +456,12 @@ export class MusicCommandHandler {
+   }
+ 
+   private async handleSkip(bot: VoiceBot, userClid: number): Promise<void> {
++    const now = Date.now();
++    if (now - this.lastSkipAt < 400) {
++      this.reply(bot, userClid, 'Slow down — skipping again in a moment.');
++      return;
++    }
++    this.lastSkipAt = now;
+     const next = bot.queue.next();
+     if (next) {
+       if (next.streamUrl) {
+@@ -487,4 +604,741 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -245,10 +309,12 @@ index 379ee96..eb7e027 100644
 +      '!queue play <n> · !queue remove <n>',
 +      '!repeat [off|one|all] · !shuffle [on|off]',
 +      '!seek <m:ss|+s|-s> · !np — position / now playing',
++      '!skipto <n> — jump to queue position · !lib [play <id|name>] — library',
 +      '!radio [id] — list / play a radio station',
 +      '!playlist [list|play|queue|add] <id|name>',
 +      '!sleep <min|off> — stop timer · !autodj [on|off]',
 +      '!history [play <n>] — recently played',
++      '!avatar <image-url>|off — set / remove bot avatar',
 +      '!duck on|off — volume ducks while others speak',
 +      '!duckdelay <ms> — require sustained speech before ducking',
 +      '!duckrelease <ms> — hold after speech stops',
@@ -416,12 +482,14 @@ index 379ee96..eb7e027 100644
 +    }
 +    if (args === 'on') {
 +      this.autoDjEnabled.set(botId, true);
++      this.persistBotSetting(botId, { autoDjEnabled: true });
 +      this.reply(bot, userClid, "AutoDJ on — I'll keep the music going from the library.");
 +      this.maybeAutoDj(botId, bot).catch(() => { });
 +      return;
 +    }
 +    if (args === 'off') {
 +      this.autoDjEnabled.set(botId, false);
++      this.persistBotSetting(botId, { autoDjEnabled: false });
 +      this.reply(bot, userClid, 'AutoDJ off.');
 +      return;
 +    }
@@ -439,6 +507,7 @@ index 379ee96..eb7e027 100644
 +      return;
 +    }
 +    bot.setDuckDelay(ms);
++    this.persistBotSetting(bot.currentConfig.id, { duckDelayMs: ms });
 +    this.reply(bot, userClid, ms === 0 ? 'Duck delay off — instant ducking.' : `Duck delay set: ducking after ${ms}ms of sustained speech.`);
 +  }
 +
@@ -453,6 +522,7 @@ index 379ee96..eb7e027 100644
 +      return;
 +    }
 +    bot.setDuckRelease(ms);
++    this.persistBotSetting(bot.currentConfig.id, { duckReleaseMs: ms });
 +    this.reply(bot, userClid, `Duck release set: music recovers ${ms}ms after speech stops.`);
 +  }
 +
@@ -463,6 +533,7 @@ index 379ee96..eb7e027 100644
 +    }
 +    if (args === 'on' || args === 'off') {
 +      bot.setDucking(args === 'on');
++      this.persistBotSetting(bot.currentConfig.id, { duckEnabled: args === 'on' });
 +      this.reply(bot, userClid, `Talk-ducking ${args}.`);
 +      return;
 +    }
@@ -480,7 +551,90 @@ index 379ee96..eb7e027 100644
 +      return;
 +    }
 +    bot.setCrossfade(s);
++    this.persistBotSetting(bot.currentConfig.id, { crossfadeSeconds: s });
 +    this.reply(bot, userClid, s === 0 ? 'Crossfade off — hard cuts.' : `Crossfade set to ${s}s.`);
++  }
++
++  /** !skipto <n> — jump straight to a queue position. */
++  private async handleSkipto(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    const n = parseInt(args);
++    if (isNaN(n) || n < 1) {
++      this.reply(bot, userClid, `Usage: !skipto <queue position> (queue has ${bot.queue.length})`);
++      return;
++    }
++    const item = bot.queue.playAt(n - 1);
++    if (!item) {
++      this.reply(bot, userClid, `Invalid position. Queue has ${bot.queue.length} tracks.`);
++      return;
++    }
++    if (item.streamUrl) {
++      await bot.playStream(item);
++    } else {
++      await bot.play(item);
++    }
++    this.reply(bot, userClid, `Skipped to #${n}: ${item.title}`);
++  }
++
++  /** !lib — browse and play the music library from chat. */
++  private async handleLib(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    const serverConfigId = bot.currentConfig.serverConfigId;
++    if (!serverConfigId) {
++      this.reply(bot, userClid, 'Error: bot has no server config.');
++      return;
++    }
++    const parts = (args || '').trim().split(/\s+/);
++    const sub = (parts[0] || '').toLowerCase();
++    const rest = args ? args.substring(sub.length).trim() : '';
++
++    if (!sub || sub === 'list') {
++      const songs = await this.prisma.song.findMany({ where: { serverConfigId }, orderBy: { id: 'asc' }, take: 10 });
++      const total = await this.prisma.song.count({ where: { serverConfigId } });
++      if (songs.length === 0) {
++        this.reply(bot, userClid, 'Library is empty. Upload songs in the web UI (Library tab).');
++        return;
++      }
++      const lines = songs.map((sg) => `[${sg.id}] ${sg.artist ? sg.artist + ' - ' : ''}${sg.title}`);
++      this.reply(bot, userClid, `Library (${total} tracks):\n${lines.join('\n')}\n!lib play <id|name> — queue a track`);
++      return;
++    }
++
++    if (sub === 'play') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib play <id|name>');
++        return;
++      }
++      const asId = parseInt(rest);
++      const song = !isNaN(asId)
++        ? await this.prisma.song.findFirst({ where: { id: asId, serverConfigId } })
++        : await this.prisma.song.findFirst({
++            where: { serverConfigId, title: { contains: rest } },
++            orderBy: { id: 'asc' },
++          });
++      if (!song) {
++        this.reply(bot, userClid, `Library track "${rest}" not found. Use !lib to list.`);
++        return;
++      }
++      const item: QueueItem = {
++        id: `lib_${song.id}_${Date.now()}`,
++        title: song.title,
++        artist: song.artist ?? undefined,
++        duration: song.duration ?? undefined,
++        filePath: song.filePath,
++        source: song.source as any,
++        sourceUrl: song.sourceUrl ?? undefined,
++      };
++      bot.queue.add(item);
++      if (bot.status === 'playing' || bot.status === 'paused') {
++        this.reply(bot, userClid, `Queued: ${item.title} (position #${bot.queue.length})`);
++      } else {
++        bot.queue.playAt(bot.queue.length - 1);
++        await bot.play(item);
++        this.reply(bot, userClid, `Now playing: ${item.title}`);
++      }
++      return;
++    }
++
++    this.reply(bot, userClid, 'Usage: !lib [list|play <id|name>]');
 +  }
 +
 +  /** Log every aired track (all sources) to the PlayedTrack history. */
@@ -581,6 +735,119 @@ index 379ee96..eb7e027 100644
 +    }
 +
 +    this.reply(bot, userClid, 'Usage: !history [play <n>]');
++  }
++
++  /** Fire-and-forget persistence of a bot runtime setting (QuadNix custom). */
++  private persistBotSetting(botId: number, data: Record<string, unknown>): void {
++    this.prisma.musicBot.update({ where: { id: botId }, data }).catch((err: any) => {
++      console.error(`[MusicCmd] persist setting failed: ${err.message}`);
++    });
++  }
++
++  private async handleAvatar(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    console.log(`[Avatar] cmd: "${args}" (ts3id=${bot.ts3ClientId})`);
++    if (!args) {
++      this.reply(bot, userClid, 'Usage: !avatar <image-url> · !avatar file <path> · !avatar off — remove (max 250 KB)');
++      return;
++    }
++    try {
++      // Resolve the bot's client database id via the WebQuery clientlist
++      // (voice-protocol whoami returns dbid=0 on the TS6 beta server)
++      const cfg = await this.prisma.tsServerConfig.findUnique({ where: { id: bot.currentConfig.serverConfigId } });
++      if (!cfg) throw new Error('server config not found');
++      // NOTE: node fetch blocks port 10080 (Chromium blocklist) — use http.get
++      const listResp: any = await new Promise((resolve, reject) => {
++        http
++          .get(
++            `http://${cfg.host}:${cfg.webqueryPort}/1/clientlist`,
++            { headers: { 'x-api-key': decrypt(cfg.apiKey) } },
++            (res) => {
++              let d = '';
++              res.on('data', (c: Buffer) => (d += c));
++              res.on('end', () => {
++                try {
++                  resolve(JSON.parse(d));
++                } catch (e: any) {
++                  reject(e);
++                }
++              });
++            },
++          )
++          .on('error', reject);
++      });
++      const list: any = listResp;
++      const botEntry = (list.body ?? []).find((c: any) => parseInt(c.clid) === bot.ts3ClientId);
++      if (!botEntry) throw new Error(`bot not found in clientlist (ts3id=${bot.ts3ClientId})`);
++      const dbid = parseInt(botEntry.client_database_id);
++      console.log(`[Avatar] dbid=${dbid} (clid=${botEntry.clid})`);
++      if (args === 'off' || args === 'remove') {
++        const ft = await this.ftInitUploadViaSsh(bot, 0, `/avatar_${dbid}`);
++        await bot.uploadFtData(ft.ftkey, ft.port, Buffer.alloc(0));
++        this.reply(bot, userClid, 'Avatar removed.');
++        return;
++      }
++      let buf: Buffer;
++      if (args.startsWith('file ')) {
++        // Admin path: kubectl cp an image into the pod, then set it
++        const p = args.slice(5).trim();
++        buf = fs.readFileSync(p);
++      } else {
++        if (!/^https?:\/\//.test(args)) {
++          this.reply(bot, userClid, 'Usage: !avatar <image-url> | !avatar file <path> | !avatar off');
++          return;
++        }
++        this.reply(bot, userClid, 'Downloading image...');
++        const resp = await fetch(args);
++        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
++        buf = Buffer.from(await resp.arrayBuffer());
++      }
++      if (buf.length === 0) throw new Error('empty file');
++      if (buf.length > 250_000) throw new Error(`image too large (${Math.round(buf.length / 1024)} KB, max 250 KB)`);
++      const isPng = buf[0] === 0x89 && buf[1] === 0x50;
++      const isJpg = buf[0] === 0xff && buf[1] === 0xd8;
++      const isGif = buf[0] === 0x47 && buf[1] === 0x49;
++      if (!isPng && !isJpg && !isGif) throw new Error('not an image (png/jpg/gif only)');
++      const ft = await this.ftInitUploadViaSsh(bot, buf.length, `/avatar_${dbid}`);
++      await bot.uploadFtData(ft.ftkey, ft.port, buf);
++      this.reply(bot, userClid, `Avatar set (${Math.round(buf.length / 1024)} KB).`);
++    } catch (err: any) {
++      console.error(`[Avatar] FAILED: ${err.message}`);
++      this.reply(bot, userClid, `Avatar failed: ${err.message}`);
++    }
++  }
++
++  /**
++   * One-shot SSH query: run ftinitupload as serveradmin (full rights — the
++   * TS6 voice-protocol ftinitupload returns no ftkey and the WebQuery API
++   * blocks filetransfer commands for API keys). Returns ftkey + port.
++   */
++  private async ftInitUploadViaSsh(bot: VoiceBot, size: number, avatarName: string): Promise<{ ftkey: string; port: number }> {
++    const cfg = await this.prisma.tsServerConfig.findUnique({ where: { id: bot.currentConfig.serverConfigId } });
++    if (!cfg?.sshUsername || !cfg.sshPassword || !cfg.sshPort) {
++      throw new Error('SSH query credentials not configured for this server');
++    }
++    const client = new SshQueryClient({
++      host: cfg.host,
++      port: cfg.sshPort,
++      username: cfg.sshUsername,
++      password: decrypt(cfg.sshPassword),
++    });
++    await client.connect();
++    try {
++      // SSH query sessions start at instance level — file commands are
++      // virtual-server scoped (error 1024 invalid serverID without this)
++      await client.executeCommand('use sid=1');
++      const response = await client.executeCommand(
++        `ftinitupload clientftfid=1 name=${avatarName} cid=0 cpw= size=${size} overwrite=1 resume=0`,
++      );
++      console.log(`[Avatar] ssh ftinitupload: ${response.substring(0, 160)}`);
++      const ftkeyMatch = response.match(/ftkey=([^\s]+)/);
++      const portMatch = response.match(/port=(\d+)/);
++      if (!ftkeyMatch) throw new Error(`ftinitupload response: ${response.substring(0, 120)}`);
++      return { ftkey: ftkeyMatch[1], port: portMatch ? parseInt(portMatch[1]) : 30033 };
++    } finally {
++      try { client.destroy(); } catch { }
++    }
 +  }
 +
 +  /** AutoDJ: queue empty + idle → play a weighted-random library track. */
@@ -810,11 +1077,47 @@ index eb9f18a..1b86927 100644
    constructor() {
      super();
    }
+diff --git a/packages/backend/src/voice/voice-bot-manager.ts b/packages/backend/src/voice/voice-bot-manager.ts
+index 377a36b..bdef77b 100644
+--- a/packages/backend/src/voice/voice-bot-manager.ts
++++ b/packages/backend/src/voice/voice-bot-manager.ts
+@@ -68,6 +68,12 @@ export class VoiceBotManager extends EventEmitter {
+         sidecarBinaryPath: process.env.SIDECAR_BINARY_PATH,
+         sidecarPort: (dbBot as any).sidecarPort ?? 9800,
+         streamPreset: (dbBot as any).streamPreset ?? '720p',
++        // QuadNix custom: persisted runtime settings
++        crossfadeSeconds: dbBot.crossfadeSeconds ?? undefined,
++        duckEnabled: dbBot.duckEnabled ?? undefined,
++        duckDelayMs: dbBot.duckDelayMs ?? undefined,
++        duckReleaseMs: dbBot.duckReleaseMs ?? undefined,
++        autoDjEnabled: dbBot.autoDjEnabled ?? undefined,
+       };
+ 
+       const bot = this.createBotInstance(config);
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..e6db44c 100644
+index 1af2ba9..ab9ea4b 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
-@@ -85,6 +85,20 @@ export class VoiceBot extends EventEmitter {
+@@ -1,4 +1,5 @@
+ import { EventEmitter } from 'events';
++import net from 'net';
+ import { Ts3Client, type Ts3ClientOptions, generateIdentity, type IdentityData, buildCommand } from './tslib/index.js';
+ import { AudioPipeline, FRAME_MS, BYTES_PER_FRAME } from './audio/pipeline.js';
+ import { PlayQueue, type QueueItem } from './playlist/queue.js';
+@@ -74,6 +75,12 @@ export interface VoiceBotConfig {
+   sidecarBinaryPath?: string;
+   sidecarPort?: number;
+   streamPreset?: string;
++  // QuadNix custom: persisted runtime settings
++  crossfadeSeconds?: number;
++  duckEnabled?: boolean;
++  duckDelayMs?: number;
++  duckReleaseMs?: number;
++  autoDjEnabled?: boolean;
+ }
+ 
+ export class VoiceBot extends EventEmitter {
+@@ -85,6 +92,23 @@ export class VoiceBot extends EventEmitter {
    private _lastError: string = '';
    private identity: IdentityData | null = null;
    private playbackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -832,19 +1135,28 @@ index 1af2ba9..e6db44c 100644
 +  private voiceStartAt = 0;
 +  // Hold time after speech stops before music returns to full (ms)
 +  private duckReleaseMs = 1200;
++  private duckHoldUntil = 0;
++  // Avatar upload (QuadNix custom)
++  private rcCounter = 0;
    private _nowPlaying: QueueItem | null = null;
  
    // PCM-level playback state
-@@ -137,6 +151,8 @@ export class VoiceBot extends EventEmitter {
+@@ -136,7 +160,14 @@ export class VoiceBot extends EventEmitter {
+     super();
      this.config = config;
      this._originalNickname = config.nickname;
++    // Restore persisted runtime settings (QuadNix custom)
++    if (config.crossfadeSeconds !== undefined) this.crossfadeSeconds = config.crossfadeSeconds;
++    if (config.duckEnabled !== undefined) this.duckEnabled = config.duckEnabled;
++    if (config.duckDelayMs !== undefined) this.duckDelayMs = config.duckDelayMs;
++    if (config.duckReleaseMs !== undefined) this.duckReleaseMs = config.duckReleaseMs;
      this.client = new Ts3Client();
 +    // Talk-ducking: measure incoming voice energy from other users
 +    this.client.on('voice', (buf: Buffer) => this.handleIncomingVoice(buf));
      this.pipeline = new AudioPipeline();
      this.queue = new PlayQueue();
  
-@@ -251,6 +267,19 @@ export class VoiceBot extends EventEmitter {
+@@ -251,6 +282,19 @@ export class VoiceBot extends EventEmitter {
      }
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
@@ -864,7 +1176,7 @@ index 1af2ba9..e6db44c 100644
      } catch { }
    }
  
-@@ -259,6 +288,7 @@ export class VoiceBot extends EventEmitter {
+@@ -259,6 +303,7 @@ export class VoiceBot extends EventEmitter {
      if (this._status === 'stopped') return;
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
@@ -872,7 +1184,7 @@ index 1af2ba9..e6db44c 100644
      } catch { }
    }
  
-@@ -536,6 +566,81 @@ export class VoiceBot extends EventEmitter {
+@@ -536,6 +581,192 @@ export class VoiceBot extends EventEmitter {
      this.emit('volumeChange', this.config.volume);
    }
  
@@ -914,6 +1226,113 @@ index 1af2ba9..e6db44c 100644
 +  }
 +
 +  /**
++   * Send a command and wait for its echoed return_code response (QuadNix
++   * custom — upstream fire-and-forgets everything). Resolves with the data
++   * line params; rejects on the trailing ts3error or timeout.
++   */
++  private sendCommandAwaitResponse(command: string, match: (p: Record<string, string>) => boolean, timeoutMs = 6000): Promise<Record<string, string>> {
++    const rc = `rc${++this.rcCounter}`;
++    this.client.sendCommand(`${command} return_code=${rc}`);
++    return new Promise<Record<string, string>>((resolve, reject) => {
++      let done = false;
++      const onData = (parsed: { name: string; params: Record<string, string> }) => {
++        if (this.rcCounter > 0) {
++          console.log(`[QDebug] ${parsed.name} | ${JSON.stringify(parsed.params).substring(0, 220)}`);
++        }
++        if (done) return;
++        if (parsed.name === 'error') return; // ts3error handler owns these
++        if (parsed.params.return_code !== undefined) return;
++        if (!match(parsed.params)) return;
++        done = true;
++        cleanup();
++        resolve(parsed.params);
++      };
++      const onErr = (params: Record<string, string>) => {
++        if (done) return;
++        if (params.return_code !== rc) return;
++        done = true;
++        cleanup();
++        if (params.id === '0') {
++          resolve({}); // command ok, no data line
++        } else {
++          reject(new Error(`TS3 error ${params.id}: ${params.msg || 'unknown'}`));
++        }
++      };
++      const cleanup = () => {
++        clearTimeout(timer);
++        this.client.off('command', onData);
++        this.client.off('ts3error', onErr);
++      };
++      const timer = setTimeout(() => {
++        if (done) return;
++        done = true;
++        cleanup();
++        reject(new Error('server query timed out'));
++      }, timeoutMs);
++      this.client.on('command', onData);
++      this.client.on('ts3error', onErr);
++    });
++  }
++
++  /**
++   * Upload a PNG buffer as this bot's avatar via the TS3 file-transfer
++   * protocol (QuadNix custom). An empty buffer deletes the avatar.
++   * Server-side cap: i_client_max_avatar_filesize (default 250 KB).
++   */
++  async setAvatar(png: Buffer, dbid: number): Promise<void> {
++    if (png.length > 250_000) {
++      throw new Error('avatar too large (max 250 KB)');
++    }
++    if (!dbid) throw new Error('could not resolve client database id');
++    console.log(`[Avatar] uploading /avatar_${dbid} (${png.length} bytes)`);
++    const ft = await this.sendCommandAwaitResponse(
++      buildCommand('ftinitupload', {
++        clientftfid: ++this.rcCounter,
++        name: `/avatar_${dbid}`,
++        cid: 0,
++        cpw: '',
++        size: png.length,
++        overwrite: 1,
++        resume: 0,
++      }),
++      (p) => 'ftkey' in p,
++    );
++    console.log(`[Avatar] ft params: ${JSON.stringify(ft)}`);
++    if (!ft.ftkey) {
++      throw new Error(`ftinitupload incomplete — TS6 response shape: ${JSON.stringify(ft)}`);
++    }
++    // TS6 no longer echoes the transfer port — it's the server's configured
++    // filetransfer port (30033, exposed on the query service)
++    await this.transferUpload(this.config.serverHost, parseInt(ft.port) || 30033, ft.ftkey, png);
++  }
++
++  /** Push raw bytes over the file-transfer connection (QuadNix custom). */
++  uploadFtData(ftkey: string, port: number, data: Buffer): Promise<void> {
++    return this.transferUpload(this.config.serverHost, port, ftkey, data);
++  }
++
++  private transferUpload(host: string, port: number, ftkey: string, data: Buffer): Promise<void> {
++    return new Promise<void>((resolve, reject) => {
++      const sock = net.connect(port, host, () => {
++        try {
++          // Protocol: raw ftkey bytes followed by the raw payload — the size
++          // was already declared in ftinitupload
++          sock.write(Buffer.from(ftkey, 'ascii'));
++          sock.write(data);
++          setTimeout(() => {
++            sock.end();
++            resolve();
++          }, 400);
++        } catch (e: any) {
++          sock.destroy();
++          reject(e);
++        }
++      });
++      sock.on('error', reject);
++    });
++  }
++
++  /**
 +   * Incoming voice packets from the bot's channel. Decodes and measures RMS
 +   * energy; speech above a threshold ducks the music (see playback loop).
 +   * Payload layout varies by server build — try both offsets.
@@ -942,6 +1361,10 @@ index 1af2ba9..e6db44c 100644
 +      // Voice episode starts on first loud packet; gaps > 300ms reset it
 +      if (this.voiceStartAt === 0 || now - this.lastVoiceAt > 300) this.voiceStartAt = now;
 +      this.lastVoiceAt = now;
++      // Once sustained past the attack delay, extend the release hold
++      if (now - this.voiceStartAt >= this.duckDelayMs) {
++        this.duckHoldUntil = Math.max(this.duckHoldUntil, now + this.duckReleaseMs);
++      }
 +    } else if (this.voiceStartAt !== 0 && now - this.lastVoiceAt > 300) {
 +      this.voiceStartAt = 0;
 +    }
@@ -954,18 +1377,14 @@ index 1af2ba9..e6db44c 100644
    skip(): void {
      this.stopIcyPolling();
      this.stopPlayback();
-@@ -666,13 +771,85 @@ export class VoiceBot extends EventEmitter {
+@@ -666,13 +897,81 @@ export class VoiceBot extends EventEmitter {
          nextDue = now + FRAME_MS;
        }
  
 +      // Talk-ducking gain smoothing (drop to 25% once voice is sustained,
 +      // hold for duckReleaseMs after speech stops, then recover)
 +      if (this.duckEnabled) {
-+        const speaking =
-+          this.voiceStartAt !== 0 &&
-+          Date.now() - this.voiceStartAt >= this.duckDelayMs &&
-+          Date.now() - this.lastVoiceAt < this.duckReleaseMs;
-+        const target = speaking ? 0.25 : 1;
++        const target = this.duckHoldUntil > Date.now() ? 0.25 : 1;
 +        this.duckGain += (target - this.duckGain) * 0.3;
 +      }
 +
@@ -1041,7 +1460,7 @@ index 1af2ba9..e6db44c 100644
        // End-of-track handling
        if (this.frameIndex >= this.pcmFrames.length) {
          this.client.sendVoiceStop();
-@@ -729,6 +906,8 @@ export class VoiceBot extends EventEmitter {
+@@ -729,6 +1028,8 @@ export class VoiceBot extends EventEmitter {
      this.pcmFrames = [];
      this.frameIndex = 0;
      this.pausedAtFrame = 0;

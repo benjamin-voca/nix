@@ -227,6 +227,12 @@ spec:
       port: 9987
       targetPort: voice
       protocol: UDP
+    # File transfer — ts6-manager avatar uploads do ftinitupload over the
+    # query connection, then push bytes to this port on the same host
+    - name: filetransfer
+      port: 30033
+      targetPort: filetransfer
+      protocol: TCP
 '';
 in {
   chartFiles = {};

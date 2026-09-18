@@ -1,5 +1,14 @@
 ## Nix Agent Notes
 
+### Patching upstream apps into our fork (ts6-manager pattern)
+
+Custom features for third-party apps live in `docker/ts6-manager/`:
+- `music-commands.patch` — the cumulative patch vs upstream (regenerate with `git diff FETCH_HEAD HEAD` from the clone, against the commit in `UPSTREAM_COMMIT`)
+- `build-in-cluster.sh <tag>` — THE build path: renders `kaniko-build-job.yaml` (Forgejo token from sops at runtime), runs kaniko in-cluster, pushes to Harbor. Never build locally + upload.
+- Fork source lives on Forgejo: `Benjamin/ts6-manager-fork` (push via `ssh -J backbone01 -p 32222` — the CF tunnel drops large packs)
+
+Workflow: edit source (clone at UPSTREAM_COMMIT, apply patch, amend) → push to Forgejo → `./build-in-cluster.sh <tag>` → bump tag in `modules/outputs/bootstrap/ts6-manager.nix` → apply. See `docker/ts6-manager/README.md`.
+
 - **Deploy (deploy-rs)**: `nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks`
 - **Machine registry**: `machines/default.nix` — source of truth for all hosts and roles
 - **Machine consumer**: `machines/consumer.nix` — bridges registry into NixOS module system
