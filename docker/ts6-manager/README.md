@@ -19,6 +19,9 @@ music bots (upstream only loads playlists through the web UI).
 | `!playlist queue <id|name>` | Append the playlist to the current queue (auto-starts if idle) |
 | `!playlist add <id\|name>` | Add the **currently playing track** to the playlist (creates the library Song row if missing) |
 | `!play <url\|query>` | Non-URL args are treated as a YouTube search — first result plays. Ad-hoc tracks land in the library automatically (deduped on `filePath`) |
+| `!skip [1-25]` | Skip n tracks in one go (default 1) |
+| `!clear [all]` | Drop all queued tracks, keep the current one playing. `!clear all` also stops playback |
+| `!queue remove <n\|a-b\|text\|all>` | Remove by position, 1-based inclusive range, or title/artist substring match. `all` = keep-current clear. The playing track is never dropped by range/text/all |
 | `!lib [play <id\|name>]` | List the library (up to 100 tracks) / queue a library track |
 | `!help` | Command reference, in-chat |
 

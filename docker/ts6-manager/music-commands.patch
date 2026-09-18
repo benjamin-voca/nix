@@ -81,7 +81,7 @@ index b4d5eb5..4cf3b67 100644
 +  }
  }
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..999d374 100644
+index 379ee96..04aede0 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
 @@ -1,8 +1,12 @@
@@ -107,7 +107,7 @@ index 379ee96..999d374 100644
 +  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
 +  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
 +  'duck', 'crossfade', 'xfade', 'duckdelay', 'duckrelease', 'history', 'avatar',
-+  'skipto', 'lib', 'library',
++  'skipto', 'lib', 'library', 'clear',
  ]);
  
  /**
@@ -153,7 +153,16 @@ index 379ee96..999d374 100644
      console.log(`[MusicCmd] Registered text command listener on bot ${botId}`);
    }
  
-@@ -108,6 +143,61 @@ export class MusicCommandHandler {
+@@ -82,7 +117,7 @@ export class MusicCommandHandler {
+           break;
+         case 'skip':
+         case 'next':
+-          await this.handleSkip(bot, userClid);
++          await this.handleSkip(bot, userClid, args);
+           break;
+         case 'prev':
+           await this.handlePrev(bot, userClid);
+@@ -108,6 +143,64 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -204,6 +213,9 @@ index 379ee96..999d374 100644
 +        case 'skipto':
 +          await this.handleSkipto(bot, userClid, args);
 +          break;
++        case 'clear':
++          this.handleClear(bot, userClid, args);
++          break;
 +        case 'lib':
 +        case 'library':
 +          await this.handleLib(bot, userClid, args);
@@ -215,7 +227,7 @@ index 379ee96..999d374 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -115,8 +205,15 @@ export class MusicCommandHandler {
+@@ -115,8 +208,15 @@ export class MusicCommandHandler {
      }
    }
  
@@ -231,7 +243,7 @@ index 379ee96..999d374 100644
        bot.sendTextMessage(targetClid, msg);
      } catch (err: any) {
        console.error(`[MusicCmd] Failed to send reply: ${err.message}`);
-@@ -183,19 +280,33 @@ export class MusicCommandHandler {
+@@ -183,19 +283,33 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -270,7 +282,7 @@ index 379ee96..999d374 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +315,7 @@ export class MusicCommandHandler {
+@@ -204,7 +318,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -279,7 +291,7 @@ index 379ee96..999d374 100644
        };
  
        bot.queue.add(queueItem);
-@@ -212,6 +323,9 @@ export class MusicCommandHandler {
+@@ -212,6 +326,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -289,7 +301,108 @@ index 379ee96..999d374 100644
        // If something is already playing, queue it instead of interrupting
        if (bot.status === 'playing' || bot.status === 'paused') {
          this.reply(bot, userClid, `Queued: ${info.artist} - ${info.title} (position #${bot.queue.length})`);
-@@ -314,6 +428,9 @@ export class MusicCommandHandler {
+@@ -250,17 +367,71 @@ export class MusicCommandHandler {
+       return;
+     }
+ 
+-    // !queue remove <index>
+-    if (args.toLowerCase().startsWith('remove ')) {
+-      const idx = parseInt(args.substring(7).trim()) - 1; // 1-based to 0-based
++    // !queue remove <n|a-b|text|all>
++    if (args.toLowerCase().startsWith('remove')) {
++      const rest = args.substring(6).trim();
+       const items = bot.queue.getAll();
+-      if (isNaN(idx) || idx < 0 || idx >= items.length) {
+-        this.reply(bot, userClid, `Invalid index. Queue has ${items.length} tracks.`);
++      const playing = bot.status === 'playing' || bot.status === 'paused';
++      const cur = bot.queue.index;
++      if (!rest) {
++        this.reply(bot, userClid, `Usage: !queue remove <n|a-b|text|all> (queue has ${items.length})`);
+         return;
+       }
+-      const removed = items[idx];
+-      bot.queue.remove(removed.id);
+-      this.reply(bot, userClid, `Removed #${idx + 1}: ${removed.title}`);
++
++      // !queue remove all — wipe everything except the playing track
++      if (rest.toLowerCase() === 'all') {
++        this.handleClear(bot, userClid, '');
++        return;
++      }
++
++      // !queue remove <a-b> — 1-based inclusive range
++      const range = rest.match(/^(\d+)\s*-\s*(\d+)$/);
++      if (range) {
++        const start = parseInt(range[1]);
++        const end = parseInt(range[2]);
++        if (start < 1 || end > items.length || start > end) {
++          this.reply(bot, userClid, `Invalid range. Queue has ${items.length} tracks.`);
++          return;
++        }
++        let removed = 0;
++        for (let i = end - 1; i >= start - 1; i--) {
++          if (playing && i === cur) continue; // never drop the playing track here
++          bot.queue.remove(items[i].id);
++          removed++;
++        }
++        this.reply(bot, userClid, removed === 0
++          ? `Nothing removed — #${start}-${end} is the playing track.`
++          : `Removed ${removed} track(s) (#${start}-${end}).`);
++        return;
++      }
++
++      // !queue remove <n> — single 1-based position
++      const idx = parseInt(rest) - 1; // 1-based to 0-based
++      if (!isNaN(idx)) {
++        if (idx < 0 || idx >= items.length) {
++          this.reply(bot, userClid, `Invalid index. Queue has ${items.length} tracks.`);
++          return;
++        }
++        const removed = items[idx];
++        bot.queue.remove(removed.id);
++        this.reply(bot, userClid, `Removed #${idx + 1}: ${removed.title}`);
++        return;
++      }
++
++      // !queue remove <text> — drop every queued track matching title/artist
++      const needle = rest.toLowerCase();
++      let removed = 0;
++      for (let i = items.length - 1; i >= 0; i--) {
++        if (playing && i === cur) continue;
++        const it = items[i];
++        if (`${it.title} ${it.artist ?? ''}`.toLowerCase().includes(needle)) {
++          bot.queue.remove(it.id);
++          removed++;
++        }
++      }
++      this.reply(bot, userClid, removed === 0
++        ? `No queued tracks match "${rest}".`
++        : `Removed ${removed} track(s) matching "${rest}".`);
+       return;
+     }
+ 
+@@ -281,16 +452,15 @@ export class MusicCommandHandler {
+       return;
+     }
+ 
+-    // !queue clear
+-    if (args.toLowerCase() === 'clear') {
+-      bot.queue.clear();
+-      this.reply(bot, userClid, 'Queue cleared.');
++    // !queue clear [all]
++    if (args.toLowerCase().startsWith('clear')) {
++      this.handleClear(bot, userClid, args.substring(5).trim());
+       return;
+     }
+ 
+     // URL provided — add to queue without interrupting
+     if (!args.startsWith('http://') && !args.startsWith('https://')) {
+-      this.reply(bot, userClid, 'Usage: !queue [show|play <n>|remove <n>|clear|<url>]');
++      this.reply(bot, userClid, 'Usage: !queue [show|play <n>|remove <n|a-b|text>|clear [all]|<url>]');
+       return;
+     }
+ 
+@@ -314,6 +484,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -299,20 +412,88 @@ index 379ee96..999d374 100644
        // If nothing is playing, start playing the queued item
        if (bot.status !== 'playing' && bot.status !== 'paused') {
          bot.queue.playAt(bot.queue.length - 1);
-@@ -345,6 +462,12 @@ export class MusicCommandHandler {
+@@ -344,19 +517,71 @@ export class MusicCommandHandler {
+     }
    }
  
-   private async handleSkip(bot: VoiceBot, userClid: number): Promise<void> {
+-  private async handleSkip(bot: VoiceBot, userClid: number): Promise<void> {
+-    const next = bot.queue.next();
+-    if (next) {
+-      if (next.streamUrl) {
+-        await bot.playStream(next);
+-      } else {
+-        await bot.play(next);
++  private async handleSkip(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    let n = 1;
++    if (args) {
++      n = parseInt(args);
++      if (isNaN(n) || n < 1 || n > 25) {
++        this.reply(bot, userClid, 'Usage: !skip [1-25]');
++        return;
+       }
+-      this.reply(bot, userClid, `Skipped to: ${next.title}`);
++    }
 +    const now = Date.now();
 +    if (now - this.lastSkipAt < 400) {
 +      this.reply(bot, userClid, 'Slow down — skipping again in a moment.');
 +      return;
 +    }
 +    this.lastSkipAt = now;
-     const next = bot.queue.next();
-     if (next) {
-       if (next.streamUrl) {
-@@ -487,4 +610,772 @@ export class MusicCommandHandler {
++    let next: QueueItem | null = null;
++    let skipped = 0;
++    for (let i = 0; i < n; i++) {
++      const step = bot.queue.next();
++      if (!step) break;
++      next = step;
++      skipped++;
++    }
++    if (!next) {
++      bot.stopAudio();
++      this.reply(bot, userClid, skipped > 0
++        ? `Skipped ${skipped} — end of queue, playback stopped.`
++        : 'Nothing to skip — queue empty.');
++      return;
++    }
++    if (next.streamUrl) {
++      await bot.playStream(next);
+     } else {
++      await bot.play(next);
++    }
++    this.reply(bot, userClid, n > 1 ? `Skipped ${skipped} → ${next.title}` : `Skipped to: ${next.title}`);
++  }
++
++  /**
++   * !clear [all] — queue wipe. Default drops every queued track but keeps the
++   * current one playing; "all" also stops playback and empties the queue.
++   */
++  private handleClear(bot: VoiceBot, userClid: number, args: string): void {
++    if (args && args.toLowerCase() !== 'all') {
++      this.reply(bot, userClid, 'Usage: !clear [all]');
++      return;
++    }
++    if (args.toLowerCase() === 'all') {
++      bot.queue.clear();
+       bot.stopAudio();
+-      this.reply(bot, userClid, 'Queue empty — playback stopped.');
++      this.reply(bot, userClid, 'Queue cleared, playback stopped.');
++      return;
++    }
++    const playing = bot.status === 'playing' || bot.status === 'paused';
++    const cur = bot.queue.index;
++    const items = bot.queue.getAll();
++    const startIdx = playing ? cur + 1 : 0;
++    let removed = 0;
++    for (let i = items.length - 1; i >= startIdx; i--) {
++      bot.queue.remove(items[i].id);
++      removed++;
+     }
++    this.reply(bot, userClid, removed === 0
++      ? 'Queue is already clear.'
++      : `Removed ${removed} queued track(s)${playing ? ' — current track keeps playing' : ''}.`);
+   }
+ 
+   private async handlePrev(bot: VoiceBot, userClid: number): Promise<void> {
+@@ -487,4 +712,772 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -324,9 +505,9 @@ index 379ee96..999d374 100644
 +      'Music bot commands:',
 +      '!play <url|query> — play now (searches YouTube) · !play resumes',
 +      '!search <query> → !pick <1-10> — pick multiple from results',
-+      '!pause · !stop · !skip · !prev',
-+      '!queue — show · !queue <url> — append · !queue clear',
-+      '!queue play <n> · !queue remove <n>',
++      '!pause · !stop · !skip [1-25] · !prev',
++      '!queue — show · !queue <url> — append',
++      '!queue play <n> · !queue remove <n|a-b|text|all> · !clear [all]',
 +      '!repeat [off|one|all] · !shuffle [on|off]',
 +      '!seek <m:ss|+s|-s> · !np — position / now playing',
 +      '!skipto <n> — jump to queue position · !lib [play <id|name>] — library',
