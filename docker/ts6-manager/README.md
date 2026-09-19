@@ -19,6 +19,7 @@ music bots (upstream only loads playlists through the web UI).
 | `!playlist queue <id|name>` | Append the playlist to the current queue (auto-starts if idle) |
 | `!playlist add <id\|name>` | Add the **currently playing track** to the playlist (creates the library Song row if missing) |
 | `!play <url\|query>` | Non-URL args are treated as a YouTube search — first result plays. Ad-hoc tracks land in the library automatically (deduped on `filePath`) |
+| `!play <mix-url>` | YouTube mix URLs (`…watch?v=<id>&list=RD…`) start the anchor video and create/reuse a DB playlist named `"<video title> -- mix"` (e.g. `U 96 - Club Bizarre -- mix`). Every track the mix serves is appended to that playlist. Loading is lazy: exactly one track is buffered ahead, the next one is only fetched when the queue runs dry (track end or `!next`) — `!next` skips instantly while the buffer holds, otherwise it loads the next mix song on demand. Active until `!stop`, `!clear all`, `!playlist play <x>`, another mix, or the mix runs dry |
 | `!skip [1-25]` | Skip n tracks in one go (default 1) |
 | `!clear [all]` | Drop all queued tracks, keep the current one playing. `!clear all` also stops playback |
 | `!queue remove <n\|a-b\|text\|all>` | Remove by position, 1-based inclusive range, or title/artist substring match. `all` = keep-current clear. The playing track is never dropped by range/text/all |

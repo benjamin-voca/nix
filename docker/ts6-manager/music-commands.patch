@@ -80,11 +80,467 @@ index b4d5eb5..4cf3b67 100644
 +    }
 +  }
  }
+diff --git a/packages/backend/src/voice/auto-dj.test.ts b/packages/backend/src/voice/auto-dj.test.ts
+new file mode 100644
+index 0000000..a4ff97c
+--- /dev/null
++++ b/packages/backend/src/voice/auto-dj.test.ts
+@@ -0,0 +1,317 @@
++import { describe, it } from 'node:test';
++import assert from 'node:assert/strict';
++import {
++  RECENT_WINDOW,
++  pickAutoDjTrack,
++  pushRecent,
++  remainingTracks,
++  shouldAutoDj,
++  toQueueItem,
++  trackKey,
++  type AutoDjTrack,
++} from './auto-dj.js';
++
++/** Deterministic LCG in [0,1) — statistical tests never flake. */
++function lcg(seed: number): () => number {
++  let s = seed >>> 0;
++  return () => {
++    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
++    return s / 4294967296;
++  };
++}
++
++const song = (over: Partial<AutoDjTrack> & { id: number }): AutoDjTrack => ({
++  title: `Song ${over.id}`,
++  filePath: `/music/${over.id}.mp3`,
++  source: 'youtube',
++  ...over,
++});
++
++describe('remainingTracks', () => {
++  it('empty queue → 0', () => {
++    assert.equal(remainingTracks(-1, 0), 0);
++  });
++
++  it('exhausted queue (index rewound to -1, items still present) → 0', () => {
++    // THE regression: PlayQueue never removes played items.
++    assert.equal(remainingTracks(-1, 1), 0);
++    assert.equal(remainingTracks(-1, 5), 0);
++    assert.equal(remainingTracks(-1, 100), 0);
++  });
++
++  it('playing first of n → n-1 remaining', () => {
++    assert.equal(remainingTracks(0, 3), 2);
++    assert.equal(remainingTracks(0, 1), 0);
++  });
++
++  it('playing mid-queue → counts only entries after current', () => {
++    assert.equal(remainingTracks(1, 3), 1);
++    assert.equal(remainingTracks(2, 5), 2);
++  });
++
++  it('playing last track → 0 (nothing queued behind it)', () => {
++    assert.equal(remainingTracks(2, 3), 0);
++    assert.equal(remainingTracks(4, 5), 0);
++  });
++
++  it('index beyond length (defensive) → 0', () => {
++    assert.equal(remainingTracks(3, 3), 0);
++    assert.equal(remainingTracks(7, 3), 0);
++  });
++});
++
++describe('shouldAutoDj', () => {
++  const idle = {
++    enabled: true,
++    nowPlaying: false,
++    status: 'connected',
++    queueIndex: -1,
++    queueLength: 0,
++    repeat: 'off',
++  };
++
++  it('idle + enabled → fire', () => {
++    assert.equal(shouldAutoDj(idle), true);
++  });
++
++  it('disabled → never fire (even when idle)', () => {
++    assert.equal(shouldAutoDj({ ...idle, enabled: false }), false);
++  });
++
++  it('stopped bot → never fire', () => {
++    assert.equal(shouldAutoDj({ ...idle, status: 'stopped' }), false);
++  });
++
++  it('something playing → never fire', () => {
++    assert.equal(shouldAutoDj({ ...idle, nowPlaying: true, queueIndex: 0, queueLength: 1 }), false);
++  });
++
++  it('paused counts as still playing', () => {
++    assert.equal(shouldAutoDj({ ...idle, status: 'paused', nowPlaying: true, queueIndex: 0, queueLength: 1 }), false);
++  });
++
++  it('queue with unplayed tracks → never fire (upstream advances on its own)', () => {
++    assert.equal(shouldAutoDj({ ...idle, queueIndex: 0, queueLength: 2 }), false);
++    assert.equal(shouldAutoDj({ ...idle, queueIndex: 1, queueLength: 3 }), false);
++  });
++
++  it('REGRESSION: exhausted-but-nonempty queue → fire (old length>0 guard silenced AutoDJ forever)', () => {
++    assert.equal(shouldAutoDj({ ...idle, queueIndex: -1, queueLength: 7 }), true);
++  });
++
++  it('repeat on → never fire (queue never runs dry)', () => {
++    assert.equal(shouldAutoDj({ ...idle, repeat: 'track' }), false);
++    assert.equal(shouldAutoDj({ ...idle, repeat: 'queue' }), false);
++  });
++
++  it('at trackEnd: index still points at finished track, unplayed remain → wait', () => {
++    // emit order: trackEnd fires before queue.next() advances the index
++    assert.equal(shouldAutoDj({ ...idle, queueIndex: 2, queueLength: 5 }), false);
++  });
++
++  it('at trackEnd: finished the last track → fire', () => {
++    assert.equal(shouldAutoDj({ ...idle, queueIndex: 4, queueLength: 5 }), true);
++  });
++});
++
++describe('trackKey', () => {
++  it('prefers sourceUrl', () => {
++    assert.equal(trackKey({ sourceUrl: 'https://yt/x', filePath: '/a.mp3' }), 'https://yt/x');
++  });
++
++  it('falls back to filePath for local tracks', () => {
++    assert.equal(trackKey({ sourceUrl: null, filePath: '/a.mp3' }), '/a.mp3');
++    assert.equal(trackKey({ sourceUrl: undefined, filePath: '/a.mp3' }), '/a.mp3');
++  });
++});
++
++describe('pushRecent', () => {
++  it('appends the key', () => {
++    assert.deepEqual(pushRecent(['a'], 'b'), ['a', 'b']);
++  });
++
++  it('caps at RECENT_WINDOW', () => {
++    let recent: string[] = [];
++    for (let i = 0; i < 20; i++) recent = pushRecent(recent, `k${i}`);
++    assert.equal(recent.length, RECENT_WINDOW);
++    assert.deepEqual(recent, ['k15', 'k16', 'k17', 'k18', 'k19']);
++  });
++
++  it('honours a custom size', () => {
++    assert.deepEqual(pushRecent(['a', 'b'], 'c', 2), ['b', 'c']);
++  });
++
++  it('does not mutate the input array', () => {
++    const input = ['a', 'b'];
++    const out = pushRecent(input, 'c');
++    assert.deepEqual(input, ['a', 'b']);
++    assert.notEqual(input, out);
++  });
++
++  it('empty input works', () => {
++    assert.deepEqual(pushRecent([], 'x'), ['x']);
++  });
++});
++
++describe('pickAutoDjTrack', () => {
++  it('empty library → null', () => {
++    assert.equal(pickAutoDjTrack({ songs: [] }), null);
++  });
++
++  it('single song → always that song, any rng', () => {
++    const s = song({ id: 1 });
++    for (const r of [0, 0.3, 0.999999]) {
++      assert.equal(pickAutoDjTrack({ songs: [s], rng: () => r }), s);
++    }
++  });
++
++  it('rng at the very bottom picks the first candidate', () => {
++    const songs = [song({ id: 1 }), song({ id: 2 }), song({ id: 3 })];
++    assert.equal(pickAutoDjTrack({ songs, rng: () => 0 }), songs[0]);
++  });
++
++  it('rng near the top picks the last candidate', () => {
++    const songs = [song({ id: 1 }), song({ id: 2 }), song({ id: 3 })];
++    assert.equal(pickAutoDjTrack({ songs, rng: () => 0.9999999 }), songs[2]);
++  });
++
++  it('exact weighted boundaries: weights 1 vs 3 over total 4', () => {
++    const a = song({ id: 1, sourceUrl: 'a' });
++    const b = song({ id: 2, sourceUrl: 'b' });
++    const counts = new Map([['a', 0], ['b', 2]]); // w(a)=1, w(b)=3
++    // roll = rng*4; a wins while roll <= 1 (rng <= 0.25), b after
++    assert.equal(pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng: () => 0.25 }), a);
++    assert.equal(pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng: () => 0.2500001 }), b);
++    assert.equal(pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng: () => 0.5 }), b);
++    assert.equal(pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng: () => 0.9999999 }), b);
++  });
++
++  it('unweighted track (no history) has weight 1', () => {
++    const a = song({ id: 1, sourceUrl: 'a' });
++    const b = song({ id: 2, sourceUrl: 'b' });
++    const counts = new Map([['b', 8]]); // w(a)=1, w(b)=9, total 10
++    assert.equal(pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng: () => 0.09 }), a);
++    assert.equal(pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng: () => 0.11 }), b);
++  });
++
++  it('local files weight on filePath key, youtube on sourceUrl key', () => {
++    const local = song({ id: 1, source: 'local', sourceUrl: null, filePath: '/l.mp3' });
++    const yt = song({ id: 2, sourceUrl: 'yt', filePath: '/y.mp3' });
++    const counts = new Map([['/l.mp3', 4], ['yt', 0]]); // w(local)=5, w(yt)=1, total 6
++    assert.equal(pickAutoDjTrack({ songs: [local, yt], playCounts: counts, rng: () => 0.5 }), local);
++    assert.equal(pickAutoDjTrack({ songs: [local, yt], playCounts: counts, rng: () => 5 / 6 }), local);
++    assert.equal(pickAutoDjTrack({ songs: [local, yt], playCounts: counts, rng: () => 0.9 }), yt);
++  });
++
++  it('excludes recently played tracks', () => {
++    const songs = [song({ id: 1, sourceUrl: 'a' }), song({ id: 2, sourceUrl: 'b' })];
++    for (const r of [0, 0.5, 0.9999999]) {
++      assert.equal(pickAutoDjTrack({ songs, recent: ['a'], rng: () => r }), songs[1]);
++    }
++  });
++
++  it('all tracks recent → falls back to full library', () => {
++    const songs = [song({ id: 1, sourceUrl: 'a' }), song({ id: 2, sourceUrl: 'b' })];
++    assert.equal(pickAutoDjTrack({ songs, recent: ['a', 'b'], rng: () => 0 }), songs[0]);
++    assert.equal(pickAutoDjTrack({ songs, recent: ['a', 'b'], rng: () => 0.999 }), songs[1]);
++  });
++
++  it('recent filtering beats weighting: the only fresh track always wins', () => {
++    const fresh = song({ id: 1, sourceUrl: 'fresh' });
++    const fav = song({ id: 2, sourceUrl: 'fav' });
++    const counts = new Map([['fav', 1000]]); // heavily weighted
++    for (const r of [0, 0.2, 0.4, 0.6, 0.8, 0.999]) {
++      assert.equal(pickAutoDjTrack({ songs: [fresh, fav], playCounts: counts, recent: ['fav'], rng: () => r }), fresh);
++    }
++  });
++
++  it('returns an element of the input array (identity, not a copy)', () => {
++    const songs = [song({ id: 1 }), song({ id: 2 })];
++    const picked = pickAutoDjTrack({ songs, rng: lcg(7) });
++    assert.ok(songs.includes(picked!));
++  });
++
++  it('rng sweep: every pick is a valid candidate across the whole [0,1) domain', () => {
++    const songs = Array.from({ length: 25 }, (_, i) => song({ id: i, sourceUrl: `u${i}` }));
++    const counts = new Map(songs.map((s, i) => [s.sourceUrl!, i % 4]));
++    const seen = new Set<string>();
++    for (let i = 0; i < 1000; i++) {
++      const picked = pickAutoDjTrack({ songs, playCounts: counts, rng: () => i / 1000 });
++      assert.ok(picked, `rng=${i / 1000} produced null`);
++      assert.ok(songs.includes(picked));
++      seen.add(picked.sourceUrl!);
++    }
++    // full-domain sweep must reach every candidate at least once
++    assert.equal(seen.size, songs.length);
++  });
++
++  it('statistical: 9x-weighted track wins ~90% over 20k seeded draws', () => {
++    const a = song({ id: 1, sourceUrl: 'a' });
++    const b = song({ id: 2, sourceUrl: 'b' });
++    const counts = new Map([['b', 8]]); // w(a)=1, w(b)=9
++    let bWins = 0;
++    const rng = lcg(42);
++    for (let i = 0; i < 20000; i++) {
++      if (pickAutoDjTrack({ songs: [a, b], playCounts: counts, rng }) === b) bWins++;
++    }
++    const share = bWins / 20000;
++    assert.ok(share > 0.86 && share < 0.94, `expected ~0.9, got ${share}`);
++  });
++
++  it('statistical: unweighted library distributes across all tracks over seeded draws', () => {
++    const songs = Array.from({ length: 8 }, (_, i) => song({ id: i, sourceUrl: `u${i}` }));
++    const hits = new Map<string, number>();
++    const rng = lcg(1234);
++    for (let i = 0; i < 16000; i++) {
++      const p = pickAutoDjTrack({ songs, rng })!;
++      hits.set(p.sourceUrl!, (hits.get(p.sourceUrl!) ?? 0) + 1);
++    }
++    assert.equal(hits.size, songs.length);
++    for (const n of hits.values()) {
++      const share = n / 16000;
++      assert.ok(share > 0.08 && share < 0.17, `uniform track share out of band: ${share}`);
++    }
++  });
++
++  it('recent window cycles: with window 5 and library 3, rotation still reaches every track', () => {
++    const songs = [song({ id: 1, sourceUrl: 'a' }), song({ id: 2, sourceUrl: 'b' }), song({ id: 3, sourceUrl: 'c' })];
++    let recent: string[] = [];
++    const rng = lcg(99);
++    const hits = new Map<string, number>();
++    for (let i = 0; i < 3000; i++) {
++      const p = pickAutoDjTrack({ songs, recent, rng })!;
++      hits.set(p.sourceUrl!, (hits.get(p.sourceUrl!) ?? 0) + 1);
++      recent = pushRecent(recent, trackKey(p));
++    }
++    assert.equal(hits.size, songs.length);
++  });
++});
++
++describe('toQueueItem', () => {
++  it('maps all fields and embeds id + timestamp', () => {
++    const s = song({ id: 13, title: '505', artist: 'Arctic Monkeys', duration: 245, sourceUrl: 'yt' });
++    assert.deepEqual(toQueueItem(s, 1700000000000), {
++      id: 'lib_13_1700000000000',
++      title: '505',
++      artist: 'Arctic Monkeys',
++      duration: 245,
++      filePath: '/music/13.mp3',
++      source: 'youtube',
++      sourceUrl: 'yt',
++    });
++  });
++
++  it('null optionals become undefined (JSON-clean), not null', () => {
++    const s = song({ id: 1, artist: null, duration: null, sourceUrl: null });
++    const item = toQueueItem(s, 5);
++    assert.equal(item.artist, undefined);
++    assert.equal(item.duration, undefined);
++    assert.equal(item.sourceUrl, undefined);
++    assert.equal('artist' in item && item.artist === null, false);
++  });
++
++  it('distinct ids for distinct timestamps (dedupes queue entries)', () => {
++    const s = song({ id: 9 });
++    assert.notEqual(toQueueItem(s, 1).id, toQueueItem(s, 2).id);
++  });
++});
+diff --git a/packages/backend/src/voice/auto-dj.ts b/packages/backend/src/voice/auto-dj.ts
+new file mode 100644
+index 0000000..c0efae0
+--- /dev/null
++++ b/packages/backend/src/voice/auto-dj.ts
+@@ -0,0 +1,127 @@
++/**
++ * Pure AutoDJ selection logic — no I/O, no bot state, fully unit-testable.
++ *
++ * The MusicCommandHandler feeds this module runtime snapshots (queue index,
++ * library songs, play counts) and gets back decisions (should we pick a
++ * track, and which one). All randomness is injected so tests are exact.
++ */
++import type { QueueItem } from './playlist/queue.js';
++
++/** Minimal shape of a prisma `Song` row that AutoDJ cares about. */
++export interface AutoDjTrack {
++  id: number | string;
++  title: string;
++  artist?: string | null;
++  duration?: number | null;
++  filePath: string;
++  source: string;
++  sourceUrl?: string | null;
++}
++
++/** Snapshot of the bits of bot + queue state AutoDJ decisions depend on. */
++export interface AutoDjBotState {
++  enabled: boolean;
++  nowPlaying: boolean;
++  status: string;
++  queueIndex: number;
++  queueLength: number;
++  repeat: string;
++}
++
++/** Rolling window of recently AutoDJ'd track keys (deduped against). */
++export const RECENT_WINDOW = 5;
++
++/**
++ * Unplayed tracks left in the queue.
++ *
++ * PlayQueue keeps played items in its array — only `index` advances (and
++ * rewinds to -1 once the queue is exhausted). So `length > 0` does NOT mean
++ * there is anything left to play:
++ *   - length 0            → empty queue, 0 remaining
++ *   - index -1, length >0 → exhausted (every entry played), 0 remaining
++ *   - index i,  length n  → n - i - 1 entries after the current one
++ *
++ * Note: at `trackEnd` emit time `queue.next()` has not run yet, so `index`
++ * still points at the track that just finished — exactly what we want.
++ */
++export function remainingTracks(queueIndex: number, queueLength: number): number {
++  if (queueLength <= 0) return 0;
++  if (queueIndex < 0) return 0;
++  return Math.max(0, queueLength - queueIndex - 1);
++}
++
++/**
++ * Should AutoDJ fire right now? True only when the bot is connected, idle,
++ * repeat is off, and the queue has nothing left to play (possibly because
++ * it is exhausted-but-nonempty — the classic "autodj on but silent" bug).
++ */
++export function shouldAutoDj(state: AutoDjBotState): boolean {
++  if (!state.enabled) return false;
++  if (state.status === 'stopped') return false;
++  if (state.nowPlaying) return false;
++  if (state.repeat !== 'off') return false; // queue never runs dry → nothing to fill
++  return remainingTracks(state.queueIndex, state.queueLength) === 0;
++}
++
++/** Stable identity of a track for dedupe/history weighting. */
++export function trackKey(t: Pick<AutoDjTrack, 'sourceUrl' | 'filePath'>): string {
++  return t.sourceUrl ?? t.filePath;
++}
++
++/** Append a key to the recent window, capped at `size`, without mutating. */
++export function pushRecent(recent: string[], key: string, size: number = RECENT_WINDOW): string[] {
++  return [...recent, key].slice(-size);
++}
++
++export interface PickInput<T extends AutoDjTrack> {
++  songs: readonly T[];
++  /** sourceUrl → request count (favourites come up more often) */
++  playCounts?: ReadonlyMap<string, number>;
++  /** recently played keys; excluded unless that would empty the pool */
++  recent?: readonly string[];
++  /** [0,1) randomness source; defaults to Math.random */
++  rng?: () => number;
++}
++
++/**
++ * Weighted-random pick of the next AutoDJ track.
++ *
++ * - prefers tracks not in `recent`; falls back to the full library if every
++ *   track was played recently
++ * - weight = 1 + historical request count, so favourites surface more often
++ * - never returns null unless `songs` is empty
++ */
++export function pickAutoDjTrack<T extends AutoDjTrack>(input: PickInput<T>): T | null {
++  const { songs, playCounts, recent = [], rng = Math.random } = input;
++  if (songs.length === 0) return null;
++
++  const recentSet = new Set(recent);
++  const fresh = songs.filter((s) => !recentSet.has(trackKey(s)));
++  const candidates = fresh.length > 0 ? fresh : songs;
++
++  const weightOf = (s: T) => 1 + (playCounts?.get(trackKey(s)) ?? 0);
++  const total = candidates.reduce((acc, s) => acc + weightOf(s), 0);
++  let roll = rng() * total;
++  let picked = candidates[candidates.length - 1];
++  for (const s of candidates) {
++    roll -= weightOf(s);
++    if (roll <= 0) {
++      picked = s;
++      break;
++    }
++  }
++  return picked;
++}
++
++/** Map a library row to a queue entry (pure: `now` injected for the id). */
++export function toQueueItem(song: AutoDjTrack, now: number): QueueItem {
++  return {
++    id: `lib_${song.id}_${now}`,
++    title: song.title,
++    artist: song.artist ?? undefined,
++    duration: song.duration ?? undefined,
++    filePath: song.filePath,
++    source: song.source as QueueItem['source'],
++    sourceUrl: song.sourceUrl ?? undefined,
++  };
++}
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..04aede0 100644
+index 379ee96..ffe2a18 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -1,8 +1,12 @@
+@@ -1,8 +1,13 @@
  import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
@@ -95,11 +551,12 @@ index 379ee96..04aede0 100644
 +import { decrypt } from '../utils/crypto.js';
 +import { SshQueryClient } from '../bot-engine/ssh-query-client.js';
 +import type { QueueItem, RepeatMode } from './playlist/queue.js';
-+import { downloadYouTube, searchYouTube } from './audio/youtube.js';
++import { downloadYouTube, getYouTubeUrlInfo, searchYouTube } from './audio/youtube.js';
++import { pickAutoDjTrack, pushRecent, shouldAutoDj, toQueueItem, trackKey } from './auto-dj.js';
  
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
-@@ -10,7 +14,10 @@ const CMD_PREFIX = '!';
+@@ -10,9 +15,44 @@ const CMD_PREFIX = '!';
  const MUSIC_COMMANDS = new Set([
    'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
    'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
@@ -110,8 +567,42 @@ index 379ee96..04aede0 100644
 +  'skipto', 'lib', 'library', 'clear',
  ]);
  
++/** A YouTube mix link: watch?v=<id>&list=RD… (RD* lists are mixes/radio). */
++interface MixRef {
++  anchorVideoId: string;
++  listId: string;
++}
++
++/** Per-bot active mix. videoIds/cursor = consumed batch, grown by refetches. */
++interface MixState {
++  listId: string;
++  playlistId: number;
++  playlistName: string;
++  videoIds: string[];
++  cursor: number;
++}
++
++function parseMixUrl(raw: string): MixRef | null {
++  let u: URL;
++  try {
++    u = new URL(raw);
++  } catch {
++    return null;
++  }
++  const listId = u.searchParams.get('list');
++  if (!listId || !listId.startsWith('RD')) return null;
++  let anchor = u.searchParams.get('v');
++  if (!anchor && u.hostname.endsWith('youtu.be')) {
++    anchor = u.pathname.split('/').filter(Boolean)[0];
++  }
++  if (!anchor) return null;
++  return { anchorVideoId: anchor, listId };
++}
++
  /**
-@@ -22,6 +29,17 @@ const MUSIC_COMMANDS = new Set([
+  * Handles text-based music commands (!radio, !play, !stop, etc.)
+  * by listening directly on each VoiceBot's TS3 connection.
+@@ -22,6 +62,21 @@ const MUSIC_COMMANDS = new Set([
   */
  export class MusicCommandHandler {
    private registeredBots = new Set<number>();
@@ -126,10 +617,14 @@ index 379ee96..04aede0 100644
 +  private autoDjEnabled = new Map<number, boolean>();
 +  private recentAutoDj = new Map<number, string[]>();
 +  private lastSkipAt = 0;
++  // !play <mix-url> — active YouTube mix, per bot. Exactly one track is
++  // buffered ahead; the next one is only fetched when the queue runs dry.
++  private mixState = new Map<number, MixState>();
++  private mixPrefetch = new Map<number, Promise<QueueItem | null>>();
  
    constructor(
      private prisma: PrismaClient,
-@@ -42,6 +60,23 @@ export class MusicCommandHandler {
+@@ -42,11 +97,34 @@ export class MusicCommandHandler {
        });
      });
  
@@ -148,12 +643,23 @@ index 379ee96..04aede0 100644
 +      this.recordHistory(botId, bot, item).catch((err) => {
 +        console.error(`[MusicCmd] history write failed on bot ${botId}: ${err.message}`);
 +      });
++      // Mixes: buffer the next mix track the moment one starts
++      this.maybePrefetchMix(botId, bot).catch((err) => {
++        console.error(`[MusicCmd] mix prefetch failed on bot ${botId}: ${err.message}`);
++      });
 +    });
 +
      console.log(`[MusicCmd] Registered text command listener on bot ${botId}`);
    }
  
-@@ -82,7 +117,7 @@ export class MusicCommandHandler {
+   unregisterBot(botId: number): void {
+     this.registeredBots.delete(botId);
++    this.mixState.delete(botId);
++    this.mixPrefetch.delete(botId);
+   }
+ 
+   private async onTextMessage(botId: number, bot: VoiceBot, data: Record<string, string>): Promise<void> {
+@@ -82,7 +160,7 @@ export class MusicCommandHandler {
            break;
          case 'skip':
          case 'next':
@@ -162,7 +668,7 @@ index 379ee96..04aede0 100644
            break;
          case 'prev':
            await this.handlePrev(bot, userClid);
-@@ -108,6 +143,64 @@ export class MusicCommandHandler {
+@@ -108,6 +186,64 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -227,7 +733,7 @@ index 379ee96..04aede0 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -115,8 +208,15 @@ export class MusicCommandHandler {
+@@ -115,8 +251,15 @@ export class MusicCommandHandler {
      }
    }
  
@@ -243,7 +749,7 @@ index 379ee96..04aede0 100644
        bot.sendTextMessage(targetClid, msg);
      } catch (err: any) {
        console.error(`[MusicCmd] Failed to send reply: ${err.message}`);
-@@ -183,19 +283,33 @@ export class MusicCommandHandler {
+@@ -183,19 +326,38 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -267,6 +773,11 @@ index 379ee96..04aede0 100644
 +      url = `https://www.youtube.com/watch?v=${results[0].id}`;
 +      this.reply(bot, userClid, `Found: ${results[0].title} — loading...`);
 +    } else {
++      const mix = parseMixUrl(args);
++      if (mix) {
++        await this.handleMixPlay(bot, userClid, mix);
++        return;
++      }
 +      this.reply(bot, userClid, 'Loading...');
      }
  
@@ -274,15 +785,15 @@ index 379ee96..04aede0 100644
 +    await this.downloadAndPlay(bot, userClid, url);
 +  }
  
-+  /** Download (if needed) and play/queue a YouTube URL — shared by !play and !pick. */
-+  private async downloadAndPlay(bot: VoiceBot, userClid: number, url: string): Promise<void> {
++  /** Download (if needed) and play/queue a YouTube URL — shared by !play, !pick and mixes. */
++  private async downloadAndPlay(bot: VoiceBot, userClid: number, url: string, opts?: { silent?: boolean }): Promise<QueueItem | null> {
      try {
 -      const { filePath, info } = await downloadYouTube(args, MUSIC_DIR);
 +      const { filePath, info } = await downloadYouTube(url, MUSIC_DIR);
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +318,7 @@ export class MusicCommandHandler {
+@@ -204,7 +366,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -291,17 +802,198 @@ index 379ee96..04aede0 100644
        };
  
        bot.queue.add(queueItem);
-@@ -212,6 +326,9 @@ export class MusicCommandHandler {
+@@ -212,16 +374,188 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
 +      // Ad-hoc plays land in the library (deduped on filePath)
-+      this.saveToLibrary(bot, queueItem);
++      void this.saveToLibrary(bot, queueItem);
 +
        // If something is already playing, queue it instead of interrupting
        if (bot.status === 'playing' || bot.status === 'paused') {
-         this.reply(bot, userClid, `Queued: ${info.artist} - ${info.title} (position #${bot.queue.length})`);
-@@ -250,17 +367,71 @@ export class MusicCommandHandler {
+-        this.reply(bot, userClid, `Queued: ${info.artist} - ${info.title} (position #${bot.queue.length})`);
++        if (!opts?.silent) this.reply(bot, userClid, `Queued: ${info.artist} - ${info.title} (position #${bot.queue.length})`);
+       } else {
+         bot.queue.playAt(bot.queue.length - 1);
+         await bot.play(queueItem);
+-        this.reply(bot, userClid, `Now playing: ${info.artist} - ${info.title}`);
++        if (!opts?.silent) this.reply(bot, userClid, `Now playing: ${info.artist} - ${info.title}`);
+       }
++      return queueItem;
+     } catch (err: any) {
+       this.reply(bot, userClid, `Failed to play: ${err.message}`);
++      return null;
++    }
++  }
++
++  // ─── YouTube Mix (list=RD…) ─────────────────────────────
++
++  /**
++   * !play <mix-url>: the anchor video starts now and a DB playlist named
++   * "<anchor title> -- mix" collects every track the mix serves up. The mix
++   * itself loads lazily — exactly one track is buffered ahead, the next one
++   * is only fetched when the queue runs dry (track end / !next).
++   */
++  private async handleMixPlay(bot: VoiceBot, userClid: number, mix: MixRef): Promise<void> {
++    this.reply(bot, userClid, 'Loading mix...');
++    const anchor = await this.downloadAndPlay(bot, userClid, `https://www.youtube.com/watch?v=${mix.anchorVideoId}`, { silent: true });
++    if (!anchor) return;
++
++    const playlist = await this.ensureMixPlaylist(bot, `${anchor.title} -- mix`);
++    const song = await this.saveToLibrary(bot, anchor);
++    if (song) await this.linkSongToPlaylist(playlist.id, song.id);
++
++    const botId = bot.id;
++    this.mixState.set(botId, {
++      listId: mix.listId,
++      playlistId: playlist.id,
++      playlistName: playlist.name,
++      videoIds: [mix.anchorVideoId],
++      cursor: 1,
++    });
++    // Seed the id list from the flat mix (metadata only, no downloads),
++    // then buffer the next track in the background.
++    void this.seedMixIds(botId)
++      .then(() => this.maybePrefetchMix(botId, bot))
++      .catch((err: any) => {
++        console.error(`[MusicCmd] mix setup failed on bot ${botId}: ${err.message}`);
++      });
++
++    this.reply(bot, userClid,
++      `Now playing: ${anchor.artist ? `${anchor.artist} - ` : ''}${anchor.title}\n` +
++      `Mix "${playlist.name}" → playlist [${playlist.id}]. Next track loads when the queue runs dry.`);
++  }
++
++  /** Fetch the flat mix track list (ids only — no downloads). */
++  private async seedMixIds(botId: number): Promise<void> {
++    const st = this.mixState.get(botId);
++    if (!st || st.videoIds.length === 0) return;
++    const anchor = st.videoIds[0];
++    try {
++      const res = await getYouTubeUrlInfo(`https://www.youtube.com/watch?v=${anchor}&list=${st.listId}`);
++      // The mix page usually starts with the anchor — drop the dupe.
++      const fresh = res.items.map((i) => i.id).filter((id) => id && id !== anchor);
++      if (this.mixState.get(botId) === st) st.videoIds = [anchor, ...fresh as string[]];
++    } catch (err: any) {
++      console.error(`[MusicCmd] mix list fetch failed on bot ${botId}: ${err.message}`);
++      // Keep the anchor only — prefetch retries the fetch when it runs dry
++    }
++  }
++
++  /**
++   * Keep exactly one mix track buffered behind the queue. Called after every
++   * track start; !next awaits it when the queue is dry. Never blocks the
++   * current track. Resolves with the track it buffered (null = nothing).
++   */
++  private maybePrefetchMix(botId: number, bot: VoiceBot): Promise<QueueItem | null> {
++    if (!this.mixState.has(botId)) return Promise.resolve(null);
++    const inflight = this.mixPrefetch.get(botId);
++    if (inflight) return inflight;
++    const task = this.runMixPrefetch(botId, bot)
++      .finally(() => {
++        if (this.mixPrefetch.get(botId) === task) this.mixPrefetch.delete(botId);
++      });
++    this.mixPrefetch.set(botId, task);
++    return task;
++  }
++
++  private async runMixPrefetch(botId: number, bot: VoiceBot): Promise<QueueItem | null> {
++    const st = this.mixState.get(botId);
++    if (!st) return null;
++    if (bot.queue.repeat !== 'off') return null; // user asked for repeats — hands off
++    // Only buffer when nothing unplayed sits behind the current track
++    const cur = bot.queue.index;
++    if (cur >= 0 && cur + 1 < bot.queue.length) return null;
++
++    const videoId = await this.nextMixVideoId(botId, bot, st);
++    if (!videoId || !this.mixState.has(botId)) return null;
++
++    const url = `https://www.youtube.com/watch?v=${videoId}`;
++    const { filePath, info } = await downloadYouTube(url, MUSIC_DIR);
++    if (!this.mixState.has(botId)) return null; // mix ended while downloading
++
++    const item: QueueItem = {
++      id: `yt_${info.id}`,
++      title: info.title,
++      artist: info.artist,
++      duration: info.duration,
++      filePath,
++      source: 'youtube',
++      sourceUrl: url,
++    };
++    bot.queue.add(item);
++
++    const song = await this.saveToLibrary(bot, item);
++    if (song) await this.linkSongToPlaylist(st.playlistId, song.id);
++
++    // Bot went idle while we were downloading — start the buffered track now
++    if (bot.status !== 'playing' && bot.status !== 'paused' && !bot.nowPlaying) {
++      const idx = bot.queue.getAll().findIndex((i) => i.id === item.id);
++      const start = bot.queue.playAt(idx);
++      if (start) await bot.play(start);
++    }
++    return item;
++  }
++
++  /** Next unconsumed id from the mix; refetches the flat list when dry. */
++  private async nextMixVideoId(botId: number, bot: VoiceBot, st: MixState): Promise<string | null> {
++    while (this.mixState.get(botId) === st) {
++      if (st.cursor < st.videoIds.length) {
++        const id = st.videoIds[st.cursor++];
++        if (id) return id;
++        continue;
++      }
++      // Batch exhausted — mixes grow server-side as they play, so refetch
++      // anchored at the last served video to reveal the next batch.
++      const anchor = st.videoIds[st.cursor - 1];
++      if (!anchor) return this.endMix(botId, st, 'Mix is empty.');
++      let fresh: string[] = [];
++      try {
++        const res = await getYouTubeUrlInfo(`https://www.youtube.com/watch?v=${anchor}&list=${st.listId}`);
++        const seen = new Set(st.videoIds);
++        fresh = res.items.map((i) => i.id).filter((id): id is string => !!id && !seen.has(id));
++      } catch (err: any) {
++        console.error(`[MusicCmd] mix refetch failed on bot ${botId}: ${err.message}`);
++        return this.endMix(botId, st, 'Refetch failed.');
++      }
++      if (fresh.length === 0) {
++        return this.endMix(botId, st, `Mix "${st.playlistName}" finished.`);
++      }
++      st.videoIds = st.videoIds.concat(fresh);
++    }
++    return null;
++  }
++
++  private endMix(botId: number, st: MixState, reason: string): null {
++    if (this.mixState.get(botId) === st) this.mixState.delete(botId);
++    console.log(`[MusicCmd] Mix ended on bot ${botId}: ${reason}`);
++    return null;
++  }
++
++  /** Find-or-create the named mix playlist. */
++  private async ensureMixPlaylist(bot: VoiceBot, name: string) {
++    const existing = await this.prisma.playlist.findFirst({ where: { name } });
++    if (existing) return existing;
++    return this.prisma.playlist.create({ data: { name, musicBotId: bot.id } });
++  }
++
++  /** Append a song to a playlist (unique per pair — duplicates are ignored). */
++  private async linkSongToPlaylist(playlistId: number, songId: number): Promise<void> {
++    const last = await this.prisma.playlistSong.findFirst({
++      where: { playlistId },
++      orderBy: { position: 'desc' },
++      select: { position: true },
++    });
++    try {
++      await this.prisma.playlistSong.create({
++        data: { playlistId, songId, position: (last?.position ?? -1) + 1 },
++      });
++    } catch {
++      // already in the playlist
+     }
+   }
+ 
+@@ -250,17 +584,71 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -318,11 +1010,8 @@ index 379ee96..04aede0 100644
 +      const cur = bot.queue.index;
 +      if (!rest) {
 +        this.reply(bot, userClid, `Usage: !queue remove <n|a-b|text|all> (queue has ${items.length})`);
-         return;
-       }
--      const removed = items[idx];
--      bot.queue.remove(removed.id);
--      this.reply(bot, userClid, `Removed #${idx + 1}: ${removed.title}`);
++        return;
++      }
 +
 +      // !queue remove all — wipe everything except the playing track
 +      if (rest.toLowerCase() === 'all') {
@@ -361,8 +1050,11 @@ index 379ee96..04aede0 100644
 +        const removed = items[idx];
 +        bot.queue.remove(removed.id);
 +        this.reply(bot, userClid, `Removed #${idx + 1}: ${removed.title}`);
-+        return;
-+      }
+         return;
+       }
+-      const removed = items[idx];
+-      bot.queue.remove(removed.id);
+-      this.reply(bot, userClid, `Removed #${idx + 1}: ${removed.title}`);
 +
 +      // !queue remove <text> — drop every queued track matching title/artist
 +      const needle = rest.toLowerCase();
@@ -381,7 +1073,7 @@ index 379ee96..04aede0 100644
        return;
      }
  
-@@ -281,16 +452,15 @@ export class MusicCommandHandler {
+@@ -281,16 +669,15 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -402,17 +1094,25 @@ index 379ee96..04aede0 100644
        return;
      }
  
-@@ -314,6 +484,9 @@ export class MusicCommandHandler {
+@@ -314,6 +701,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
 +      // Ad-hoc plays land in the library (deduped on filePath)
-+      this.saveToLibrary(bot, queueItem);
++      void this.saveToLibrary(bot, queueItem);
 +
        // If nothing is playing, start playing the queued item
        if (bot.status !== 'playing' && bot.status !== 'paused') {
          bot.queue.playAt(bot.queue.length - 1);
-@@ -344,19 +517,71 @@ export class MusicCommandHandler {
+@@ -329,6 +719,7 @@ export class MusicCommandHandler {
+ 
+   private handleStop(bot: VoiceBot, userClid: number): void {
+     bot.stopAudio();
++    this.mixState.delete(bot.id);
+     this.reply(bot, userClid, 'Playback stopped.');
+   }
+ 
+@@ -344,19 +735,85 @@ export class MusicCommandHandler {
      }
    }
  
@@ -447,6 +1147,19 @@ index 379ee96..04aede0 100644
 +      next = step;
 +      skipped++;
 +    }
++    if (!next && this.mixState.has(bot.id)) {
++      // Queue is dry — pull exactly one more track from the active mix
++      const buffered = await this.maybePrefetchMix(bot.id, bot);
++      if (buffered) {
++        const idx = bot.queue.getAll().findIndex((i) => i.id === buffered.id);
++        const mixNext = idx >= 0 ? bot.queue.playAt(idx) : null;
++        if (mixNext) {
++          await bot.play(mixNext);
++          this.reply(bot, userClid, `Mix → ${mixNext.title}`);
++          return;
++        }
++      }
++    }
 +    if (!next) {
 +      bot.stopAudio();
 +      this.reply(bot, userClid, skipped > 0
@@ -475,9 +1188,10 @@ index 379ee96..04aede0 100644
 +      bot.queue.clear();
        bot.stopAudio();
 -      this.reply(bot, userClid, 'Queue empty — playback stopped.');
++      this.mixState.delete(bot.id);
 +      this.reply(bot, userClid, 'Queue cleared, playback stopped.');
 +      return;
-+    }
+     }
 +    const playing = bot.status === 'playing' || bot.status === 'paused';
 +    const cur = bot.queue.index;
 +    const items = bot.queue.getAll();
@@ -486,14 +1200,14 @@ index 379ee96..04aede0 100644
 +    for (let i = items.length - 1; i >= startIdx; i--) {
 +      bot.queue.remove(items[i].id);
 +      removed++;
-     }
++    }
 +    this.reply(bot, userClid, removed === 0
 +      ? 'Queue is already clear.'
 +      : `Removed ${removed} queued track(s)${playing ? ' — current track keeps playing' : ''}.`);
    }
  
    private async handlePrev(bot: VoiceBot, userClid: number): Promise<void> {
-@@ -487,4 +712,772 @@ export class MusicCommandHandler {
+@@ -487,4 +944,770 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -503,7 +1217,7 @@ index 379ee96..04aede0 100644
 +  private handleHelp(bot: VoiceBot, userClid: number): void {
 +    const lines = [
 +      'Music bot commands:',
-+      '!play <url|query> — play now (searches YouTube) · !play resumes',
++      '!play <url|query> — play now (searches YouTube) · mix URLs (list=RD…) → playlist · !play resumes',
 +      '!search <query> → !pick <1-10> — pick multiple from results',
 +      '!pause · !stop · !skip [1-25] · !prev',
 +      '!queue — show · !queue <url> — append',
@@ -685,7 +1399,9 @@ index 379ee96..04aede0 100644
 +      this.autoDjEnabled.set(botId, true);
 +      this.persistBotSetting(botId, { autoDjEnabled: true });
 +      this.reply(bot, userClid, "AutoDJ on — I'll keep the music going from the library.");
-+      this.maybeAutoDj(botId, bot).catch(() => { });
++      this.maybeAutoDj(botId, bot).catch((err) => {
++        console.error(`[MusicCmd] AutoDJ error on bot ${botId}: ${err.message}`);
++      });
 +      return;
 +    }
 +    if (args === 'off') {
@@ -859,16 +1575,17 @@ index 379ee96..04aede0 100644
 +  /**
 +   * Fire-and-forget: persist an ad-hoc track into the library so it shows up
 +   * in !lib / AutoDJ. Deduped on filePath + serverConfigId (same rule as
-+   * !playlist add).
++   * !playlist add). Resolves with the Song row (null on failure) so callers
++   * can link it into a mix playlist.
 +   */
-+  private saveToLibrary(bot: VoiceBot, item: QueueItem): void {
++  private saveToLibrary(bot: VoiceBot, item: QueueItem): Promise<{ id: number } | null> {
 +    const serverConfigId = bot.currentConfig.serverConfigId;
-+    if (!serverConfigId || !item.filePath) return;
-+    this.prisma.song
++    if (!serverConfigId || !item.filePath) return Promise.resolve(null);
++    return this.prisma.song
 +      .findFirst({ where: { filePath: item.filePath, serverConfigId } })
 +      .then(async (existing) => {
-+        if (existing) return;
-+        await this.prisma.song.create({
++        if (existing) return existing;
++        const created = await this.prisma.song.create({
 +          data: {
 +            title: item.title || 'Unknown Title',
 +            artist: item.artist ?? null,
@@ -880,9 +1597,11 @@ index 379ee96..04aede0 100644
 +          },
 +        });
 +        console.log(`[MusicCmd] Added "${item.title}" to library (bot ${bot.id})`);
++        return created;
 +      })
 +      .catch((err: any) => {
 +        console.error(`[MusicCmd] library save failed: ${err.message}`);
++        return null;
 +      });
 +  }
 +
@@ -1082,10 +1801,18 @@ index 379ee96..04aede0 100644
 +    }
 +  }
 +
-+  /** AutoDJ: queue empty + idle → play a weighted-random library track. */
++  /** AutoDJ: queue dry + idle → play a weighted-random library track (selection logic in auto-dj.ts). */
 +  private async maybeAutoDj(botId: number, bot: VoiceBot): Promise<void> {
-+    if (!this.autoDjEnabled.get(botId)) return;
-+    if (bot.queue.length > 0 || bot.nowPlaying || bot.status === 'stopped') return;
++    if (this.mixState.has(botId)) return; // an active mix owns the dead air
++    if (!shouldAutoDj({
++      enabled: this.autoDjEnabled.get(botId) === true,
++      nowPlaying: bot.nowPlaying !== null,
++      status: bot.status,
++      queueIndex: bot.queue.index,
++      queueLength: bot.queue.length,
++      repeat: bot.queue.repeat,
++    })) return;
++
 +    const dbBot = await this.prisma.musicBot.findUnique({ where: { id: botId }, select: { serverConfigId: true } });
 +    if (!dbBot) return;
 +    const songs = await this.prisma.song.findMany({ where: { serverConfigId: dbBot.serverConfigId } });
@@ -1096,31 +1823,15 @@ index 379ee96..04aede0 100644
 +      where: { serverConfigId: dbBot.serverConfigId },
 +      select: { url: true },
 +    });
-+    const weights = new Map<string, number>();
-+    for (const h of history) weights.set(h.url, (weights.get(h.url) ?? 0) + 1);
++    const playCounts = new Map<string, number>();
++    for (const h of history) playCounts.set(h.url, (playCounts.get(h.url) ?? 0) + 1);
 +
-+    const recent = new Set(this.recentAutoDj.get(botId) ?? []);
-+    const fresh = songs.filter((s) => !recent.has(s.sourceUrl ?? s.filePath));
-+    const candidates = fresh.length > 0 ? fresh : songs;
-+    const weightOf = (s: any) => 1 + (weights.get(s.sourceUrl ?? '') ?? 0);
-+    const total = candidates.reduce((acc, s) => acc + weightOf(s), 0);
-+    let roll = Math.random() * total;
-+    let picked = candidates[candidates.length - 1];
-+    for (const s of candidates) {
-+      roll -= weightOf(s);
-+      if (roll <= 0) { picked = s; break; }
-+    }
-+    this.recentAutoDj.set(botId, (this.recentAutoDj.get(botId) ?? []).concat(picked.sourceUrl ?? picked.filePath).slice(-5));
++    const recent = this.recentAutoDj.get(botId) ?? [];
++    const picked = pickAutoDjTrack({ songs, playCounts, recent });
++    if (!picked) return;
++    this.recentAutoDj.set(botId, pushRecent(recent, trackKey(picked)));
 +
-+    const item: QueueItem = {
-+      id: `lib_${picked.id}_${Date.now()}`,
-+      title: picked.title,
-+      artist: picked.artist ?? undefined,
-+      duration: picked.duration ?? undefined,
-+      filePath: picked.filePath,
-+      source: picked.source as any,
-+      sourceUrl: picked.sourceUrl ?? undefined,
-+    };
++    const item = toQueueItem(picked, Date.now());
 +    bot.queue.add(item);
 +    const first = bot.queue.playAt(bot.queue.length - 1);
 +    if (first) await bot.play(first);
@@ -1240,6 +1951,7 @@ index 379ee96..04aede0 100644
 +
 +    if (sub === 'play') {
 +      bot.queue.clear();
++      this.mixState.delete(bot.id);
 +      bot.queue.addMany(items);
 +      const first = bot.queue.playAt(0);
 +      if (first) {
@@ -1715,3 +2427,15 @@ index 1af2ba9..bd2c956 100644
  
      // Kill streaming FFmpeg if active
      if (this.streamKill) {
+diff --git a/packages/backend/tsconfig.json b/packages/backend/tsconfig.json
+index 0ca11b1..4b67cd7 100644
+--- a/packages/backend/tsconfig.json
++++ b/packages/backend/tsconfig.json
+@@ -9,5 +9,6 @@
+     "lib": ["ES2022"],
+     "skipLibCheck": true
+   },
+-  "include": ["src/**/*"]
++  "include": ["src/**/*"],
++  "exclude": ["src/**/*.test.ts"]
+ }
