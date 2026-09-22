@@ -537,10 +537,10 @@ index 0000000..c0efae0
 +  };
 +}
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..ffe2a18 100644
+index 379ee96..288f1b0 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -1,8 +1,13 @@
+@@ -1,18 +1,58 @@
  import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
@@ -556,15 +556,16 @@ index 379ee96..ffe2a18 100644
  
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
-@@ -10,9 +15,44 @@ const CMD_PREFIX = '!';
+ 
  const MUSIC_COMMANDS = new Set([
-   'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
+-  'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
++  'radio', 'play', 'playnext', 'stop', 'pause', 'resume', 'skip', 'next', 'prev',
    'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
 -  'stream', 'stopstream', 'viewers',
 +  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
 +  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
 +  'duck', 'crossfade', 'xfade', 'duckdelay', 'duckrelease', 'history', 'avatar',
-+  'skipto', 'lib', 'library', 'clear',
++  'skipto', 'lib', 'library', 'clear', 'link', 'botmove',
  ]);
  
 +/** A YouTube mix link: watch?v=<id>&list=RD… (RD* lists are mixes/radio). */
@@ -659,8 +660,22 @@ index 379ee96..ffe2a18 100644
    }
  
    private async onTextMessage(botId: number, bot: VoiceBot, data: Record<string, string>): Promise<void> {
-@@ -82,7 +160,7 @@ export class MusicCommandHandler {
+@@ -74,15 +152,21 @@ export class MusicCommandHandler {
+         case 'play':
+           await this.handlePlay(bot, userClid, args);
            break;
++        case 'playnext':
++          await this.handlePlayNext(bot, userClid, args);
++          break;
+         case 'stop':
+           this.handleStop(bot, userClid);
+           break;
+         case 'pause':
+           this.handlePause(bot, userClid);
+           break;
++        case 'resume':
++          this.handleResume(bot, userClid);
++          break;
          case 'skip':
          case 'next':
 -          await this.handleSkip(bot, userClid);
@@ -668,7 +683,20 @@ index 379ee96..ffe2a18 100644
            break;
          case 'prev':
            await this.handlePrev(bot, userClid);
-@@ -108,6 +186,64 @@ export class MusicCommandHandler {
+@@ -95,6 +179,12 @@ export class MusicCommandHandler {
+         case 'nowplaying':
+           this.handleNowPlaying(bot, userClid);
+           break;
++        case 'link':
++          this.handleLink(bot, userClid);
++          break;
++        case 'botmove':
++          this.handleBotMove(bot, userClid, args);
++          break;
+         case 'queue':
+         case 'add':
+           await this.handleQueue(bot, userClid, args);
+@@ -108,6 +198,64 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -733,7 +761,7 @@ index 379ee96..ffe2a18 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -115,8 +251,15 @@ export class MusicCommandHandler {
+@@ -115,8 +263,15 @@ export class MusicCommandHandler {
      }
    }
  
@@ -749,7 +777,7 @@ index 379ee96..ffe2a18 100644
        bot.sendTextMessage(targetClid, msg);
      } catch (err: any) {
        console.error(`[MusicCmd] Failed to send reply: ${err.message}`);
-@@ -183,19 +326,38 @@ export class MusicCommandHandler {
+@@ -183,19 +338,72 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -784,6 +812,40 @@ index 379ee96..ffe2a18 100644
 -    this.reply(bot, userClid, 'Loading...');
 +    await this.downloadAndPlay(bot, userClid, url);
 +  }
++
++  /** !playnext <url|query> — download a track and slot it directly after the current one. */
++  private async handlePlayNext(bot: VoiceBot, userClid: number, args: string): Promise<void> {
++    if (!args) {
++      this.reply(bot, userClid, 'Usage: !playnext <url|search query>');
++      return;
++    }
++    let url = args;
++    if (!args.startsWith('http://') && !args.startsWith('https://')) {
++      this.reply(bot, userClid, `Searching: ${args}...`);
++      const results = await searchYouTube(args, 1);
++      if (!results || results.length === 0) {
++        this.reply(bot, userClid, `No results found for "${args}".`);
++        return;
++      }
++      url = `https://www.youtube.com/watch?v=${results[0].id}`;
++      this.reply(bot, userClid, `Found: ${results[0].title} — loading...`);
++    } else {
++      if (parseMixUrl(url)) {
++        this.reply(bot, userClid, 'Mix links are not supported with !playnext — use !play instead.');
++        return;
++      }
++      this.reply(bot, userClid, 'Loading...');
++    }
++    const item = await this.downloadAndPlay(bot, userClid, url, { silent: true });
++    if (!item) return;
++    if (bot.status === 'playing' || bot.status === 'paused') {
++      bot.queue.move(bot.queue.length - 1, bot.queue.index + 1);
++      this.reply(bot, userClid, `Playing next: ${item.title}`);
++    } else {
++      // Nothing was playing — downloadAndPlay already started it.
++      this.reply(bot, userClid, `Now playing: ${item.title}`);
++    }
++  }
  
 +  /** Download (if needed) and play/queue a YouTube URL — shared by !play, !pick and mixes. */
 +  private async downloadAndPlay(bot: VoiceBot, userClid: number, url: string, opts?: { silent?: boolean }): Promise<QueueItem | null> {
@@ -793,7 +855,7 @@ index 379ee96..ffe2a18 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +366,7 @@ export class MusicCommandHandler {
+@@ -204,7 +412,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -802,7 +864,7 @@ index 379ee96..ffe2a18 100644
        };
  
        bot.queue.add(queueItem);
-@@ -212,16 +374,188 @@ export class MusicCommandHandler {
+@@ -212,16 +420,188 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -993,7 +1055,7 @@ index 379ee96..ffe2a18 100644
      }
    }
  
-@@ -250,17 +584,71 @@ export class MusicCommandHandler {
+@@ -250,17 +630,71 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1073,7 +1135,7 @@ index 379ee96..ffe2a18 100644
        return;
      }
  
-@@ -281,16 +669,15 @@ export class MusicCommandHandler {
+@@ -281,16 +715,15 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1094,7 +1156,7 @@ index 379ee96..ffe2a18 100644
        return;
      }
  
-@@ -314,6 +701,9 @@ export class MusicCommandHandler {
+@@ -314,6 +747,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -1104,7 +1166,7 @@ index 379ee96..ffe2a18 100644
        // If nothing is playing, start playing the queued item
        if (bot.status !== 'playing' && bot.status !== 'paused') {
          bot.queue.playAt(bot.queue.length - 1);
-@@ -329,6 +719,7 @@ export class MusicCommandHandler {
+@@ -329,6 +765,7 @@ export class MusicCommandHandler {
  
    private handleStop(bot: VoiceBot, userClid: number): void {
      bot.stopAudio();
@@ -1112,7 +1174,7 @@ index 379ee96..ffe2a18 100644
      this.reply(bot, userClid, 'Playback stopped.');
    }
  
-@@ -344,19 +735,85 @@ export class MusicCommandHandler {
+@@ -344,19 +781,106 @@ export class MusicCommandHandler {
      }
    }
  
@@ -1123,6 +1185,17 @@ index 379ee96..ffe2a18 100644
 -        await bot.playStream(next);
 -      } else {
 -        await bot.play(next);
++  private handleResume(bot: VoiceBot, userClid: number): void {
++    if (bot.status === 'paused') {
++      bot.resume();
++      this.reply(bot, userClid, 'Resumed.');
++    } else if (bot.status === 'playing') {
++      this.reply(bot, userClid, 'Already playing.');
++    } else {
++      this.reply(bot, userClid, 'Nothing is paused.');
++    }
++  }
++
 +  private async handleSkip(bot: VoiceBot, userClid: number, args: string): Promise<void> {
 +    let n = 1;
 +    if (args) {
@@ -1161,6 +1234,16 @@ index 379ee96..ffe2a18 100644
 +      }
 +    }
 +    if (!next) {
++      // Queue dry: AutoDJ owns the dead air — never stop while it is on.
++      // maybeAutoDj's idle guards (nowPlaying/status) do not apply here:
++      // the user explicitly asked to move on, so play the next DJ pick.
++      if (this.autoDjEnabled.get(bot.id) === true && !this.mixState.has(bot.id) && bot.queue.repeat === 'off') {
++        const auto = await this.playAutoDjTrack(bot.id, bot);
++        if (auto) {
++          this.reply(bot, userClid, skipped > 0 ? `Skipped ${skipped} → ${auto.title} (AutoDJ)` : `AutoDJ → ${auto.title}`);
++          return;
++        }
++      }
 +      bot.stopAudio();
 +      this.reply(bot, userClid, skipped > 0
 +        ? `Skipped ${skipped} — end of queue, playback stopped.`
@@ -1191,7 +1274,7 @@ index 379ee96..ffe2a18 100644
 +      this.mixState.delete(bot.id);
 +      this.reply(bot, userClid, 'Queue cleared, playback stopped.');
 +      return;
-     }
++    }
 +    const playing = bot.status === 'playing' || bot.status === 'paused';
 +    const cur = bot.queue.index;
 +    const items = bot.queue.getAll();
@@ -1200,14 +1283,44 @@ index 379ee96..ffe2a18 100644
 +    for (let i = items.length - 1; i >= startIdx; i--) {
 +      bot.queue.remove(items[i].id);
 +      removed++;
-+    }
+     }
 +    this.reply(bot, userClid, removed === 0
 +      ? 'Queue is already clear.'
 +      : `Removed ${removed} queued track(s)${playing ? ' — current track keeps playing' : ''}.`);
    }
  
    private async handlePrev(bot: VoiceBot, userClid: number): Promise<void> {
-@@ -487,4 +944,770 @@ export class MusicCommandHandler {
+@@ -401,6 +925,29 @@ export class MusicCommandHandler {
+     this.reply(bot, userClid, `Now playing: ${artist}${np.title}`);
+   }
+ 
++  /** !link — paste the source URL of the current track. */
++  private handleLink(bot: VoiceBot, userClid: number): void {
++    const np = bot.nowPlaying;
++    if (!np) {
++      this.reply(bot, userClid, 'Nothing is playing.');
++      return;
++    }
++    this.reply(bot, userClid, np.sourceUrl ?? `${np.title} has no source URL (local file).`);
++  }
++
++  /** !botmove <channel> — move the bot to another channel on this server. */
++  private handleBotMove(bot: VoiceBot, userClid: number, args: string): void {
++    if (!args) {
++      this.reply(bot, userClid, 'Usage: !botmove <channel name>');
++      return;
++    }
++    if (bot.moveToChannel(args.trim())) {
++      this.reply(bot, userClid, `Moved to channel "${args.trim()}".`);
++    } else {
++      this.reply(bot, userClid, `Channel "${args.trim()}" not found.`);
++    }
++  }
++
+   // ─── Video Streaming Commands ─────────────────────────────
+ 
+   private async handleStream(bot: VoiceBot, userClid: number, args: string): Promise<void> {
+@@ -487,4 +1034,1115 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -1224,7 +1337,7 @@ index 379ee96..ffe2a18 100644
 +      '!queue play <n> · !queue remove <n|a-b|text|all> · !clear [all]',
 +      '!repeat [off|one|all] · !shuffle [on|off]',
 +      '!seek <m:ss|+s|-s> · !np — position / now playing',
-+      '!skipto <n> — jump to queue position · !lib [play <id|name>] — library',
++      '!skipto <n> — jump to queue position · !lib — music library (play/add/search/random/remove + more, !lib for usage)',
 +      '!radio [id] — list / play a radio station',
 +      '!playlist [list|play|queue|add] <id|name>',
 +      '!sleep <min|off> — stop timer · !autodj [on|off]',
@@ -1516,31 +1629,126 @@ index 379ee96..ffe2a18 100644
 +      return;
 +    }
 +
++    if (sub === 'search') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib search <text>');
++        return;
++      }
++      const where = { serverConfigId, OR: [{ title: { contains: rest } }, { artist: { contains: rest } }] };
++      const songs = await this.prisma.song.findMany({ where, orderBy: { id: 'asc' }, take: 10 });
++      const total = await this.prisma.song.count({ where });
++      if (songs.length === 0) {
++        this.reply(bot, userClid, `No library matches for "${rest}".`);
++        return;
++      }
++      const lines = songs.map((sg) => `[${sg.id}] ${sg.artist ? sg.artist + ' - ' : ''}${sg.title}`);
++      const more = total > songs.length ? `\n... and ${total - songs.length} more` : '';
++      this.reply(bot, userClid, `Library matches (${total}):\n${lines.join('\n')}${more}\n!lib play <id> — queue a track`);
++      return;
++    }
++
++    if (sub === 'info') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib info <id|name>');
++        return;
++      }
++      const song = await this.resolveLibSong(serverConfigId, rest);
++      if (!song) {
++        this.reply(bot, userClid, `Library track "${rest}" not found. Use !lib to list.`);
++        return;
++      }
++      let sizeMb = song.fileSize ? (song.fileSize / 1048576).toFixed(1) + ' MB' : null;
++      if (!sizeMb) {
++        try { sizeMb = (fs.statSync(song.filePath).size / 1048576).toFixed(1) + ' MB'; } catch { /* gone */ }
++      }
++      const fmt = (d?: number) => (d ? ` [${Math.floor(d / 60)}:${String(Math.floor(d % 60)).padStart(2, '0')}]` : '');
++      const bits = [
++        song.duration ? fmt(song.duration).trim() : null,
++        song.source,
++        sizeMb,
++        `added ${song.createdAt.toISOString().slice(0, 10)}`,
++      ].filter(Boolean);
++      const meta = bits.length ? `\n${bits.join(' · ')}` : '';
++      const url = song.sourceUrl ? `\n${song.sourceUrl}` : '';
++      this.reply(bot, userClid, `[${song.id}] ${song.artist ? song.artist + ' - ' : ''}${song.title}${meta}${url}`);
++      return;
++    }
++
++    if (sub === 'random') {
++      const n = Math.min(Math.max(parseInt(rest) || 1, 1), 10);
++      const all = await this.prisma.song.findMany({ where: { serverConfigId }, select: { id: true } });
++      if (all.length === 0) {
++        this.reply(bot, userClid, 'Library is empty.');
++        return;
++      }
++      const picked = all.map((s) => s.id).sort(() => Math.random() - 0.5).slice(0, n);
++      const songs = await this.prisma.song.findMany({ where: { id: { in: picked } }, orderBy: { id: 'asc' } });
++      songs.forEach((sg, i) => bot.queue.add(this.libQueueItem(sg, i)));
++      if (bot.status === 'playing' || bot.status === 'paused') {
++        this.reply(bot, userClid, `Queued ${songs.length} random track${songs.length === 1 ? '' : 's'} (next: ${songs[0].title})`);
++      } else {
++        const startIdx = bot.queue.getAll().findIndex((it) => it.filePath === songs[0].filePath);
++        if (startIdx >= 0) bot.queue.playAt(startIdx);
++        await bot.play(bot.queue.current!);
++        this.reply(bot, userClid, `Now playing: ${songs[0].title}`);
++      }
++      return;
++    }
++
++    if (sub === 'add') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib add <url|search query>');
++        return;
++      }
++      let url = rest;
++      if (!url.startsWith('http://') && !url.startsWith('https://')) {
++        this.reply(bot, userClid, `Searching: ${rest}...`);
++        const results = await searchYouTube(rest, 1);
++        if (!results || results.length === 0) {
++          this.reply(bot, userClid, `No results found for "${rest}".`);
++          return;
++        }
++        url = `https://www.youtube.com/watch?v=${results[0].id}`;
++      }
++      this.reply(bot, userClid, 'Downloading to library...');
++      try {
++        const { filePath, info } = await downloadYouTube(url, MUSIC_DIR);
++        const existing = await this.prisma.song.findFirst({ where: { filePath, serverConfigId } });
++        if (existing) {
++          this.reply(bot, userClid, `Already in library: [${existing.id}] ${existing.title}`);
++          return;
++        }
++        const song = await this.saveToLibrary(bot, {
++          id: `yt_${info.id}`,
++          title: info.title,
++          artist: info.artist,
++          duration: info.duration,
++          filePath,
++          source: 'youtube',
++          sourceUrl: url,
++        });
++        if (!song) {
++          this.reply(bot, userClid, 'Failed to add: could not save to library.');
++          return;
++        }
++        this.reply(bot, userClid, `Added to library: [${song.id}] ${info.title}${info.artist ? ' — ' + info.artist : ''}`);
++      } catch (err: any) {
++        this.reply(bot, userClid, `Failed to add: ${err.message}`);
++      }
++      return;
++    }
++
 +    if (sub === 'play') {
 +      if (!rest) {
 +        this.reply(bot, userClid, 'Usage: !lib play <id|name>');
 +        return;
 +      }
-+      const asId = parseInt(rest);
-+      const song = !isNaN(asId)
-+        ? await this.prisma.song.findFirst({ where: { id: asId, serverConfigId } })
-+        : await this.prisma.song.findFirst({
-+            where: { serverConfigId, title: { contains: rest } },
-+            orderBy: { id: 'asc' },
-+          });
++      const song = await this.resolveLibSong(serverConfigId, rest);
 +      if (!song) {
 +        this.reply(bot, userClid, `Library track "${rest}" not found. Use !lib to list.`);
 +        return;
 +      }
-+      const item: QueueItem = {
-+        id: `lib_${song.id}_${Date.now()}`,
-+        title: song.title,
-+        artist: song.artist ?? undefined,
-+        duration: song.duration ?? undefined,
-+        filePath: song.filePath,
-+        source: song.source as any,
-+        sourceUrl: song.sourceUrl ?? undefined,
-+      };
++      const item = this.libQueueItem(song);
 +      bot.queue.add(item);
 +      if (bot.status === 'playing' || bot.status === 'paused') {
 +        this.reply(bot, userClid, `Queued: ${item.title} (position #${bot.queue.length})`);
@@ -1552,7 +1760,247 @@ index 379ee96..ffe2a18 100644
 +      return;
 +    }
 +
-+    this.reply(bot, userClid, 'Usage: !lib [list|play <id|name>]');
++    if (sub === 'remove') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib remove <id|name>');
++        return;
++      }
++      const song = await this.resolveLibSong(serverConfigId, rest);
++      if (!song) {
++        this.reply(bot, userClid, `Library track "${rest}" not found. Use !lib to list.`);
++        return;
++      }
++      // Same semantics as the web UI delete: unlink the audio file (best
++      // effort), then drop the row — playlist links cascade. Still-queued
++      // copies are purged so the bot never tries to play the deleted file.
++      try {
++        if (fs.existsSync(song.filePath)) fs.unlinkSync(song.filePath);
++      } catch { /* ignore file deletion failure */ }
++      let dropped = 0;
++      for (const it of bot.queue.getAll()) {
++        if (it.filePath === song.filePath && it.id !== bot.queue.current?.id) {
++          bot.queue.remove(it.id);
++          dropped++;
++        }
++      }
++      await this.prisma.song.delete({ where: { id: song.id } });
++      this.reply(bot, userClid, `Removed from library: [${song.id}] ${song.title}${dropped ? ` — dropped ${dropped} queued` : ''}`);
++      return;
++    }
++
++    if (sub === 'next') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib next <id|name>');
++        return;
++      }
++      const song = await this.resolveLibSong(serverConfigId, rest);
++      if (!song) {
++        this.reply(bot, userClid, `Library track "${rest}" not found. Use !lib to list.`);
++        return;
++      }
++      const item = this.libQueueItem(song);
++      bot.queue.add(item);
++      if (bot.status === 'playing' || bot.status === 'paused') {
++        bot.queue.move(bot.queue.length - 1, bot.queue.index + 1);
++        this.reply(bot, userClid, `Playing next: ${item.title}`);
++      } else {
++        bot.queue.playAt(bot.queue.length - 1);
++        await bot.play(bot.queue.current!);
++        this.reply(bot, userClid, `Now playing: ${item.title}`);
++      }
++      return;
++    }
++
++    if (sub === 'all') {
++      const shuffled = rest.toLowerCase().startsWith('shuf');
++      const songs = await this.prisma.song.findMany({ where: { serverConfigId }, orderBy: { id: 'asc' } });
++      if (songs.length === 0) {
++        this.reply(bot, userClid, 'Library is empty.');
++        return;
++      }
++      if (shuffled) songs.sort(() => Math.random() - 0.5);
++      bot.queue.addMany(songs.map((sg, i) => this.libQueueItem(sg, i)));
++      if (bot.status === 'playing' || bot.status === 'paused') {
++        this.reply(bot, userClid, `Queued ${songs.length} library track${songs.length === 1 ? '' : 's'}${shuffled ? ' (shuffled)' : ''} (next: ${songs[0].title})`);
++      } else {
++        bot.queue.playAt(0);
++        await bot.play(bot.queue.current!);
++        this.reply(bot, userClid, `Now playing: ${songs[0].title}${songs.length > 1 ? ` — ${songs.length - 1} more queued` : ''}`);
++      }
++      return;
++    }
++
++    if (sub === 'recent') {
++      const n = Math.min(Math.max(parseInt(rest) || 5, 1), 10);
++      const played = await this.prisma.playedTrack.findMany({
++        where: { serverConfigId },
++        orderBy: { playedAt: 'desc' },
++        take: n,
++      });
++      if (played.length === 0) {
++        this.reply(bot, userClid, 'No play history yet.');
++        return;
++      }
++      const lines = played.map((pt) => {
++        const when = pt.playedAt.toISOString().slice(5, 16).replace('T', ' ');
++        return `${when}  ${pt.artist ? pt.artist + ' - ' : ''}${pt.title}`;
++      });
++      this.reply(bot, userClid, `Recently played:\n${lines.join('\n')}`);
++      return;
++    }
++
++    if (sub === 'top') {
++      const n = Math.min(Math.max(parseInt(rest) || 5, 1), 10);
++      const grouped = await this.prisma.playedTrack.groupBy({
++        by: ['filePath'],
++        where: { serverConfigId, filePath: { not: null } },
++        _count: { filePath: true },
++        orderBy: { _count: { filePath: 'desc' } },
++        take: n,
++      });
++      if (grouped.length === 0) {
++        this.reply(bot, userClid, 'No play history yet.');
++        return;
++      }
++      const paths = grouped.map((g) => g.filePath!).filter(Boolean);
++      const songs = await this.prisma.song.findMany({ where: { serverConfigId, filePath: { in: paths } } });
++      const byPath = new Map(songs.map((sg) => [sg.filePath, sg]));
++      const lines = grouped
++        .map((g) => {
++          const sg = byPath.get(g.filePath!);
++          const name = sg ? `${sg.artist ? sg.artist + ' - ' : ''}${sg.title}` : g.filePath!.split('/').pop() ?? 'unknown';
++          return `${g._count.filePath}×  ${name}`;
++        });
++      this.reply(bot, userClid, `Most played:\n${lines.join('\n')}`);
++      return;
++    }
++
++    if (sub === 'stats') {
++      const agg = await this.prisma.song.aggregate({
++        where: { serverConfigId },
++        _count: { _all: true },
++        _sum: { duration: true, fileSize: true },
++      });
++      const totalMin = Math.round((agg._sum.duration ?? 0) / 60);
++      const totalMb = ((agg._sum.fileSize ?? 0) / 1048576).toFixed(1);
++      this.reply(bot, userClid, `Library stats: ${agg._count._all} tracks · ~${totalMin} min total · ${totalMb} MB on disk`);
++      return;
++    }
++
++    if (sub === 'url') {
++      if (!rest) {
++        this.reply(bot, userClid, 'Usage: !lib url <id|name>');
++        return;
++      }
++      const song = await this.resolveLibSong(serverConfigId, rest);
++      if (!song) {
++        this.reply(bot, userClid, `Library track "${rest}" not found. Use !lib to list.`);
++        return;
++      }
++      this.reply(bot, userClid, song.sourceUrl ? `Source for [${song.id}] ${song.title}:\n${song.sourceUrl}` : `[${song.id}] ${song.title} has no source URL (local upload).`);
++      return;
++    }
++
++    if (sub === 'rename' || sub === 'artist') {
++      const [target, ...valueParts] = rest.split(/\s+/);
++      const value = valueParts.join(' ').trim();
++      if (!target || !value) {
++        this.reply(bot, userClid, sub === 'rename' ? 'Usage: !lib rename <id|name> <new title>' : 'Usage: !lib artist <id|name> <new artist>');
++        return;
++      }
++      const song = await this.resolveLibSong(serverConfigId, target);
++      if (!song) {
++        this.reply(bot, userClid, `Library track "${target}" not found. Use !lib to list.`);
++        return;
++      }
++      if (sub === 'rename') {
++        await this.prisma.song.update({ where: { id: song.id }, data: { title: value } });
++        this.reply(bot, userClid, `Renamed [${song.id}]: ${song.title} → ${value}`);
++      } else {
++        await this.prisma.song.update({ where: { id: song.id }, data: { artist: value } });
++        this.reply(bot, userClid, `Artist for [${song.id}] ${song.title}: ${song.artist ?? '(none)'} → ${value}`);
++      }
++      return;
++    }
++
++    if (sub === 'dedupe') {
++      const songs = await this.prisma.song.findMany({ where: { serverConfigId }, orderBy: { id: 'asc' }, select: { id: true, filePath: true } });
++      const seen = new Set<string>();
++      const dupIds: number[] = [];
++      for (const sg of songs) {
++        if (seen.has(sg.filePath)) dupIds.push(sg.id);
++        else seen.add(sg.filePath);
++      }
++      if (dupIds.length === 0) {
++        this.reply(bot, userClid, 'No duplicate library entries found.');
++        return;
++      }
++      await this.prisma.song.deleteMany({ where: { id: { in: dupIds } } });
++      this.reply(bot, userClid, `Removed ${dupIds.length} duplicate entr${dupIds.length === 1 ? 'y' : 'ies'} (files untouched).`);
++      return;
++    }
++
++    if (sub === 'verify') {
++      const songs = await this.prisma.song.findMany({ where: { serverConfigId }, select: { id: true, title: true, filePath: true } });
++      const missing = songs.filter((sg) => !fs.existsSync(sg.filePath));
++      if (missing.length === 0) {
++        this.reply(bot, userClid, `All ${songs.length} library file${songs.length === 1 ? '' : 's'} verified on disk.`);
++        return;
++      }
++      if (rest.toLowerCase() === 'prune') {
++        await this.prisma.song.deleteMany({ where: { id: { in: missing.map((sg) => sg.id) } } });
++        this.reply(bot, userClid, `Pruned ${missing.length} library entr${missing.length === 1 ? 'y' : 'ies'} with missing files.`);
++        return;
++      }
++      const names = missing.slice(0, 5).map((sg) => `[${sg.id}] ${sg.title}`);
++      const more = missing.length > 5 ? `\n... and ${missing.length - 5} more` : '';
++      this.reply(bot, userClid, `Missing files: ${missing.length}/${songs.length}\n${names.join('\n')}${more}\n!lib verify prune — remove these entries`);
++      return;
++    }
++
++    if (sub === 'clear') {
++      if (rest.toLowerCase() !== 'confirm') {
++        this.reply(bot, userClid, `This deletes ALL ${await this.prisma.song.count({ where: { serverConfigId } })} library entries for this server (audio files stay on disk).\nRun "!lib clear confirm" to proceed.`);
++        return;
++      }
++      const count = await this.prisma.song.deleteMany({ where: { serverConfigId } });
++      this.reply(bot, userClid, `Deleted ${count.count} library entries. Audio files were kept on disk.`);
++      return;
++    }
++
++    this.reply(
++      bot,
++      userClid,
++      'Usage: !lib [list|play <id|name>|next <id|name>|add <url|query>|search <text>|info <id|name>|random [1-10]|all [shuffled]]\n'
++        + '      !lib [recent [1-10]|top [1-10]|stats|url <id|name>|rename <id|name> <title>|artist <id|name> <artist>|remove <id|name>|verify [prune]|dedupe|clear confirm]',
++    );
++  }
++
++  /** Build a play-queue item from a library Song row. */
++  private libQueueItem(
++    song: { id: number; title: string; artist: string | null; duration: number | null; filePath: string; source: string; sourceUrl: string | null },
++    seq = 0,
++  ): QueueItem {
++    return {
++      id: `lib_${song.id}_${Date.now()}_${seq}`,
++      title: song.title,
++      artist: song.artist ?? undefined,
++      duration: song.duration ?? undefined,
++      filePath: song.filePath,
++      source: song.source as any,
++      sourceUrl: song.sourceUrl ?? undefined,
++    };
++  }
++
++  /** Resolve a !lib <id|name> argument to a Song row, scoped to this server. */
++  private resolveLibSong(serverConfigId: number, rest: string) {
++    const asId = parseInt(rest);
++    return !isNaN(asId)
++      ? this.prisma.song.findFirst({ where: { id: asId, serverConfigId } })
++      : this.prisma.song.findFirst({
++          where: { serverConfigId, title: { contains: rest } },
++          orderBy: { id: 'asc' },
++        });
 +  }
 +
 +  /** Log every aired track (all sources) to the PlayedTrack history. */
@@ -1812,11 +2260,20 @@ index 379ee96..ffe2a18 100644
 +      queueLength: bot.queue.length,
 +      repeat: bot.queue.repeat,
 +    })) return;
++    await this.playAutoDjTrack(botId, bot);
++  }
 +
++  /**
++   * Pick a weighted-random library track and start it immediately.
++   * No idle guards — callers (track-end AutoDJ, !skip past the end) have
++   * already decided dead air must be filled. Returns the queued item, or
++   * null when the library is empty / unusable.
++   */
++  private async playAutoDjTrack(botId: number, bot: VoiceBot): Promise<QueueItem | null> {
 +    const dbBot = await this.prisma.musicBot.findUnique({ where: { id: botId }, select: { serverConfigId: true } });
-+    if (!dbBot) return;
++    if (!dbBot) return null;
 +    const songs = await this.prisma.song.findMany({ where: { serverConfigId: dbBot.serverConfigId } });
-+    if (songs.length === 0) return;
++    if (songs.length === 0) return null;
 +
 +    // Weight by play history — favourites come up more often
 +    const history = await this.prisma.musicRequest.findMany({
@@ -1828,7 +2285,7 @@ index 379ee96..ffe2a18 100644
 +
 +    const recent = this.recentAutoDj.get(botId) ?? [];
 +    const picked = pickAutoDjTrack({ songs, playCounts, recent });
-+    if (!picked) return;
++    if (!picked) return null;
 +    this.recentAutoDj.set(botId, pushRecent(recent, trackKey(picked)));
 +
 +    const item = toQueueItem(picked, Date.now());
@@ -1836,6 +2293,7 @@ index 379ee96..ffe2a18 100644
 +    const first = bot.queue.playAt(bot.queue.length - 1);
 +    if (first) await bot.play(first);
 +    console.log(`[MusicCmd] AutoDJ bot ${botId}: ${picked.title}`);
++    return first ?? item;
 +  }
 +
 +  // ─── Playlist Commands ─────────────────────────────────
@@ -2039,7 +2497,7 @@ index 377a36b..bdef77b 100644
  
        const bot = this.createBotInstance(config);
 diff --git a/packages/backend/src/voice/voice-bot.ts b/packages/backend/src/voice/voice-bot.ts
-index 1af2ba9..bd2c956 100644
+index 1af2ba9..3d2e7eb 100644
 --- a/packages/backend/src/voice/voice-bot.ts
 +++ b/packages/backend/src/voice/voice-bot.ts
 @@ -1,4 +1,5 @@
@@ -2101,14 +2559,14 @@ index 1af2ba9..bd2c956 100644
      this.pipeline = new AudioPipeline();
      this.queue = new PlayQueue();
  
-@@ -251,6 +283,19 @@ export class VoiceBot extends EventEmitter {
+@@ -251,14 +283,40 @@ export class VoiceBot extends EventEmitter {
      }
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: nick }));
 +      this.updateNowPlayingChannelTopic(title);
-+    } catch { }
-+  }
-+
+     } catch { }
+   }
+ 
 +  /** Mirror now playing into the bot channel's description (topic). */
 +  updateNowPlayingChannelTopic(title: string | null): void {
 +    const channel = this.config.defaultChannel;
@@ -2118,10 +2576,23 @@ index 1af2ba9..bd2c956 100644
 +    const desc = title ? `\u266A ${title}` : 'Music bot idle';
 +    try {
 +      this.client.sendCommand(buildCommand('channeledit', { cid, channel_description: desc }));
-     } catch { }
-   }
- 
-@@ -259,6 +304,7 @@ export class VoiceBot extends EventEmitter {
++    } catch { }
++  }
++
++  /** Move the bot to another channel by name (false if unknown or move failed). */
++  moveToChannel(channelName: string): boolean {
++    const cid = this.client.getChannelCid(channelName);
++    if (!cid) return false;
++    try {
++      this.client.sendCommand(buildCommand('clientmove', { clid: this.ts3ClientId, cid }));
++      return true;
++    } catch {
++      return false;
++    }
++  }
++
+   /** Reset TS3 nickname to original. */
+   private resetNickname(): void {
      if (this._status === 'stopped') return;
      try {
        this.client.sendCommand(buildCommand('clientupdate', { client_nickname: this._originalNickname }));
@@ -2129,7 +2600,7 @@ index 1af2ba9..bd2c956 100644
      } catch { }
    }
  
-@@ -536,6 +582,205 @@ export class VoiceBot extends EventEmitter {
+@@ -536,6 +594,205 @@ export class VoiceBot extends EventEmitter {
      this.emit('volumeChange', this.config.volume);
    }
  
@@ -2335,7 +2806,7 @@ index 1af2ba9..bd2c956 100644
    skip(): void {
      this.stopIcyPolling();
      this.stopPlayback();
-@@ -666,13 +911,81 @@ export class VoiceBot extends EventEmitter {
+@@ -666,13 +923,81 @@ export class VoiceBot extends EventEmitter {
          nextDue = now + FRAME_MS;
        }
  
@@ -2418,7 +2889,7 @@ index 1af2ba9..bd2c956 100644
        // End-of-track handling
        if (this.frameIndex >= this.pcmFrames.length) {
          this.client.sendVoiceStop();
-@@ -729,6 +1042,8 @@ export class VoiceBot extends EventEmitter {
+@@ -729,6 +1054,8 @@ export class VoiceBot extends EventEmitter {
      this.pcmFrames = [];
      this.frameIndex = 0;
      this.pausedAtFrame = 0;

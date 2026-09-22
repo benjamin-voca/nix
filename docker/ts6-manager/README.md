@@ -23,7 +23,25 @@ music bots (upstream only loads playlists through the web UI).
 | `!skip [1-25]` | Skip n tracks in one go (default 1) |
 | `!clear [all]` | Drop all queued tracks, keep the current one playing. `!clear all` also stops playback |
 | `!queue remove <n\|a-b\|text\|all>` | Remove by position, 1-based inclusive range, or title/artist substring match. `all` = keep-current clear. The playing track is never dropped by range/text/all |
-| `!lib [play <id\|name>]` | List the library (up to 100 tracks) / queue a library track |
+| `!lib [list\|play <id\|name>]` | List the library (up to 100 tracks) / queue a library track |
+| `!lib add <url\|query>` | Download a track straight into the library without playing it |
+| `!lib search <text>` | Search library titles and artists |
+| `!lib info <id\|name>` | Duration, source, size, added date, source URL |
+| `!lib random [1-10]` | Queue n random library tracks (auto-starts if idle) |
+| `!lib next <id\|name>` | Slot a library track directly after the current one |
+| `!lib all [shuffled]` | Queue the whole library (optionally shuffled) |
+| `!lib recent [1-10]` / `!lib top [1-10]` | Recently played / most played (from play history) |
+| `!lib stats` | Track count, total duration, disk usage |
+| `!lib url <id\|name>` | Show a track's source URL |
+| `!lib rename <id\|name> <title>` / `!lib artist <id\|name> <artist>` | Edit metadata |
+| `!lib remove <id\|name>` | Delete from library + disk, purge queued copies |
+| `!lib verify [prune]` | Find library rows whose file is missing on disk; prune deletes them |
+| `!lib dedupe` | Drop duplicate library rows (same file, keeps oldest) |
+| `!lib clear confirm` | Delete all library rows for this server (files kept) |
+| `!resume` | Resume playback (explicit counterpart to `!pause`'s toggle) |
+| `!playnext <url\|query>` | Download a track and slot it directly after the current one |
+| `!link` | Paste the source URL of the current track |
+| `!botmove <channel>` | Move the bot to another channel |
 | `!help` | Command reference, in-chat |
 
 Resolution: numeric id, case-insensitive full name, then name prefix.
