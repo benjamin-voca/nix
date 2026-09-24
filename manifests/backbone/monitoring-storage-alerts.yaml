@@ -1,0 +1,113 @@
+# Storage + backup alerting
+#
+# Added after the 2026-09-24 incident: the single-OSD Ceph cluster silently
+# filled to 95% (unpruned S3 backups), RBD writes stalled cluster-wide, and
+# every database behind Ceph returned errors for ~12h. Ceph mgr metrics were
+# exported but never scraped, so nothing could alert.
+#
+# Three pieces:
+#   1. ServiceMonitor scraping rook-ceph-mgr's prometheus module (:9283)
+#   2. PodMonitor scraping CNPG instance metrics (:9187) across namespaces
+#   3. PrometheusRule: Ceph fullness/health + CNPG backup staleness alerts
+#
+# Label `release: monitoring` matches the kube-prometheus-stack
+# serviceMonitorSelector/podMonitorSelector/ruleSelector.
+#
+# NOTE: Alertmanager currently has no external receivers configured — alerts
+# appear in Alertmanager/Grafana only. Wire a receiver (Slack/webhook) to
+# actually get paged.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rook-ceph-mgr
+  namespace: rook-ceph
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - rook-ceph
+  selector:
+    matchLabels:
+      app: rook-ceph-mgr
+  endpoints:
+    - port: http-metrics
+      interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cnpg-instances
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchExpressions:
+      - key: cnpg.io/cluster
+        operator: Exists
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: storage-and-backup-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: ceph-storage
+      rules:
+        - alert: CephClusterUnhealthy
+          expr: ceph_health_status == 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph cluster in HEALTH_ERR"
+            description: "Writes are likely failing cluster-wide. Check `ceph health detail` — this took down all databases on 2026-09-24."
+        - alert: CephClusterDegraded
+          expr: ceph_health_status == 1
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph cluster in HEALTH_WARN for 30m"
+        - alert: CephPoolSpaceCritical
+          expr: min(ceph_pool_max_avail) < 15e9
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph pool headroom below 15GiB"
+            description: "ceph_pool_max_avail is per-pool (÷3 for size-3 replication ≈ 45GiB raw). At 0 the OSD goes full and ALL RBD writes stall (databases hang in D-state). Free space now: prune cnpg-backups or expand storage."
+        - alert: CephPoolSpaceLow
+          expr: min(ceph_pool_max_avail) < 40e9
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph pool headroom below 40GiB"
+            description: "Check RGW bucket growth (s3://cnpg-backups) and backup retention."
+    - name: cnpg-backups
+      rules:
+        - alert: CNPGBackupStale
+          expr: time() - max(cnpg_collector_last_available_backup_timestamp) by (namespace) > 7200
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "No successful CNPG backup in {{ $labels.namespace }} for >2h"
+            description: "Hourly schedule expected. A stuck backup can also block subsequent ones — check `kubectl get backups -n {{ $labels.namespace }}`."
+        - alert: CNPGBackupFailedRecently
+          expr: (time() - max(cnpg_collector_last_failed_backup_timestamp) by (namespace)) < 7200
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG backup failed in {{ $labels.namespace }} within the last 2h"

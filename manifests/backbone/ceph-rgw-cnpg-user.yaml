@@ -6,3 +6,11 @@ metadata:
 spec:
   store: ceph-objectstore
   displayName: CNPG Backups
+  # Hard cap so runaway backups can never fill the OSD and stall RBD writes
+  # cluster-wide (2026-09-24 incident: 780GiB of unpruned backups + WALs took
+  # every database down). 150Gi ≫ the ~60Gi steady state of 2d retention on
+  # both clusters, so only true runaway growth trips it. S3 writes then fail
+  # (backups alert + degrade) while the databases keep running.
+  quotas:
+    maxSize: 150Gi
+    maxBuckets: 10

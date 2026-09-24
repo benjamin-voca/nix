@@ -18,6 +18,12 @@ spec:
   storage:
     storageClass: ceph-block
     size: 10Gi
+  postgresql:
+    parameters:
+      # CNPG default 5min forces a 16MiB WAL segment every 5 min ≈ 4.6GiB/day
+      # of archived WAL per cluster, which is what filled the Ceph disk.
+      # 15min cuts that ~3× with acceptable PITR granularity for these apps.
+      archive_timeout: 15min
   bootstrap:
     initdb:
       database: mydatabase
