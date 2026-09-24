@@ -6,11 +6,17 @@ metadata:
 spec:
   store: ceph-objectstore
   displayName: CNPG Backups
-  # Hard cap so runaway backups can never fill the OSD and stall RBD writes
-  # cluster-wide (2026-09-24 incident: 780GiB of unpruned backups + WALs took
-  # every database down). 150Gi ≫ the ~60Gi steady state of 2d retention on
-  # both clusters, so only true runaway growth trips it. S3 writes then fail
-  # (backups alert + degrade) while the databases keep running.
-  quotas:
-    maxSize: 150Gi
-    maxBuckets: 10
+  # QUOTA INTENTIONALLY DISABLED (2026-09-24): the incident cleanup left
+  # ~740GiB of orphaned RGW data objects (multipart parts whose manifests were
+  # deleted without upload aborts). RGW's user-usage stats still count them,
+  # so an enforced quota rejects ALL writes (WAL archiving fails -> pg_wal
+  # fills) until the orphans are purged.
+  # Re-enable AFTER orphan cleanup:
+  #   1. rgw-orphan-list ceph-objectstore.rgw.buckets.data  (toolbox pod)
+  #   2. rados -p ceph-objectstore.rgw.buckets.data rm <orphans>  (parallel)
+  #   3. confirm `radosgw-admin user info --uid=cnpg-backups` stats are small
+  #   4. uncomment the block below and `kubectl apply` (rook applies it via
+  #      the admin REST API, which works even when radosgw-admin CLI hangs)
+  # quotas:
+  #   maxSize: 150Gi
+  #   maxBuckets: 10
