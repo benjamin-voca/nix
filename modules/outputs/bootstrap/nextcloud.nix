@@ -72,6 +72,9 @@ spec:
       - host all all 0.0.0.0/0 md5
       - host all all ::0/0 md5
   backup:
+    # Prune old hourly backups + their WALs; without this the RGW bucket
+    # grows unbounded and can fill the Ceph cluster (see edukurs-cnpg.yaml)
+    retentionPolicy: "2d"
     barmanObjectStore:
       destinationPath: "s3://cnpg-backups/nextcloud-db"
       endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"

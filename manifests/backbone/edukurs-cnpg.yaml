@@ -1,0 +1,54 @@
+# EduKurs CNPG cluster + hourly backup schedule
+#
+# 2026-09-24 incident: with no retentionPolicy, 5 months of hourly base backups
+# plus 5-minute WAL archiving filled the single-disk Ceph cluster to 95%.
+# Every RBD write stalled (ext4 journal hang -> postgres fdatasync in D-state),
+# wedging ~100 backend connections and returning 500s on the site for ~12h.
+# retentionPolicy makes CNPG prune old base backups and their WALs.
+#
+# Secrets (k8s-secrets-inject from SOPS): edukurs-db-ceph-secret, ceph-rgw-s3-credentials
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: edukurs-db-ceph
+  namespace: edukurs
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  storage:
+    storageClass: ceph-block
+    size: 10Gi
+  bootstrap:
+    initdb:
+      database: mydatabase
+      owner: myuser
+      secret:
+        name: edukurs-db-ceph-secret
+  backup:
+    retentionPolicy: "2d"
+    barmanObjectStore:
+      destinationPath: "s3://cnpg-backups/edukurs-db-ceph"
+      endpointURL: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local"
+      s3Credentials:
+        accessKeyId:
+          key: ACCESS_KEY_ID
+          name: ceph-rgw-s3-credentials
+        region:
+          key: ACCESS_REGION
+          name: ceph-rgw-s3-credentials
+        secretAccessKey:
+          key: ACCESS_SECRET_KEY
+          name: ceph-rgw-s3-credentials
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: edukurs-db-ceph-hourly
+  namespace: edukurs
+spec:
+  schedule: "0 0 * * * *"
+  immediate: true
+  backupOwnerReference: cluster
+  method: barmanObjectStore
+  cluster:
+    name: edukurs-db-ceph
