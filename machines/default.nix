@@ -35,9 +35,19 @@ in {
           boot.loader.efi.canTouchEfiVariables = true;
           boot.loader.efi.efiSysMountPoint = "/boot";
         })
-        # Android fleet: WireGuard sidecar pods need the wg + tun devices
+        # Android fleet: WireGuard sidecar pods need the wg + tun devices;
+        # Codec2 (media.swcodec) needs DMA-BUF heaps or MediaCodecList stays
+        # empty and scrcpy cannot encode (see runbooks/android-fleet.md)
         ({ ... }: {
           boot.kernelModules = ["wireguard" "tun"];
+          boot.kernelPatches = [{
+            name = "dmabuf-heaps";
+            patch = null;
+            extraConfig = ''
+              DMABUF_HEAPS y
+              DMABUF_HEAPS_SYSTEM y
+            '';
+          }];
         })
       ];
     };

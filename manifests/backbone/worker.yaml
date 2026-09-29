@@ -30,7 +30,7 @@ spec:
         - name: harbor-registry
       containers:
         - name: worker
-          image: 10.0.0.56:5000/library/slopcannon-render-worker:0.1.0
+          image: 10.0.0.56:5000/library/slopcannon-render-worker:0.1.1-468b9f7
           imagePullPolicy: Never
           env:
             - name: REDIS_URL
@@ -58,7 +58,7 @@ spec:
                   key: AWS_SECRET_ACCESS_KEY
           resources:
             requests:
-              cpu: 50m
+              cpu: 25m
               memory: 256Mi
             limits:
               cpu: "2"
