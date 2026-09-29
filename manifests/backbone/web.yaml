@@ -15,7 +15,7 @@ data:
   PORT: "3000"
   REDIS_URL: redis://slopcannon-redis.slopcannon.svc.cluster.local:6379
   S3_ENDPOINT: http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80
-  S3_PUBLIC_ENDPOINT: http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80
+  S3_PUBLIC_ENDPOINT: https://s3.voltrum.co
   S3_REGION: us-east-1
   DB_HOST: shared-pg-rw.cnpg-system.svc.cluster.local
   DB_PORT: "5432"
@@ -51,7 +51,7 @@ spec:
         - name: harbor-registry
       containers:
         - name: web
-          image: 10.0.0.56:5000/library/slopcannon-web:0.1.6-6029607
+          image: 10.0.0.56:5000/library/slopcannon-web:0.1.7-754271b
           imagePullPolicy: Never
           ports:
             - containerPort: 3000

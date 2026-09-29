@@ -1,0 +1,59 @@
+# slop.voltrum.co is edge-TLS'd by Cloudflare (wildcard DNS -> cloudflared ->
+# ingress-nginx NodePort); the tls block mirrors the cluster convention (cf.
+# grafana-tls) and nginx serves its default cert upstream of the tunnel.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: slopcannon-web
+  namespace: slopcannon
+  labels:
+    app: slopcannon-web
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: slop.voltrum.co
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: slopcannon-web
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - slop.voltrum.co
+      secretName: slopcannon-tls
+---
+# Browser-facing S3: presigned clip uploads/downloads embed this host
+# (S3_PUBLIC_ENDPOINT), so it must resolve from outside the cluster.
+# proxy-body-size=0 keeps nginx from 413ing multipart-free presigned PUTs.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: slopcannon-s3
+  # backend services must live in the Ingress's own namespace (v1 has no
+  # cross-namespace backends) — the RGW service is in rook-ceph
+  namespace: rook-ceph
+  labels:
+    app: slopcannon-s3
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: s3.voltrum.co
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: rook-ceph-rgw-ceph-objectstore
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - s3.voltrum.co
+      secretName: slopcannon-tls
