@@ -22,6 +22,14 @@
   time.timeZone = "UTC";
   networking.firewall.enable = true;
 
+  # Upstream nixpkgs defaults DefaultIPAccounting=true, which makes systemd
+  # attach its sd_fw_{ingress,egress} BPF programs (BPF_F_ALLOW_MULTI) to
+  # every cgroup on the host. Ancestor multi-attached programs make ALL
+  # exclusive cgroup BPF attaches fail with EPERM — which crash-loops
+  # Android/redroid netd at boot (libnetd_updatable_init). No consumer of
+  # these counters; off it goes. See runbooks/android-fleet.md.
+  systemd.settings.Manager.DefaultIPAccounting = false;
+
   services.openssh = {
     enable = true;
     settings.PasswordAuthentication = false;

@@ -27,7 +27,7 @@ in {
           done
 
           # Ensure namespaces exist before injecting secrets
-          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta upg-assets teamspeak; do
+          for ns in harbor cnpg-system edukurs forgejo minecraft openclaw rook-ceph orkestr argocd mosaic clickstack n8n nextcloud clustta upg-assets teamspeak android-fleet; do
             $kubectl create namespace "$ns" --dry-run=client -o yaml | $kubectl apply -f - 2>/dev/null || true
           done
 
@@ -330,6 +330,19 @@ in {
               $TS6_ARGS \
               --dry-run=client -o yaml | $kubectl apply -f -
             echo "Injected ts6-manager-secret"
+          fi
+
+          # Android fleet per-device WireGuard configs. One Mullvad device
+          # (WG keypair) per pod — a shared config would make concurrent pods
+          # fight over the same peer on Mullvad's side. The initContainer in
+          # the StatefulSet picks the right conf by pod name.
+          if [ -f /run/secrets/android-fleet-wg-0-conf ] && [ -f /run/secrets/android-fleet-wg-1-conf ]; then
+            $kubectl create secret generic android-fleet-wg \
+              --namespace=android-fleet \
+              --from-file=redroid-0.conf=/run/secrets/android-fleet-wg-0-conf \
+              --from-file=redroid-1.conf=/run/secrets/android-fleet-wg-1-conf \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected android-fleet-wg"
           fi
 
           

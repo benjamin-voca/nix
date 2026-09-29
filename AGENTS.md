@@ -9,6 +9,10 @@ Custom features for third-party apps live in `docker/ts6-manager/`:
 
 Workflow: edit source (clone at UPSTREAM_COMMIT, apply patch, amend) → push to Forgejo → `./build-in-cluster.sh <tag>` → bump tag in `modules/outputs/bootstrap/ts6-manager.nix` → apply. See `docker/ts6-manager/README.md`.
 
+### Runbooks
+
+- **`runbooks/android-fleet.md`** — Android device fleet (redroid/Mullvad/adb): deploy + secret-update flow, scaling, relay rotation, and the debug ladder. Read it before touching `android-fleet.nix`, `android-fleet-wg-*` secrets, or anything in namespace `android-fleet`.
+
 - **Deploy (deploy-rs)**: `nix run github:serokell/deploy-rs -- .#backbone-01 --skip-checks`
 - **Machine registry**: `machines/default.nix` — source of truth for all hosts and roles
 - **Machine consumer**: `machines/consumer.nix` — bridges registry into NixOS module system

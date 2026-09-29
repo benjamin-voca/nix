@@ -14,6 +14,9 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    # Fresh nixos-unstable for k8s nodes: containerd >= 2.2.2 fixes Android
+    # image creation (containerd#13382, "/etc -> /system/etc" symlink bug)
+    nixpkgs-containerd.url = "github:nixos/nixpkgs/nixos-unstable";
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     deploy-rs.url = "github:serokell/deploy-rs";

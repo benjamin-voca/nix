@@ -1,0 +1,31 @@
+# slopcannon Postgres via CNPG (pattern: edukurs-cnpg.yaml).
+#
+# Secrets: CNPG generates `slopcannon-db-credentials` (username/password keys)
+# for the `app` owner — web consumes it directly, nothing to inject from SOPS.
+#
+# NOTE: no barman backup wired yet — v1 DB state (clips/stories/jobs metadata)
+# is regenerable. If this becomes load-bearing, add barmanObjectStore with
+# retentionPolicy (see the 2026-09-25 Ceph-full incident) + ScheduledBackup.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: slopcannon-db
+  namespace: slopcannon
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1-system-trixie
+  storage:
+    storageClass: ceph-block
+    size: 5Gi
+  bootstrap:
+    initdb:
+      database: slopcannon
+      owner: app
+      secret:
+        name: slopcannon-db-credentials
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 1Gi

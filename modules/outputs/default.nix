@@ -58,6 +58,7 @@
     upgAssetsMod = import ./bootstrap/upg-assets.nix {inherit pkgs lib;};
     teamspeakMod = import ./bootstrap/teamspeak.nix {inherit pkgs lib;};
     ts6ManagerMod = import ./bootstrap/ts6-manager.nix {inherit pkgs lib;};
+    androidFleetMod = import ./bootstrap/android-fleet.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -102,7 +103,8 @@
       // clusttaMod.inlineFiles
       // upgAssetsMod.inlineFiles
       // teamspeakMod.inlineFiles
-      // ts6ManagerMod.inlineFiles;
+      // ts6ManagerMod.inlineFiles
+      // androidFleetMod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -502,6 +504,12 @@
       cat $out/27d-ts6-manager-services.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/27e-ts6-manager-ingress.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/28-android-fleet-namespace.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/28a-android-fleet-statefulset.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/28b-android-fleet-services.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml

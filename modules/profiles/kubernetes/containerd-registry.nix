@@ -1,10 +1,21 @@
 {
+  inputs,
   config,
   ...
 }: let
   d = import ../../../lib/domain.nix;
   harborHost = d.host "harbor";
 in {
+  # containerd 2.2.1 fails to create containers from Android images
+  # (redroid: /etc is an absolute symlink to /system/etc; Go 1.24 os.Root
+  # rejects it -> "openat etc/passwd: path escapes from parent", fixed in
+  # containerd >= 2.2.2, upstream #13382)
+  nixpkgs.overlays = [
+    (final: prev: {
+      containerd = inputs.nixpkgs-containerd.legacyPackages.${prev.system}.containerd;
+    })
+  ];
+
   virtualisation.containerd = {
     enable = true;
     settings = {

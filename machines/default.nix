@@ -35,6 +35,10 @@ in {
           boot.loader.efi.canTouchEfiVariables = true;
           boot.loader.efi.efiSysMountPoint = "/boot";
         })
+        # Android fleet: WireGuard sidecar pods need the wg + tun devices
+        ({ ... }: {
+          boot.kernelModules = ["wireguard" "tun"];
+        })
       ];
     };
 
@@ -175,6 +179,9 @@ in {
         "ts6-manager-jwt-secret"
         "ts6-manager-encryption-key"
         "ts6-bot-avatar-png"
+        # Android device fleet (one full WireGuard config per pod)
+        "android-fleet-wg-0-conf"
+        "android-fleet-wg-1-conf"
       ];
     };
 

@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slopcannon-render-worker
+  namespace: slopcannon
+  labels:
+    app: slopcannon-render-worker
+spec:
+  # Concurrency 1 per the product spec. Scale by adding replicas — Redis
+  # BLMOVE hands each spec to exactly one consumer, and renders are idempotent.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slopcannon-render-worker
+  template:
+    metadata:
+      labels:
+        app: slopcannon-render-worker
+    spec:
+      # SIGTERM finishes the current spec; give it time for a full render.
+      terminationGracePeriodSeconds: 300
+      tolerations:
+        - key: role
+          value: backbone
+          effect: NoSchedule
+        - key: infra
+          value: "true"
+          effect: NoSchedule
+      imagePullSecrets:
+        - name: harbor-registry
+      containers:
+        - name: worker
+          image: 10.0.0.56:5000/library/slopcannon-render-worker:0.1.0
+          imagePullPolicy: Never
+          env:
+            - name: REDIS_URL
+              value: redis://slopcannon-redis.slopcannon.svc.cluster.local:6379
+            - name: S3_ENDPOINT
+              value: http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: slopcannon-clips
+                  key: BUCKET_NAME
+            - name: S3_REGION
+              value: us-east-1
+            - name: RENDER_CONCURRENCY
+              value: "1"
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: slopcannon-clips
+                  key: AWS_ACCESS_KEY_ID
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: slopcannon-clips
+                  key: AWS_SECRET_ACCESS_KEY
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 3Gi

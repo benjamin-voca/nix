@@ -125,3 +125,13 @@ metadata:
     app.kubernetes.io/name: orkestr
     app.kubernetes.io/component: application
     environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slopcannon
+  labels:
+    app.kubernetes.io/name: slopcannon
+    app.kubernetes.io/component: application
+    environment: production
+    app.kubernetes.io/managed-by: quadnix

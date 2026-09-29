@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: slopcannon
+---
+# Browser-facing settings. S3_PUBLIC_ENDPOINT is currently the in-cluster RGW
+# URL — fine for headless flows; exposing it to real browsers (ingress or
+# NodePort for RGW, or a MinIO in this namespace) is a documented follow-up.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slopcannon-web
+  namespace: slopcannon
+data:
+  PORT: "3000"
+  REDIS_URL: redis://slopcannon-redis.slopcannon.svc.cluster.local:6379
+  S3_ENDPOINT: http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80
+  S3_PUBLIC_ENDPOINT: http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80
+  S3_REGION: us-east-1
+  DB_HOST: shared-pg-rw.cnpg-system.svc.cluster.local
+  DB_PORT: "5432"
+  DB_NAME: slopcannon
+  SFW_ALLOWLIST_SUBREDDITS: ""
+  SFW_BLOCKLIST_WORDS: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slopcannon-web
+  namespace: slopcannon
+  labels:
+    app: slopcannon-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slopcannon-web
+  template:
+    metadata:
+      labels:
+        app: slopcannon-web
+    spec:
+      tolerations:
+        - key: role
+          value: backbone
+          effect: NoSchedule
+        - key: infra
+          value: "true"
+          effect: NoSchedule
+      imagePullSecrets:
+        - name: harbor-registry
+      containers:
+        - name: web
+          image: 10.0.0.56:5000/library/slopcannon-web:0.1.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: slopcannon-web
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: slopcannon-db-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: slopcannon-db-credentials
+                  key: password
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: slopcannon-clips
+                  key: BUCKET_NAME
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: slopcannon-clips
+                  key: AWS_ACCESS_KEY_ID
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: slopcannon-clips
+                  key: AWS_SECRET_ACCESS_KEY
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 30m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slopcannon-web
+  namespace: slopcannon
+spec:
+  type: NodePort
+  selector:
+    app: slopcannon-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30080

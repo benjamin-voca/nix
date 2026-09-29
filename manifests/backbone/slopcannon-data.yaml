@@ -1,0 +1,70 @@
+# Queue (redis, no persistence — worker recover_active() requeues on boot)
+# + clip storage via Rook RGW bucket claim (ceph-bucket StorageClass).
+#
+# The OBC generates two secrets/configmaps in this namespace:
+#   secret   slopcannon-clips     AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+#   configmap slopcannon-clips    BUCKET_HOST / BUCKET_PORT / BUCKET_NAME
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: slopcannon-clips
+  namespace: slopcannon
+spec:
+  generateBucketName: slopcannon-clips
+  storageClassName: ceph-bucket
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slopcannon-redis
+  namespace: slopcannon
+  labels:
+    app: slopcannon-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slopcannon-redis
+  template:
+    metadata:
+      labels:
+        app: slopcannon-redis
+    spec:
+      tolerations:
+        - key: role
+          value: backbone
+          effect: NoSchedule
+        - key: infra
+          value: "true"
+          effect: NoSchedule
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 5m
+              memory: 32Mi
+            limits:
+              memory: 96Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slopcannon-redis
+  namespace: slopcannon
+spec:
+  selector:
+    app: slopcannon-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
