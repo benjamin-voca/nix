@@ -8,8 +8,14 @@
 #   - The frontend image's nginx hardcodes `proxy_pass http://backend:3001`
 #     for /api and /ws — so the backend Service MUST be named `backend`
 #     in this namespace.
-#   - Image tags (backend/frontend/sidecar) are floating; pinned by amd64
+#   - Image tags (frontend/sidecar) are floating; pinned by amd64
 #     digest instead. Bump = re-resolve digests from Docker Hub.
+#   - The backend image itself is only the artifact seed + runtime deps.
+#     Code runs from a git clone (see code-sync initContainer): pushing to
+#     the Forgejo fork (Benjamin/ts6-manager-fork) hot-deploys within ~20s.
+#     Image builds (docker/ts6-manager/build-in-cluster.sh) are only needed
+#     for Dockerfile/dependency changes. Clone creds: ts6-manager-git
+#     secret (injected by k8s-secrets-inject from sops forgejo keys).
 #   - Backend needs JWT_SECRET (required) + ENCRYPTION_KEY from the
 #     injected ts6-manager-secret (sops). Both also declared in
 #     modules/services/k8s-secrets-inject.nix.
@@ -136,13 +142,127 @@ ${tolerations}
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+        # Hot deploy: clone the patched fork into the `src` emptyDir. The
+        # main container mounts it at /srv/src (NOT over /app — the image's
+        # own /app must stay visible: node_modules, the generated Prisma
+        # client and the built @ts6/common dist are gitignored, so they are
+        # copied from the image into the clone by the main container's
+        # entrypoint). Its git-poll loop resets the working tree to
+        # origin/main every 20s, so `git push` to Benjamin/ts6-manager-fork
+        # hot-deploys without an image build. Image builds are only needed
+        # for Dockerfile/dependency changes.
+        - name: code-sync
+          # Same digest-pinned alpine/git as the kaniko build job
+          image: alpine/git:latest@sha256:52be47b4d5ffd7e65439b4872d498897426c41afa38fde44d6c2f2f3249aaa97
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              URL="http://$GIT_USER:$GIT_TOKEN@forgejo-http.forgejo.svc:3000/Benjamin/ts6-manager-fork.git"
+              # Idempotent: a partial clone from a crashed earlier attempt
+              # must not wedge the init (emptyDir persists across restarts)
+              if [ -d /src/.git ]; then
+                echo "[code-sync] existing clone found; fetching"
+                git -C /src fetch --depth 50 origin main
+                git -C /src reset --hard FETCH_HEAD
+              else
+                # Clean leftovers of a crashed attempt (contents only — /src
+                # itself is the emptyDir mountpoint, removing it is EBUSY)
+                rm -rf /src/.git /src/* /src/.[!.]* 2>/dev/null || true
+                echo "[code-sync] cloning fork"
+                git clone --depth 50 "$URL" /src
+              fi
+              git -C /src log --oneline -1
+              # Main container runs as uid 1000 (tsx only reads source, but
+              # git needs to write .git for the fetch loop)
+              chown -R 1000:1000 /src
+              echo "[code-sync] ready"
+          env:
+            - name: HOME
+              value: /tmp
+            - name: GIT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ts6-manager-git
+                  key: username
+            - name: GIT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ts6-manager-git
+                  key: token
+          volumeMounts:
+            - name: src
+              mountPath: /src
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              # chown -R to uid 1000
+              add: ["CHOWN", "FOWNER"]
       containers:
         - name: backend
           # Custom build: adds !playlist chat commands — patch + build script
-          # in docker/ts6-manager/ (this repo). Tag is a pinned release build.
-          # Base: upstream backend-dev (queue chat subcommands) + patch.
-          image: 10.0.0.56:5000/library/ts6-manager-backend:0.16.1
+          # in docker/ts6-manager/ (this repo). Base: upstream backend-dev
+          # (queue chat subcommands) + patch. The container RUNS FROM GIT:
+          # the code-sync initContainer clones the fork into `src` (seeded
+          # with this image's node_modules/generated/dist) and the command
+          # below polls + resets to origin/main, restarting via tsx watch.
+          # Bump the tag only for Dockerfile/dependency changes.
+          image: 10.0.0.56:5000/library/ts6-manager-backend:0.16.2
           imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              SRC=/srv/src
+              # Seed gitignored artifacts from the image (init containers run
+              # their OWN rootfs, so this can only happen here). Plain cp
+              # (no -a) → files owned by uid 1000 so tsc/prisma generate can
+              # overwrite them on hot updates. Survives git reset --hard
+              # (untracked).
+              cp -r /app/node_modules $SRC/node_modules
+              cp -r /app/packages/backend/node_modules $SRC/packages/backend/node_modules
+              cp -r /app/packages/backend/generated $SRC/packages/backend/generated
+              cp -r /app/packages/common/dist $SRC/packages/common/dist
+              cd $SRC/packages/backend
+              npx prisma db push --skip-generate
+              npx prisma db seed || true
+              # Hot-deploy poll: every 20s, fetch origin/main and reset the
+              # working tree when it moved. tsx watch (below) restarts the
+              # server the moment the files change. Seeded artifacts are
+              # gitignored → survive reset. NO pnpm here: any pnpm invocation
+              # can trigger a dependency re-install (slow + v10 build-script
+              # guard); tsc/prisma resolve straight from the seeded
+              # node_modules.
+              (
+                while :; do
+                  sleep 20
+                  if git -C $SRC fetch -q origin main; then
+                    if [ "$(git -C $SRC rev-parse HEAD)" != "$(git -C $SRC rev-parse FETCH_HEAD)" ]; then
+                      echo "[hot-deploy] updating to $(git -C $SRC rev-parse --short FETCH_HEAD)"
+                      git -C $SRC reset --hard -q FETCH_HEAD
+                      ( cd $SRC/packages/common && npx tsc \
+                          && cd $SRC/packages/backend \
+                          && npx prisma generate \
+                          && npx prisma db push --skip-generate ) \
+                        || echo "[hot-deploy] post-update steps failed (ts watch still restarts on file changes)"
+                    fi
+                  fi
+                done
+              ) &
+              exec npx tsx watch src/index.ts
           ports:
             - name: http
               containerPort: 3001
@@ -152,12 +272,14 @@ ${tolerations}
             # image's /usr/bin/python3, hence PATH override not a bind)
             - name: PATH
               value: /opt/yt-dlp-override:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            - name: HOME
+              value: /tmp
             - name: NODE_ENV
               value: production
             - name: PORT
               value: "3001"
             - name: DATABASE_URL
-              value: file:/app/packages/backend/data/ts6webui.db
+              value: file:/srv/src/packages/backend/data/ts6webui.db
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -181,6 +303,11 @@ ${tolerations}
             - name: JWT_REFRESH_EXPIRY
               value: 7d
           volumeMounts:
+            # Git-synced source; /app (image) stays intact so the entrypoint
+            # can copy gitignored artifacts out of it. The PVC data mount
+            # nests into the clone (kubelet orders mounts by depth).
+            - name: src
+              mountPath: /srv/src
             - name: yt-dlp-bin
               mountPath: /opt/yt-dlp-override
               readOnly: true
@@ -190,7 +317,7 @@ ${tolerations}
               readOnly: true
             # One PVC, two subPath mounts (DB dir + music library)
             - name: data
-              mountPath: /app/packages/backend/data
+              mountPath: /srv/src/packages/backend/data
               subPath: data
             - name: data
               mountPath: /data/music
@@ -232,6 +359,8 @@ ${tolerations}
         - name: data
           persistentVolumeClaim:
             claimName: ts6-manager-data
+        - name: src
+          emptyDir: {}
         - name: yt-dlp-bin
           emptyDir: {}
         - name: ytdlp-config

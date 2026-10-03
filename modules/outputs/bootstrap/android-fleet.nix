@@ -78,6 +78,18 @@
                   readOnly: true
                 - name: wg-config
                   mountPath: /wg-config
+            # Stage a STATIC busybox for the redroid entrypoint wrapper:
+            # pre-init the redroid rootfs cannot exec any /system/bin binary
+            # (their ELF interpreter lives in /apex, which init mounts later).
+            # Alpine's /bin/busybox has full applets but is dynamically linked
+            # against musl (the redroid rootfs has no loader) — stage the musl
+            # loader alongside and invoke busybox THROUGH it.
+            - name: stage-wrapper
+              image: alpine:3.20
+              command: ["sh", "-c", "cp /bin/busybox /lib/ld-musl-x86_64.so.1 /wrapper/ && chmod 755 /wrapper/busybox /wrapper/ld-musl-x86_64.so.1"]
+              volumeMounts:
+                - name: wrapper
+                  mountPath: /wrapper
           containers:
             # ── VPN sidecar: all pod traffic (including Android's) exits here ──
             - name: vpn
@@ -100,13 +112,31 @@
             # redroid needs containerd >= 2.2.2 on the node (see
             # profiles/kubernetes/containerd-registry.nix overlay)
             - name: redroid
-              # Android 14, NOT 15: both 15.0.0 redroid builds (240905 and
-              # 250627) ship a broken platform<->media.swcodec apex pairing —
-              # Codec2 param-descriptor negotiation fails ("missing struct
-              # descriptor #Param::CoreIndex" spam), NO encoders register, and
-              # scrcpy dies with NAME_NOT_FOUND. The 14 image pairing is
-              # consistent. See runbooks/android-fleet.md.
+              # Android 15 build 250627. The historical "no encoders" failure
+              # was NOT an image bug — the host kernel lacked DMA-BUF heaps
+              # (fixed via boot.kernelPatches in machines/default.nix; see
+              # runbooks/android-fleet.md). 14 was a detour: its init
+              # crash-loops in this pod environment, while 15 boots.
               image: redroid/redroid:14.0.0_64only-latest
+              # Android init must mount cgroup2 ITSELF (libprocessgroup
+              # SetupCgroups); cgroup2 is single-instance per mount ns, so the
+              # CRI-injected /sys/fs/cgroup mount makes init's own mount EBUSY
+              # ("Failed to setup cgroup2 cgroup" → full self-shutdown).
+              # Wrapper: detach the CRI mount, mount a fresh cgroup2 with the
+              # options init wants, then hand over. Needs cgroupns=private
+              # (fresh superblock accepts the data) — set in
+              # profiles/kubernetes/containerd-registry.nix.
+              command:
+                - /wrapper/ld-musl-x86_64.so.1
+                - /wrapper/busybox
+                - sh
+                - -c
+                # Every busybox call needs the loader prefix — its PT_INTERP
+                # (/lib/ld-musl-x86_64.so.1) does not exist in the redroid
+                # rootfs, so direct exec ENOENTs. "$@" re-passes the
+                # --androidboot.* bootargs (they arrive as sh positionals
+                # since command+args concatenate).
+                - /wrapper/ld-musl-x86_64.so.1 /wrapper/busybox umount -l /sys/fs/cgroup; exec /init "$@"  # NO remount: cgroup2 is single-instance per mount ns — init must mount it itself (as in the working ctr boots)
               securityContext:
                 privileged: true
               args:
@@ -126,7 +156,13 @@
                 exec:
                   command: ["sh", "-c", "getprop sys.boot_completed | grep -q 1"]
                 periodSeconds: 10
-                failureThreshold: 90
+                # kubelet default is 1s: getprop via sh exceeds it under the
+                # boot-time load storm, so Ready never flips. Give it room.
+                timeoutSeconds: 5
+                # 16h budget: boot needs 5-6h+ per life under node CPU contention (ladder 15m..8h all consumed)
+                # boots can exceed 30 min; work persists on /data so one
+                # uninterrupted boot breaks the cycle
+                failureThreshold: 5760
               livenessProbe:
                 exec:
                   command: ["sh", "-c", "getprop sys.boot_completed | grep -q 1"]
@@ -147,10 +183,15 @@
               volumeMounts:
                 - name: data
                   mountPath: /data
+                - name: wrapper
+                  mountPath: /wrapper
+                  readOnly: true
           volumes:
             - name: wg-all
               secret:
                 secretName: android-fleet-wg
+            - name: wrapper
+              emptyDir: {}
             - name: wg-config
               emptyDir:
                 medium: Memory

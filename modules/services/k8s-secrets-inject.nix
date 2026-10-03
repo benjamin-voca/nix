@@ -332,6 +332,18 @@ in {
             echo "Injected ts6-manager-secret"
           fi
 
+          # TS6 Manager git clone creds (hot-deploy: code-sync initContainer
+          # in the backend pod clones the fork from cluster-internal Forgejo).
+          # Reuses the same sops keys ArgoCD already consumes.
+          if [ -f /run/secrets/argocd-forgejo-username ] && [ -f /run/secrets/argocd-forgejo-token ]; then
+            $kubectl create secret generic ts6-manager-git \
+              --namespace=teamspeak \
+              --from-literal=username="$(cat /run/secrets/argocd-forgejo-username)" \
+              --from-literal=token="$(cat /run/secrets/argocd-forgejo-token)" \
+              --dry-run=client -o yaml | $kubectl apply -f -
+            echo "Injected ts6-manager-git"
+          fi
+
           # Android fleet per-device WireGuard configs. One Mullvad device
           # (WG keypair) per pod — a shared config would make concurrent pods
           # fight over the same peer on Mullvad's side. The initContainer in

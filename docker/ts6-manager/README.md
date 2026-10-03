@@ -1,7 +1,8 @@
 # ts6-manager — custom backend build
 
 Patched TeamSpeak 6 Manager backend: adds **`!playlist` chat commands** to
-music bots (upstream only loads playlists through the web UI).
+music bots (upstream only loads playlists through the web UI) and reworks
+**AutoDJ** track selection.
 
 - Upstream: https://github.com/clusterzx/ts6-manager
 - Base commit: see `UPSTREAM_COMMIT` (main at time of patching)
@@ -9,6 +10,22 @@ music bots (upstream only loads playlists through the web UI).
   handler, prisma schema, voice bot/queue/pipeline). NOTE: `main` on the
   Forgejo fork rejects plain `git push --force`; use the `+work:main`
   refspec syntax instead.
+- Fork checkout: `ts6-manager-fork/` in this directory (gitignored here,
+  remote `origin` points at the Forgejo fork with an embedded token).
+  Edit → commit on `main` → push → regenerate the patch:
+  `git -C ts6-manager-fork diff $(cat UPSTREAM_COMMIT) HEAD > music-commands.patch`
+
+## AutoDJ rework (0.16.0)
+
+- **Popularity = user requests only.** Weights come from `MusicRequest`
+  rows, which only `!play` / web UI plays write. AutoDJ's own placements
+  never feed back into the weighting.
+- **Temperature sampling.** `weight = (1 + count)^(1/T)`, T = 2 by default:
+  a track requested 100× is ~10× as likely as an unrequested one, not 101×.
+  The algorithm decides probabilities, never certainties.
+- **Non-repeat window.** `!autodj norepeat <0-100>` (default 5): the last n
+  aired tracks (user-picked or bot-picked) are excluded from AutoDJ picks.
+  Persisted per bot in `MusicBot.autoDjNoRepeat`; `0` disables the window.
 
 ## Commands added
 
@@ -42,9 +59,28 @@ music bots (upstream only loads playlists through the web UI).
 | `!playnext <url\|query>` | Download a track and slot it directly after the current one |
 | `!link` | Paste the source URL of the current track |
 | `!botmove <channel>` | Move the bot to another channel |
+| `!autodj norepeat <0-100>` | Set the AutoDJ non-repeat window (default 5); `!autodj status` shows it |
 | `!help` | Command reference, in-chat |
 
 Resolution: numeric id, case-insensitive full name, then name prefix.
+
+## Hot deploy (no image build)
+
+The backend deployment runs **from git**, not from the image: a `code-sync`
+initContainer clones this fork (cluster-internal Forgejo, creds from the
+`ts6-manager-git` secret) into an emptyDir seeded with the image's
+`node_modules`, generated Prisma client and built `@ts6/common` dist. The
+main container runs `tsx watch` plus a git-poll loop (20s) that
+`git reset --hard`s to `origin/main` and rebuilds common/prisma client on
+change — tsx watch restarts the server the moment files move.
+
+**To ship a backend change: edit → commit on `main` → push. Done.**
+Rolling the pod (e.g. `kubectl -n teamspeak rollout restart
+deploy/ts6-manager-backend`) re-clones fresh. Regenerate
+`music-commands.patch` after pushing so the nix repo stays in sync.
+
+Image builds (below) are only needed for Dockerfile/dependency changes —
+e.g. 0.16.2 added `git` for the in-container sync loop.
 
 ## Rebuild / release (in-cluster kaniko — preferred)
 

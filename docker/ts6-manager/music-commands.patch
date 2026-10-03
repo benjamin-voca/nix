@@ -1,3 +1,30 @@
+diff --git a/Dockerfile.backend b/Dockerfile.backend
+index 83e1fb5..e4c7c0f 100644
+--- a/Dockerfile.backend
++++ b/Dockerfile.backend
+@@ -3,10 +3,12 @@ FROM node:20-slim AS base
+ RUN corepack enable && corepack prepare pnpm@9 --activate
+ 
+ # Install system deps: openssl (Prisma), ffmpeg (audio), python3+pip (yt-dlp)
++# git: the deployment's in-container hot-deploy loop (fetch + reset --hard)
+ RUN apt-get update && \
+     apt-get install -y --no-install-recommends \
+       openssl \
+       ffmpeg \
++      git \
+       python3 \
+       python3-pip \
+       ca-certificates \
+diff --git a/README.md b/README.md
+index 5aac7b7..8b93132 100644
+--- a/README.md
++++ b/README.md
+@@ -285,3 +285,5 @@ When a music bot is connected to a channel, users in that channel can control it
+ ## License
+ 
+ MIT
++
++Hot deploy: pushes to main are picked up by the backend git-poll loop (~20s) — see modules/outputs/bootstrap/ts6-manager.nix.
 diff --git a/packages/backend/prisma/schema.prisma b/packages/backend/prisma/schema.prisma
 index eed1d64..d9f0ec3 100644
 --- a/packages/backend/prisma/schema.prisma
@@ -629,10 +656,10 @@ index 0000000..829fc72
 +  };
 +}
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..26afd9a 100644
+index 379ee96..b44219c 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -1,18 +1,58 @@
+@@ -1,17 +1,122 @@
  import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
@@ -649,17 +676,85 @@ index 379ee96..26afd9a 100644
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
  
- const MUSIC_COMMANDS = new Set([
+-const MUSIC_COMMANDS = new Set([
 -  'radio', 'play', 'stop', 'pause', 'skip', 'next', 'prev',
-+  'radio', 'play', 'playnext', 'stop', 'pause', 'resume', 'skip', 'next', 'prev',
-   'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
+-  'vol', 'volume', 'np', 'nowplaying', 'queue', 'add',
 -  'stream', 'stopstream', 'viewers',
-+  'stream', 'stopstream', 'viewers', 'playlist', 'playlists', 'help',
-+  'repeat', 'loop', 'shuffle', 'search', 'pick', 'seek', 'sleep', 'autodj',
-+  'duck', 'crossfade', 'xfade', 'duckdelay', 'duckrelease', 'history', 'avatar',
-+  'skipto', 'lib', 'library', 'clear', 'link', 'botmove',
- ]);
- 
+-]);
++/**
++ * Single source of truth for every chat command. Drives BOTH the dispatch
++ * whitelist (MUSIC_COMMANDS below) and the `!help` output, so `!help` can
++ * never go stale: a command missing from this registry does not dispatch
++ * at all, and a registered command always shows up in help.
++ *
++ * After adding an entry here, wire it into the switch in onTextMessage —
++ * an unwired command answers "registered but has no handler" at runtime.
++ */
++interface CommandDoc {
++  name: string;
++  aliases?: string[];
++  /** Shown as `!<usage>`; include any subcommands inline. */
++  usage: string;
++  desc: string;
++  /** Extra detail lines appended in help (e.g. full !lib subcommand list). */
++  extra?: string[];
++}
++
++const COMMANDS: CommandDoc[] = [
++  { name: 'play', usage: 'play <url|query>', desc: 'play now (searches YouTube) · mix URLs (list=RD…) → playlist · !play resumes' },
++  { name: 'playnext', usage: 'playnext <url|query>', desc: 'queue a track to play next' },
++  { name: 'search', usage: 'search <query>', desc: 'search YouTube → results stay pickable 3 min' },
++  { name: 'pick', usage: 'pick <1-10>', desc: 'queue a search result' },
++  { name: 'pause', usage: 'pause', desc: 'pause / resume toggle' },
++  { name: 'resume', usage: 'resume', desc: 'resume paused playback' },
++  { name: 'stop', usage: 'stop', desc: 'stop playback and clear the mix' },
++  { name: 'skip', aliases: ['next'], usage: 'skip [1-25]', desc: 'skip ahead (up to 25 tracks)' },
++  { name: 'prev', usage: 'prev', desc: 'previous track' },
++  { name: 'skipto', usage: 'skipto <n>', desc: 'jump to queue position n' },
++  { name: 'np', aliases: ['nowplaying'], usage: 'np', desc: 'now playing' },
++  { name: 'seek', usage: 'seek <sec|m:ss|+s|-s>', desc: 'seek (live streams cannot seek)' },
++  { name: 'link', usage: 'link', desc: 'paste the current track\'s source URL' },
++  {
++    name: 'queue', aliases: ['add'],
++    usage: 'queue [show|<url>|play <n>|remove <n|a-b|text|all>|clear [all]]',
++    desc: 'show / append / reorder / prune the queue',
++  },
++  { name: 'clear', usage: 'clear [all]', desc: 'drop queued tracks ("all" also stops playback)' },
++  { name: 'repeat', aliases: ['loop'], usage: 'repeat [off|one|all]', desc: 'repeat mode (no arg cycles)' },
++  { name: 'shuffle', usage: 'shuffle [on|off]', desc: 'shuffle the queue (no arg toggles)' },
++  {
++    name: 'lib', aliases: ['library'],
++    usage: 'lib <subcommand>',
++    desc: 'browse / manage the music library (search, play, maintain saved tracks)',
++    extra: [
++      '!lib list · !lib play <id|name> · !lib next <id|name> · !lib add <url|query>',
++      '!lib search <text> · !lib info <id|name> · !lib random [1-10] · !lib all [shuffled]',
++      '!lib recent [1-10] · !lib top [1-10] · !lib stats · !lib url <id|name>',
++      '!lib rename <id|name> <title> · !lib artist <id|name> <artist> · !lib remove <id|name>',
++      '!lib verify [prune] · !lib dedupe · !lib clear confirm',
++    ],
++  },
++  { name: 'radio', usage: 'radio [id]', desc: 'list radio stations / play one' },
++  { name: 'playlist', aliases: ['playlists'], usage: 'playlist [list|play|queue|add] <id|name>', desc: 'play, append, or add the current track to a playlist' },
++  { name: 'history', usage: 'history [play <n>]', desc: 'recently played · replay an entry' },
++  { name: 'vol', aliases: ['volume'], usage: 'vol [0-100]', desc: 'show / set volume' },
++  { name: 'sleep', usage: 'sleep <min|off>', desc: 'stop-after timer (max 720 min)' },
++  { name: 'autodj', usage: 'autodj [on|off|norepeat <0-100>]', desc: 'keep playing from the library when the queue runs dry' },
++  { name: 'duck', usage: 'duck on|off', desc: 'duck volume while others speak (no arg = status)' },
++  { name: 'duckdelay', usage: 'duckdelay <0-5000 ms>', desc: 'sustained speech required before ducking' },
++  { name: 'duckrelease', usage: 'duckrelease <100-10000 ms>', desc: 'recovery time after speech stops' },
++  { name: 'crossfade', aliases: ['xfade'], usage: 'crossfade <0-15s>', desc: 'blend between tracks' },
++  { name: 'avatar', usage: 'avatar <image-url>|file <path>|off', desc: 'set / remove bot avatar (max 250 KB)' },
++  { name: 'botmove', usage: 'botmove <channel name>', desc: 'move the bot to another channel' },
++  { name: 'stream', usage: 'stream <url> [480p|720p|1080p]', desc: 'start / change the video stream' },
++  { name: 'stopstream', usage: 'stopstream', desc: 'stop the video stream' },
++  { name: 'viewers', usage: 'viewers', desc: 'list stream viewers' },
++  { name: 'help', usage: 'help', desc: 'this list' },
++];
++
++// Derived from the registry so dispatch and help can never drift apart.
++const MUSIC_COMMANDS = new Set(COMMANDS.flatMap((c) => [c.name, ...(c.aliases ?? [])]));
++
 +/** A YouTube mix link: watch?v=<id>&list=RD… (RD* lists are mixes/radio). */
 +interface MixRef {
 +  anchorVideoId: string;
@@ -691,11 +786,10 @@ index 379ee96..26afd9a 100644
 +  if (!anchor) return null;
 +  return { anchorVideoId: anchor, listId };
 +}
-+
+ 
  /**
   * Handles text-based music commands (!radio, !play, !stop, etc.)
-  * by listening directly on each VoiceBot's TS3 connection.
-@@ -22,6 +62,24 @@ const MUSIC_COMMANDS = new Set([
+@@ -22,6 +127,24 @@ const MUSIC_COMMANDS = new Set([
   */
  export class MusicCommandHandler {
    private registeredBots = new Set<number>();
@@ -720,7 +814,7 @@ index 379ee96..26afd9a 100644
  
    constructor(
      private prisma: PrismaClient,
-@@ -42,11 +100,39 @@ export class MusicCommandHandler {
+@@ -42,11 +165,39 @@ export class MusicCommandHandler {
        });
      });
  
@@ -760,7 +854,7 @@ index 379ee96..26afd9a 100644
    }
  
    private async onTextMessage(botId: number, bot: VoiceBot, data: Record<string, string>): Promise<void> {
-@@ -74,15 +160,21 @@ export class MusicCommandHandler {
+@@ -74,15 +225,21 @@ export class MusicCommandHandler {
          case 'play':
            await this.handlePlay(bot, userClid, args);
            break;
@@ -783,7 +877,7 @@ index 379ee96..26afd9a 100644
            break;
          case 'prev':
            await this.handlePrev(bot, userClid);
-@@ -95,6 +187,12 @@ export class MusicCommandHandler {
+@@ -95,6 +252,12 @@ export class MusicCommandHandler {
          case 'nowplaying':
            this.handleNowPlaying(bot, userClid);
            break;
@@ -796,7 +890,7 @@ index 379ee96..26afd9a 100644
          case 'queue':
          case 'add':
            await this.handleQueue(bot, userClid, args);
-@@ -108,6 +206,64 @@ export class MusicCommandHandler {
+@@ -108,6 +271,67 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -858,10 +952,13 @@ index 379ee96..26afd9a 100644
 +        case 'xfade':
 +          this.handleCrossfade(bot, userClid, args);
 +          break;
++        default:
++          this.reply(bot, userClid, `!${command} is registered but has no handler — please report this.`);
++          break;
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -115,8 +271,15 @@ export class MusicCommandHandler {
+@@ -115,8 +339,15 @@ export class MusicCommandHandler {
      }
    }
  
@@ -877,7 +974,7 @@ index 379ee96..26afd9a 100644
        bot.sendTextMessage(targetClid, msg);
      } catch (err: any) {
        console.error(`[MusicCmd] Failed to send reply: ${err.message}`);
-@@ -183,19 +346,72 @@ export class MusicCommandHandler {
+@@ -183,19 +414,72 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -955,7 +1052,7 @@ index 379ee96..26afd9a 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +420,7 @@ export class MusicCommandHandler {
+@@ -204,7 +488,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -964,7 +1061,7 @@ index 379ee96..26afd9a 100644
        };
  
        bot.queue.add(queueItem);
-@@ -212,16 +428,188 @@ export class MusicCommandHandler {
+@@ -212,16 +496,188 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -1155,7 +1252,7 @@ index 379ee96..26afd9a 100644
      }
    }
  
-@@ -250,17 +638,71 @@ export class MusicCommandHandler {
+@@ -250,17 +706,71 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1235,7 +1332,7 @@ index 379ee96..26afd9a 100644
        return;
      }
  
-@@ -281,16 +723,15 @@ export class MusicCommandHandler {
+@@ -281,16 +791,15 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1256,7 +1353,7 @@ index 379ee96..26afd9a 100644
        return;
      }
  
-@@ -314,6 +755,9 @@ export class MusicCommandHandler {
+@@ -314,6 +823,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -1266,7 +1363,7 @@ index 379ee96..26afd9a 100644
        // If nothing is playing, start playing the queued item
        if (bot.status !== 'playing' && bot.status !== 'paused') {
          bot.queue.playAt(bot.queue.length - 1);
-@@ -329,6 +773,7 @@ export class MusicCommandHandler {
+@@ -329,6 +841,7 @@ export class MusicCommandHandler {
  
    private handleStop(bot: VoiceBot, userClid: number): void {
      bot.stopAudio();
@@ -1274,7 +1371,7 @@ index 379ee96..26afd9a 100644
      this.reply(bot, userClid, 'Playback stopped.');
    }
  
-@@ -344,19 +789,106 @@ export class MusicCommandHandler {
+@@ -344,19 +857,106 @@ export class MusicCommandHandler {
      }
    }
  
@@ -1303,8 +1400,7 @@ index 379ee96..26afd9a 100644
 +      if (isNaN(n) || n < 1 || n > 25) {
 +        this.reply(bot, userClid, 'Usage: !skip [1-25]');
 +        return;
-       }
--      this.reply(bot, userClid, `Skipped to: ${next.title}`);
++      }
 +    }
 +    const now = Date.now();
 +    if (now - this.lastSkipAt < 400) {
@@ -1331,7 +1427,8 @@ index 379ee96..26afd9a 100644
 +          this.reply(bot, userClid, `Mix → ${mixNext.title}`);
 +          return;
 +        }
-+      }
+       }
+-      this.reply(bot, userClid, `Skipped to: ${next.title}`);
 +    }
 +    if (!next) {
 +      // Queue dry: AutoDJ owns the dead air — never stop while it is on.
@@ -1390,7 +1487,7 @@ index 379ee96..26afd9a 100644
    }
  
    private async handlePrev(bot: VoiceBot, userClid: number): Promise<void> {
-@@ -401,6 +933,29 @@ export class MusicCommandHandler {
+@@ -401,6 +1001,29 @@ export class MusicCommandHandler {
      this.reply(bot, userClid, `Now playing: ${artist}${np.title}`);
    }
  
@@ -1420,7 +1517,7 @@ index 379ee96..26afd9a 100644
    // ─── Video Streaming Commands ─────────────────────────────
  
    private async handleStream(bot: VoiceBot, userClid: number, args: string): Promise<void> {
-@@ -487,4 +1042,1138 @@ export class MusicCommandHandler {
+@@ -487,4 +1110,1143 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
@@ -1428,29 +1525,34 @@ index 379ee96..26afd9a 100644
 +  // ─── Help ──────────────────────────────────────────────
 +
 +  private handleHelp(bot: VoiceBot, userClid: number): void {
-+    const lines = [
-+      'Music bot commands:',
-+      '!play <url|query> — play now (searches YouTube) · mix URLs (list=RD…) → playlist · !play resumes',
-+      '!search <query> → !pick <1-10> — pick multiple from results',
-+      '!pause · !stop · !skip [1-25] · !prev',
-+      '!queue — show · !queue <url> — append',
-+      '!queue play <n> · !queue remove <n|a-b|text|all> · !clear [all]',
-+      '!repeat [off|one|all] · !shuffle [on|off]',
-+      '!seek <m:ss|+s|-s> · !np — position / now playing',
-+      '!skipto <n> — jump to queue position · !lib — music library (play/add/search/random/remove + more, !lib for usage)',
-+      '!radio [id] — list / play a radio station',
-+      '!playlist [list|play|queue|add] <id|name>',
-+      '!sleep <min|off> — stop timer · !autodj [on|off|norepeat <0-100>]',
-+      '!history [play <n>] — recently played',
-+      '!avatar <image-url>|off — set / remove bot avatar',
-+      '!duck on|off — volume ducks while others speak',
-+      '!duckdelay <ms> — require sustained speech before ducking',
-+      '!duckrelease <ms> — hold after speech stops',
-+      '!crossfade <0-15s> — blend between tracks',
-+      '!vol [0-100] — volume',
-+      '!stream <url> [480p|720p|1080p] · !stopstream · !viewers',
-+    ];
-+    this.reply(bot, userClid, lines.join('\n'));
++    const lines: string[] = ['Music bot commands:'];
++    for (const cmd of COMMANDS) {
++      const aliases = cmd.aliases?.length ? ` (${cmd.aliases.map((a) => `!${a}`).join(', ')})` : '';
++      lines.push(`!${cmd.usage}${aliases} — ${cmd.desc}`);
++      if (cmd.extra) lines.push(...cmd.extra);
++    }
++
++    // reply() throttles to one message per 600 ms (excess sends are dropped)
++    // and TS servers reject oversized messages, so chunk past both limits.
++    const chunks: string[] = [];
++    let cur = '';
++    for (const line of lines) {
++      if (cur && `${cur}\n${line}`.length > 800) {
++        chunks.push(cur);
++        cur = line;
++      } else {
++        cur = cur ? `${cur}\n${line}` : line;
++      }
++    }
++    if (cur) chunks.push(cur);
++
++    chunks.forEach((chunk, i) => {
++      if (i === 0) {
++        this.reply(bot, userClid, chunk);
++      } else {
++        setTimeout(() => this.reply(bot, userClid, chunk), i * 700);
++      }
++    });
 +  }
 +
 +  // ─── Repeat / Shuffle / Seek / Sleep / AutoDJ ─────────
