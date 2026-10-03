@@ -161,6 +161,10 @@ ${tolerations}
             - |
               set -e
               URL="http://$GIT_USER:$GIT_TOKEN@forgejo-http.forgejo.svc:3000/Benjamin/ts6-manager-fork.git"
+              # This container runs as root but a previous attempt chowns the
+              # clone to uid 1000; git >= 2.35.2 refuses fetch/reset on repos
+              # owned by another user ("dubious ownership"). Whitelist /src.
+              git config --global --add safe.directory /src
               # Idempotent: a partial clone from a crashed earlier attempt
               # must not wedge the init (emptyDir persists across restarts)
               if [ -d /src/.git ]; then
