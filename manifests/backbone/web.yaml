@@ -51,7 +51,7 @@ spec:
         - name: harbor-registry
       containers:
         - name: web
-          image: 10.0.0.56:5000/library/slopcannon-web:0.1.7-754271b
+          image: 10.0.0.56:5000/library/slopcannon-web:0.4.1-4e31e40
           imagePullPolicy: Never
           ports:
             - containerPort: 3000
