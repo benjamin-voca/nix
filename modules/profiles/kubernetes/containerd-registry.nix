@@ -19,6 +19,13 @@ in {
   virtualisation.containerd = {
     enable = true;
     settings = {
+      # Android's libprocessgroup needs to mount cgroup2 ITSELF (cgroup2 is
+      # single-instance per mount ns, so CRI's pre-mounted /sys/fs/cgroup makes
+      # init's own mount EBUSY -> init self-shutdown loop). The redroid pod's
+      # command wrapper (umount + fresh cgroup2 mount + exec /init) needs a
+      # FRESH superblock, which only exists under private cgroupns — host-ns
+      # shares the host superblock and the data mismatch still EBUSYs.
+      plugins."io.containerd.grpc.v1.cri".cgroupns_mode = "private";
       plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options.SystemdCgroup = true;
       plugins."io.containerd.grpc.v1.cri".registry.config_path = "/etc/containerd/certs.d";
       plugins."io.containerd.grpc.v1.cri".registry.configs.${harborHost}.tls.insecure_skip_verify = true;

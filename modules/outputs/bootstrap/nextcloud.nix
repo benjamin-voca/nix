@@ -68,6 +68,9 @@ spec:
       secret:
         name: nextcloud-db-secret
   postgresql:
+    parameters:
+      # See edukurs-cnpg.yaml — cuts archived WAL volume ~3×
+      archive_timeout: 15min
     pg_hba:
       - host all all 0.0.0.0/0 md5
       - host all all ::0/0 md5

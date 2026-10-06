@@ -154,7 +154,7 @@ ${tolerations}
               memory: 64Mi
       containers:
         - name: teamspeak
-          image: teamspeaksystems/teamspeak6-server:6.0.0-beta12.1
+          image: teamspeaksystems/teamspeak6-server:6.0.0-beta13.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: voice

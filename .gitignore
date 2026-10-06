@@ -1,1 +1,4 @@
 result
+
+# Local clone of the patched ts6-manager fork (see docker/ts6-manager/README.md)
+docker/ts6-manager/ts6-manager-fork/

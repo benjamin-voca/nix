@@ -288,7 +288,11 @@ in {
           ];
         };
 
-        limitsConfig = {
+        # NOTE: key must be snake_case `limits_config` — the chart merges
+        # `loki.limits_config` over its own defaults; a `limitsConfig` key
+        # here is silently ignored and loki 3.x then refuses to start
+        # (structured metadata requires schema v13, ours is v12).
+        limits_config = {
           allow_structured_metadata = false;
           volume_enabled = false;
         };

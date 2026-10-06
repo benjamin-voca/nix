@@ -39,7 +39,12 @@ in {
         # Codec2 (media.swcodec) needs DMA-BUF heaps or MediaCodecList stays
         # empty and scrcpy cannot encode (see runbooks/android-fleet.md)
         ({ ... }: {
-          boot.kernelModules = ["wireguard" "tun"];
+          # Android fleet: WireGuard sidecar pods need the wg + tun devices.
+          # netfilter set: the current kernel ships nft_masq/nft_nat as
+          # modules; wg-quick's nft ruleset inside containers fails with
+          # rule-level ENOENT unless the host loads them (containers cannot
+          # modprobe — see runbooks/android-fleet.md).
+          boot.kernelModules = ["wireguard" "tun" "nf_tables" "nft_masq" "nft_nat" "nft_chain_nat" "nf_conntrack" "nft_ct" "nft_fib" "nft_fib_inet" "nft_compat" "ip_tables" "iptable_filter" "ip6_tables" "ip6table_filter"];
           boot.kernelPatches = [{
             name = "dmabuf-heaps";
             patch = null;
