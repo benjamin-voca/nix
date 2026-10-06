@@ -169,6 +169,13 @@ ${tolerations}
               # must not wedge the init (emptyDir persists across restarts)
               if [ -d /src/.git ]; then
                 echo "[code-sync] existing clone found; fetching"
+                # A previous init run (and the main container's git-poll
+                # loop) left the clone owned by uid 1000. ALL caps are
+                # dropped here, so there is no CAP_DAC_OVERRIDE and root
+                # cannot write uid-1000 files (fetch/reset would die with
+                # "Permission denied"). Reclaim ownership first; chowned
+                # back to 1000 below before the main container starts.
+                chown -R 0:0 /src
                 git -C /src fetch --depth 50 origin main
                 git -C /src reset --hard FETCH_HEAD
               else
