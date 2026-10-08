@@ -137,6 +137,25 @@ index b4d5eb5..56f0ce4 100644
 +    }
 +  }
  }
+diff --git a/packages/backend/src/voice/audio/youtube.ts b/packages/backend/src/voice/audio/youtube.ts
+index 1e703ed..3d5f57a 100644
+--- a/packages/backend/src/voice/audio/youtube.ts
++++ b/packages/backend/src/voice/audio/youtube.ts
+@@ -31,7 +31,13 @@ export function getYtCookieFile(): string | null {
+ }
+ 
+ export function getCookieArgs(): string[] {
+-  const args: string[] = ["--remote-components", "ejs:github"];
++  const args: string[] = [
++    "--remote-components", "ejs:github",
++    // This host's IP is flagged by YouTube's bot check ("Sign in to confirm
++    // you're not a bot" + HTTP 429) for the default web client stack.
++    // web_embedded still serves unauthenticated formats; mweb is the fallback.
++    "--extractor-args", "youtube:player_client=web_embedded,mweb",
++  ];
+   if (ytCookieFile) {
+     args.push("--cookies", ytCookieFile);
+   }
 diff --git a/packages/backend/src/voice/auto-dj.test.ts b/packages/backend/src/voice/auto-dj.test.ts
 new file mode 100644
 index 0000000..7b17396
@@ -656,10 +675,10 @@ index 0000000..829fc72
 +  };
 +}
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..b44219c 100644
+index 379ee96..45d1fad 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
-@@ -1,17 +1,122 @@
+@@ -1,17 +1,123 @@
  import type { PrismaClient } from '../../generated/prisma/index.js';
  import { VoiceBotManager } from './voice-bot-manager.js';
  import type { VoiceBot } from './voice-bot.js';
@@ -673,6 +692,7 @@ index 379ee96..b44219c 100644
 +import { downloadYouTube, getYouTubeUrlInfo, searchYouTube } from './audio/youtube.js';
 +import { pickAutoDjTrack, pushRecent, RECENT_WINDOW, shouldAutoDj, toQueueItem, trackKey } from './auto-dj.js';
  
++// (hot-deploy canary: this file runs from git in the cluster — see modules/outputs/bootstrap/ts6-manager.nix)
  const MUSIC_DIR = process.env.MUSIC_DIR || '/data/music';
  const CMD_PREFIX = '!';
  
@@ -789,7 +809,7 @@ index 379ee96..b44219c 100644
  
  /**
   * Handles text-based music commands (!radio, !play, !stop, etc.)
-@@ -22,6 +127,24 @@ const MUSIC_COMMANDS = new Set([
+@@ -22,6 +128,24 @@ const MUSIC_COMMANDS = new Set([
   */
  export class MusicCommandHandler {
    private registeredBots = new Set<number>();
@@ -814,7 +834,7 @@ index 379ee96..b44219c 100644
  
    constructor(
      private prisma: PrismaClient,
-@@ -42,11 +165,39 @@ export class MusicCommandHandler {
+@@ -42,11 +166,39 @@ export class MusicCommandHandler {
        });
      });
  
@@ -854,7 +874,7 @@ index 379ee96..b44219c 100644
    }
  
    private async onTextMessage(botId: number, bot: VoiceBot, data: Record<string, string>): Promise<void> {
-@@ -74,15 +225,21 @@ export class MusicCommandHandler {
+@@ -74,15 +226,21 @@ export class MusicCommandHandler {
          case 'play':
            await this.handlePlay(bot, userClid, args);
            break;
@@ -877,7 +897,7 @@ index 379ee96..b44219c 100644
            break;
          case 'prev':
            await this.handlePrev(bot, userClid);
-@@ -95,6 +252,12 @@ export class MusicCommandHandler {
+@@ -95,6 +253,12 @@ export class MusicCommandHandler {
          case 'nowplaying':
            this.handleNowPlaying(bot, userClid);
            break;
@@ -890,7 +910,7 @@ index 379ee96..b44219c 100644
          case 'queue':
          case 'add':
            await this.handleQueue(bot, userClid, args);
-@@ -108,6 +271,67 @@ export class MusicCommandHandler {
+@@ -108,6 +272,67 @@ export class MusicCommandHandler {
          case 'viewers':
            this.handleViewers(bot, userClid);
            break;
@@ -958,7 +978,7 @@ index 379ee96..b44219c 100644
        }
      } catch (err: any) {
        console.error(`[MusicCmd] Error handling !${command}: ${err.message}`);
-@@ -115,8 +339,15 @@ export class MusicCommandHandler {
+@@ -115,8 +340,15 @@ export class MusicCommandHandler {
      }
    }
  
@@ -974,7 +994,7 @@ index 379ee96..b44219c 100644
        bot.sendTextMessage(targetClid, msg);
      } catch (err: any) {
        console.error(`[MusicCmd] Failed to send reply: ${err.message}`);
-@@ -183,19 +414,72 @@ export class MusicCommandHandler {
+@@ -183,19 +415,72 @@ export class MusicCommandHandler {
          this.reply(bot, userClid, 'Resumed.');
          return;
        }
@@ -1052,7 +1072,7 @@ index 379ee96..b44219c 100644
  
        const queueItem: QueueItem = {
          id: `yt_${info.id}`,
-@@ -204,7 +488,7 @@ export class MusicCommandHandler {
+@@ -204,7 +489,7 @@ export class MusicCommandHandler {
          duration: info.duration,
          filePath,
          source: 'youtube',
@@ -1061,7 +1081,7 @@ index 379ee96..b44219c 100644
        };
  
        bot.queue.add(queueItem);
-@@ -212,16 +496,188 @@ export class MusicCommandHandler {
+@@ -212,16 +497,188 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -1252,7 +1272,7 @@ index 379ee96..b44219c 100644
      }
    }
  
-@@ -250,17 +706,71 @@ export class MusicCommandHandler {
+@@ -250,17 +707,71 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1332,7 +1352,7 @@ index 379ee96..b44219c 100644
        return;
      }
  
-@@ -281,16 +791,15 @@ export class MusicCommandHandler {
+@@ -281,16 +792,15 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1353,7 +1373,7 @@ index 379ee96..b44219c 100644
        return;
      }
  
-@@ -314,6 +823,9 @@ export class MusicCommandHandler {
+@@ -314,6 +824,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -1363,7 +1383,7 @@ index 379ee96..b44219c 100644
        // If nothing is playing, start playing the queued item
        if (bot.status !== 'playing' && bot.status !== 'paused') {
          bot.queue.playAt(bot.queue.length - 1);
-@@ -329,6 +841,7 @@ export class MusicCommandHandler {
+@@ -329,6 +842,7 @@ export class MusicCommandHandler {
  
    private handleStop(bot: VoiceBot, userClid: number): void {
      bot.stopAudio();
@@ -1371,7 +1391,7 @@ index 379ee96..b44219c 100644
      this.reply(bot, userClid, 'Playback stopped.');
    }
  
-@@ -344,19 +857,106 @@ export class MusicCommandHandler {
+@@ -344,19 +858,106 @@ export class MusicCommandHandler {
      }
    }
  
@@ -1487,7 +1507,7 @@ index 379ee96..b44219c 100644
    }
  
    private async handlePrev(bot: VoiceBot, userClid: number): Promise<void> {
-@@ -401,6 +1001,29 @@ export class MusicCommandHandler {
+@@ -401,6 +1002,29 @@ export class MusicCommandHandler {
      this.reply(bot, userClid, `Now playing: ${artist}${np.title}`);
    }
  
@@ -1517,7 +1537,7 @@ index 379ee96..b44219c 100644
    // ─── Video Streaming Commands ─────────────────────────────
  
    private async handleStream(bot: VoiceBot, userClid: number, args: string): Promise<void> {
-@@ -487,4 +1110,1143 @@ export class MusicCommandHandler {
+@@ -487,4 +1111,1143 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }
