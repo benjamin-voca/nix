@@ -675,7 +675,7 @@ index 0000000..829fc72
 +  };
 +}
 diff --git a/packages/backend/src/voice/music-command-handler.ts b/packages/backend/src/voice/music-command-handler.ts
-index 379ee96..45d1fad 100644
+index 379ee96..e2d6dcd 100644
 --- a/packages/backend/src/voice/music-command-handler.ts
 +++ b/packages/backend/src/voice/music-command-handler.ts
 @@ -1,17 +1,123 @@
@@ -739,7 +739,7 @@ index 379ee96..45d1fad 100644
 +    usage: 'queue [show|<url>|play <n>|remove <n|a-b|text|all>|clear [all]]',
 +    desc: 'show / append / reorder / prune the queue',
 +  },
-+  { name: 'clear', usage: 'clear [all]', desc: 'drop queued tracks ("all" also stops playback)' },
++  { name: 'clear', usage: 'clear [all]', desc: 'drop played + queued tracks ("all" also stops playback)' },
 +  { name: 'repeat', aliases: ['loop'], usage: 'repeat [off|one|all]', desc: 'repeat mode (no arg cycles)' },
 +  { name: 'shuffle', usage: 'shuffle [on|off]', desc: 'shuffle the queue (no arg toggles)' },
 +  {
@@ -1272,7 +1272,32 @@ index 379ee96..45d1fad 100644
      }
    }
  
-@@ -250,17 +707,71 @@ export class MusicCommandHandler {
+@@ -232,14 +689,20 @@ export class MusicCommandHandler {
+       return;
+     }
+ 
++    // Window around the playhead: 10 played, current, 10 upcoming (queue head
++    // when idle). Absolute numbering so !queue remove/play <n> stay usable.
+     const currentIdx = bot.queue.index;
+-    const lines = items.slice(0, 15).map((item, i) => {
+-      const marker = i === currentIdx ? '▶ ' : '  ';
++    const end = Math.min(items.length, currentIdx < 0 ? 10 : currentIdx + 11);
++    const start = Math.max(0, end - 21);
++    const lines = items.slice(start, end).map((item, i) => {
++      const pos = start + i;
++      const marker = pos === currentIdx ? '▶ ' : '  ';
+       const artist = item.artist ? `${item.artist} - ` : '';
+       const dur = item.duration ? ` [${Math.floor(item.duration / 60)}:${String(Math.floor(item.duration % 60)).padStart(2, '0')}]` : '';
+-      return `${marker}${i + 1}. ${artist}${item.title}${dur}`;
++      return `${marker}${pos + 1}. ${artist}${item.title}${dur}`;
+     });
+-    if (items.length > 15) lines.push(`  ... and ${items.length - 15} more`);
++    if (start > 0) lines.unshift(`  ... ${start} earlier`);
++    if (end < items.length) lines.push(`  ... and ${items.length - end} more`);
+     this.reply(bot, userClid, `Queue (${items.length} tracks):\n${lines.join('\n')}`);
+   }
+ 
+@@ -250,17 +713,71 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1352,7 +1377,7 @@ index 379ee96..45d1fad 100644
        return;
      }
  
-@@ -281,16 +792,15 @@ export class MusicCommandHandler {
+@@ -281,16 +798,15 @@ export class MusicCommandHandler {
        return;
      }
  
@@ -1373,7 +1398,7 @@ index 379ee96..45d1fad 100644
        return;
      }
  
-@@ -314,6 +824,9 @@ export class MusicCommandHandler {
+@@ -314,6 +830,9 @@ export class MusicCommandHandler {
        // Save to MusicRequest history
        this.saveMusicRequest(bot, queueItem);
  
@@ -1383,7 +1408,7 @@ index 379ee96..45d1fad 100644
        // If nothing is playing, start playing the queued item
        if (bot.status !== 'playing' && bot.status !== 'paused') {
          bot.queue.playAt(bot.queue.length - 1);
-@@ -329,6 +842,7 @@ export class MusicCommandHandler {
+@@ -329,6 +848,7 @@ export class MusicCommandHandler {
  
    private handleStop(bot: VoiceBot, userClid: number): void {
      bot.stopAudio();
@@ -1391,7 +1416,7 @@ index 379ee96..45d1fad 100644
      this.reply(bot, userClid, 'Playback stopped.');
    }
  
-@@ -344,19 +858,106 @@ export class MusicCommandHandler {
+@@ -344,19 +864,106 @@ export class MusicCommandHandler {
      }
    }
  
@@ -1476,8 +1501,8 @@ index 379ee96..45d1fad 100644
 +  }
 +
 +  /**
-+   * !clear [all] — queue wipe. Default drops every queued track but keeps the
-+   * current one playing; "all" also stops playback and empties the queue.
++   * !clear [all] — queue wipe. Default drops played + queued tracks but keeps
++   * the current one playing; "all" also stops playback and empties the queue.
 +   */
 +  private handleClear(bot: VoiceBot, userClid: number, args: string): void {
 +    if (args && args.toLowerCase() !== 'all') {
@@ -1495,19 +1520,19 @@ index 379ee96..45d1fad 100644
 +    const playing = bot.status === 'playing' || bot.status === 'paused';
 +    const cur = bot.queue.index;
 +    const items = bot.queue.getAll();
-+    const startIdx = playing ? cur + 1 : 0;
 +    let removed = 0;
-+    for (let i = items.length - 1; i >= startIdx; i--) {
++    for (let i = items.length - 1; i >= 0; i--) {
++      if (playing && i === cur) continue; // current track keeps playing
 +      bot.queue.remove(items[i].id);
 +      removed++;
      }
 +    this.reply(bot, userClid, removed === 0
 +      ? 'Queue is already clear.'
-+      : `Removed ${removed} queued track(s)${playing ? ' — current track keeps playing' : ''}.`);
++      : `Removed ${removed} track(s)${playing ? ' — current track keeps playing' : ''}.`);
    }
  
    private async handlePrev(bot: VoiceBot, userClid: number): Promise<void> {
-@@ -401,6 +1002,29 @@ export class MusicCommandHandler {
+@@ -401,6 +1008,29 @@ export class MusicCommandHandler {
      this.reply(bot, userClid, `Now playing: ${artist}${np.title}`);
    }
  
@@ -1537,7 +1562,7 @@ index 379ee96..45d1fad 100644
    // ─── Video Streaming Commands ─────────────────────────────
  
    private async handleStream(bot: VoiceBot, userClid: number, args: string): Promise<void> {
-@@ -487,4 +1111,1143 @@ export class MusicCommandHandler {
+@@ -487,4 +1117,1143 @@ export class MusicCommandHandler {
        console.error('[MusicCmd] Failed to save music request history:', err.message);
      });
    }

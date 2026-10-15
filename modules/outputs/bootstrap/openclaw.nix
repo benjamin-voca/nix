@@ -466,21 +466,47 @@
           register(api) {
             globalThis.__clawdOutputFilters = FILTERS;
             globalThis.__clawdKeepLast = true;
+            // Own the flush before the REST intercept defines its own. A held
+            // reply must never reject: one unhandled DiscordError exits the
+            // whole gateway (2026-10-12: guild timeout 403 on the flush killed
+            // the pod and the reply was lost silently). Retry, then log LOUDLY.
+            // The intercept only defines its flush when this global is absent,
+            // so this version always wins regardless of plugin load order.
+            globalThis.__clawdFlushDiscordSend = async () => {
+              const p = globalThis.__clawdPendingDiscordPost;
+              globalThis.__clawdPendingDiscordPost = null;
+              globalThis.__clawdHoldDiscordSends = false;
+              if (!p) return;
+              let lastErr;
+              for (let attempt = 1; attempt <= 3; attempt++) {
+                globalThis.__clawdFlushingDiscord = true;
+                try {
+                  return await p.rest.request(p.method, p.path, p.params);
+                } catch (err) {
+                  lastErr = err;
+                  console.error("[output-filters] held reply attempt " + attempt + "/3 failed:", String(err && err.message ? err.message : err));
+                  await new Promise((resolve) => setTimeout(resolve, 2000 * attempt));
+                } finally {
+                  globalThis.__clawdFlushingDiscord = false;
+                }
+              }
+              console.error("[output-filters] REPLY LOST after 3 attempts:", String(lastErr && lastErr.message ? lastErr.message : lastErr), "path:", String(p.path));
+            };
             let safety;
+            const flushSoon = (ms) => setTimeout(() => {
+              const flush = globalThis.__clawdFlushDiscordSend;
+              if (typeof flush === "function") {
+                Promise.resolve(flush()).catch((e) => console.error("[output-filters] flush error:", String(e)));
+              }
+            }, ms);
             api.on("before_prompt_build", () => {
               globalThis.__clawdHoldDiscordSends = true;
               clearTimeout(safety);
-              safety = setTimeout(() => {
-                const flush = globalThis.__clawdFlushDiscordSend;
-                if (typeof flush === "function") void flush();
-              }, 15000);
+              safety = flushSoon(15000);
             });
             api.on("agent_end", () => {
               clearTimeout(safety);
-              setTimeout(() => {
-                const flush = globalThis.__clawdFlushDiscordSend;
-                if (typeof flush === "function") void flush();
-              }, 2000);
+              flushSoon(2000);
             });
             api.on("reply_payload_sending", (event) => {
               if (event.kind === "block") return { cancel: true };
