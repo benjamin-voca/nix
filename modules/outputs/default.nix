@@ -59,6 +59,7 @@
     teamspeakMod = import ./bootstrap/teamspeak.nix {inherit pkgs lib;};
     ts6ManagerMod = import ./bootstrap/ts6-manager.nix {inherit pkgs lib;};
     androidFleetMod = import ./bootstrap/android-fleet.nix {inherit pkgs lib;};
+    z38Mod = import ./bootstrap/z38.nix {inherit pkgs lib;};
     clickstackMod = import ./bootstrap/clickstack.nix {inherit lib existingCharts;};
     # doraMod = import ./bootstrap/dora-metrics.nix {inherit lib pkgs;};
     
@@ -104,7 +105,8 @@
       // upgAssetsMod.inlineFiles
       // teamspeakMod.inlineFiles
       // ts6ManagerMod.inlineFiles
-      // androidFleetMod.inlineFiles;
+      // androidFleetMod.inlineFiles
+      // z38Mod.inlineFiles;
       # // doraMod.inlineFiles;
 
 
@@ -510,6 +512,8 @@
       cat $out/28a-android-fleet-statefulset.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       cat $out/28b-android-fleet-services.yaml >> $out/bootstrap.yaml
+      echo "---" >> $out/bootstrap.yaml
+      cat $out/29-z38.yaml >> $out/bootstrap.yaml
       echo "---" >> $out/bootstrap.yaml
       # cat $out/18a-orkestr-ci-rbac.yaml >> $out/bootstrap.yaml
       # echo "---" >> $out/bootstrap.yaml
