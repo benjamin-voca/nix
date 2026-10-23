@@ -5,9 +5,15 @@ The latest built React frontend from `Developer/GitHub/Zero38Tattoos/dist` is sn
 the namespace, compressed site ConfigMaps, nginx configuration, two-replica
 Deployment, Service and Ingress. No runtime downloads or mutable host files.
 
-Current snapshot: `QuadCoreTech/Zero38Tattoos` commit `4c67867`, including the
-persistent full-recording YouTube player, availability calendar, and restored copy.
-The music player has no 30-second playback limit.
+The snapshot comes from `QuadCoreTech/Zero38Tattoos`, including the persistent
+full-recording YouTube player, availability calendar, restored copy, and Voltrum
+footer credit. The music player has no 30-second playback limit.
+
+This client-review deployment uses `bun run build:preview`. Share
+`https://z38.voltrum.co/admin?preview=1` to inspect the sample dashboard on any device
+without a password. It only uses fictional records, with settings saved locally
+in the visitor's browser. It does not authenticate to the real admin backend.
+Use the normal `bun run build` when replacing this review with the operational site.
 
 Cloudflare's existing wildcard DNS and tunnel route cover `z38.voltrum.co`;
 the ingress terminates the route in namespace `z38`. Public HTTPS is provided
@@ -33,7 +39,7 @@ To publish a newly approved live copy:
 
 ```sh
 cd /path/to/Zero38Tattoos
-bun run build
+bun run build:preview
 cd /path/to/nix
 python3 apps/z38/generate.py '/path/to/Zero38Tattoos/dist'
 kubectl apply --server-side -f apps/z38/resources.json
