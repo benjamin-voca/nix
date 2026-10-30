@@ -7,7 +7,7 @@ withdrawn pending rights review and production signing.
 `modules/outputs/bootstrap/voltrum-motion.nix` adds
 `apps/voltrum-motion/resources.json` to the declarative bootstrap output.
 The Kubernetes List defines an isolated `voltrum-motion` namespace with a
-content-addressed immutable ConfigMap, two non-root nginx replicas, service,
+content-addressed immutable shell and thumbnail ConfigMaps, two non-root nginx replicas, service,
 and ingress. The existing wildcard Cloudflare tunnel routes the hostname to
 ingress-nginx; no tunnel or DNS replacement is needed.
 
@@ -53,7 +53,7 @@ As of October 30, 2026, the shared app-repository `website/media-policy.json` is
 paused with `allowNativeDownloads: false` and `approvedMedia: []`. No real IDs are
 approved. Public `catalog.json` is `[]` and `release.json` has no downloads.
 The old NASA candidate catalog is not used by the new showcase. A separate
-`showcase.json` contains 21 user-requested cached thumbnails, Cat Pond first,
+`showcase.json` contains all 353 user-requested cached thumbnails, Cat Pond first,
 selected in `website/showcase-selection.json`. Aurora is removed from the website.
 The CSP enforces `media-src 'none'` and `img-src 'self'`. This thumbnail-only
 selection is not legal clearance; original creators/reuse rights remain unverified.
@@ -63,6 +63,10 @@ never expose that server or publish `.generated/`, its database, or recovered
 image screenshots outside the explicit selection. Production packaging rejects
 local builds, unselected IDs, modified provenance, video URLs/files, source JPEGs,
 and changed prepared thumbnail bytes. Never publish source manifests directly.
+Each archive is below 700,000 bytes; the shell and every thumbnail shard share a
+snapshot hash and a projected volume. The init container extracts all archives.
+Keep the complete matching ConfigMap set for rollback. The Library is browser-local
+favorites with search/categories and hash/history navigation, not a new backend.
 
 Native 0.2.2 is a local-only demo/import build with zero bundled remote entries.
 Earlier 0.2.0/0.2.1 previews and the historical recovery release are drafts.
@@ -71,12 +75,12 @@ Developer ID signing/notarization and explicit publication approval are required
 before advertising trusted public distribution. An available source URL or
 metadata screening is not item-specific rights clearance.
 
-TypeScript thumbnail-only snapshot: `motion-site-856c25209679`, content/configuration SHA-256
-`856c25209679a68b98fbb8b62cceb10491e2be637409d169928a155d26ef71cb`.
+Full-library thumbnail snapshot: `motion-site-336e2bd52e8f`, content/configuration SHA-256
+`336e2bd52e8f9e67cd760f76fcc0bd61cc23e9ef550b4e1ce85e50894694f780`.
 The app repository documents the exact approval schema in
 `website/MEDIA-POLICY.md`, audit in `website/MEDIA-LICENSE-AUDIT.md`, and current
 native checks in `docs/RELEASE-VALIDATION.md` and current website checks in
-`docs/WEBSITE-TYPESCRIPT.md`. Live acceptance must confirm 21 image-only defaults,
+`docs/WEBSITE-TYPESCRIPT.md`. Live acceptance must confirm 353 image-only wallpapers,
 Cat Pond first, no Aurora, empty video catalog/downloads, paused policy, 404 source
 and old Aurora paths, and two ready replicas. Never roll back to the Aurora-only
 snapshot when servicing this user-requested showcase.
