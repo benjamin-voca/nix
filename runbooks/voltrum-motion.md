@@ -44,7 +44,7 @@ installer links. Do not use an arbitrary previous ReplicaSet for rollback.
 The website source is now React/TypeScript with TanStack Start and Vite. Drizzle
 SQLite runs during the catalog import/query/export build step, not in nginx.
 Only compiled `website/dist/client/` is packaged. No database, account backend,
-recovered previews, or native installers are added to the cluster. The public
+source JPEGs/videos, or native installers are added to the cluster. The public
 site reads showcase/release manifests from the same origin. Its self-only plus
 exact script-hash CSP blocks unapproved external scripts, including the
 Cloudflare-injected analytics beacon observed during earlier browser checks.
@@ -53,13 +53,16 @@ As of October 30, 2026, the shared app-repository `website/media-policy.json` is
 paused with `allowNativeDownloads: false` and `approvedMedia: []`. No real IDs are
 approved. Public `catalog.json` is `[]` and `release.json` has no downloads.
 The old NASA candidate catalog is not used by the new showcase. A separate
-`showcase.json` contains only Motion's original Aurora demo. The CSP permits
-`media-src 'self'` and `img-src 'self'`, not external media. The original demo
-is not approval of any third-party entry. The loopback-only development command
+`showcase.json` contains 21 user-requested cached thumbnails, Cat Pond first,
+selected in `website/showcase-selection.json`. Aurora is removed from the website.
+The CSP enforces `media-src 'none'` and `img-src 'self'`. This thumbnail-only
+selection is not legal clearance; original creators/reuse rights remain unverified.
+No remote video URLs, playback, or downloads are exposed. The loopback-only command
 `bun run dev:recovered` displays 353 cached original-app thumbnails locally;
 never expose that server or publish `.generated/`, its database, or recovered
-image screenshots. Production build/packaging independently refuse recovered
-snapshots. Keep those checks enforced; never publish source manifests directly.
+image screenshots outside the explicit selection. Production packaging rejects
+local builds, unselected IDs, modified provenance, video URLs/files, source JPEGs,
+and changed prepared thumbnail bytes. Never publish source manifests directly.
 
 Native 0.2.2 is a local-only demo/import build with zero bundled remote entries.
 Earlier 0.2.0/0.2.1 previews and the historical recovery release are drafts.
@@ -68,11 +71,12 @@ Developer ID signing/notarization and explicit publication approval are required
 before advertising trusted public distribution. An available source URL or
 metadata screening is not item-specific rights clearance.
 
-TypeScript original-only snapshot: `motion-site-07559a8c758a`, content/configuration SHA-256
-`07559a8c758ac5c9d36852eda4ae78c369e3cf2b5ceb97d6e94806d01dd19fe9`.
+TypeScript thumbnail-only snapshot: `motion-site-856c25209679`, content/configuration SHA-256
+`856c25209679a68b98fbb8b62cceb10491e2be637409d169928a155d26ef71cb`.
 The app repository documents the exact approval schema in
 `website/MEDIA-POLICY.md`, audit in `website/MEDIA-LICENSE-AUDIT.md`, and current
 native checks in `docs/RELEASE-VALIDATION.md` and current website checks in
-`docs/WEBSITE-TYPESCRIPT.md`. Live acceptance must confirm the one original
-showcase item, empty third-party catalog/downloads, paused policy, 404 recovered
-paths, and two ready replicas.
+`docs/WEBSITE-TYPESCRIPT.md`. Live acceptance must confirm 21 image-only defaults,
+Cat Pond first, no Aurora, empty video catalog/downloads, paused policy, 404 source
+and old Aurora paths, and two ready replicas. Never roll back to the Aurora-only
+snapshot when servicing this user-requested showcase.
