@@ -75,8 +75,8 @@ Developer ID signing/notarization and explicit publication approval are required
 before advertising trusted public distribution. An available source URL or
 metadata screening is not item-specific rights clearance.
 
-Immersive-detail thumbnail snapshot: `motion-site-3e3576375db0`, content/configuration SHA-256
-`3e3576375db09608f37eff9d10ac714f3e5d7ee626010da94b96bb1750d6c2be`.
+Immersive-detail thumbnail snapshot: `motion-site-572fbde5ca6b`, content/configuration SHA-256
+`572fbde5ca6ba326c1097698d50ba69354dbe22f22f277db80e4eafa4f503948`.
 Wallpaper previews now use the supplied Wallper-style artwork-backed detail
 window, source metadata pills, centered title/description, and functional Library,
 search, and share-link controls. Author/size/likes are cached source values, not
