@@ -75,8 +75,16 @@ Developer ID signing/notarization and explicit publication approval are required
 before advertising trusted public distribution. An available source URL or
 metadata screening is not item-specific rights clearance.
 
-Full-library thumbnail snapshot: `motion-site-336e2bd52e8f`, content/configuration SHA-256
-`336e2bd52e8f9e67cd760f76fcc0bd61cc23e9ef550b4e1ce85e50894694f780`.
+Immersive-detail thumbnail snapshot: `motion-site-3e3576375db0`, content/configuration SHA-256
+`3e3576375db09608f37eff9d10ac714f3e5d7ee626010da94b96bb1750d6c2be`.
+Wallpaper previews now use the supplied Wallper-style artwork-backed detail
+window, source metadata pills, centered title/description, and functional Library,
+search, and share-link controls. Author/size/likes are cached source values, not
+invented credits or live counts. Set as Wallpaper and video download remain
+disabled browser controls; this is not animated native playback. Live acceptance
+also checks Winter Forest, Japanese Village, Cat Pond, direct wallpaper links,
+favorites, share links, and mobile scrolling. No native files or media approvals
+changed with this detail-view rollout.
 The app repository documents the exact approval schema in
 `website/MEDIA-POLICY.md`, audit in `website/MEDIA-LICENSE-AUDIT.md`, and current
 native checks in `docs/RELEASE-VALIDATION.md` and current website checks in
