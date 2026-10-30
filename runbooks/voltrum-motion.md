@@ -14,7 +14,7 @@ ingress-nginx; no tunnel or DNS replacement is needed.
 Generate updates from the app repository with:
 
 ```sh
-node website/validate.mjs
+(cd website && bun install --frozen-lockfile && bun run validate && bun run test:browser)
 python3 tools/package-motion-site.py ../nix
 ```
 
@@ -22,13 +22,18 @@ Use authorized local kubectl credentials to dry-run and apply the generated
 List, then verify the rollout and public manifests:
 
 ```sh
-kubectl apply --dry-run=server -f apps/voltrum-motion/resources.json
-kubectl apply -f apps/voltrum-motion/resources.json
+kubectl apply --server-side --field-manager=voltrum-motion --dry-run=server -f apps/voltrum-motion/resources.json
+kubectl apply --server-side --field-manager=voltrum-motion -f apps/voltrum-motion/resources.json
 kubectl -n voltrum-motion rollout status deployment/voltrum-motion
 curl -f https://motion.voltrum.co/release.json
 curl -f https://motion.voltrum.co/catalog.json
 ```
 
+Server-side apply avoids duplicating the compiled archive into a last-applied
+annotation, which exceeds Kubernetes' annotation-size limit for this app/demo.
+The October 30 transition used a reviewed one-time ownership adoption for Motion's
+site-hash annotation and archive volume from `kubectl-client-side-apply`; normal
+rollouts now use the `voltrum-motion` manager without forcing conflicts.
 Commit the resulting resources alongside any bootstrap changes. Do not place
 credentials, native installers, or downloaded videos in the ConfigMap. Previous
 ConfigMaps should remain available while their ReplicaSets are needed. Rollback
@@ -36,16 +41,25 @@ is allowed only to a complete snapshot enforcing the current publication policy.
 Never roll back to a pre-quarantine snapshot containing unreviewed media or
 installer links. Do not use an arbitrary previous ReplicaSet for rollback.
 
-The website has no backend, accounts, or application analytics. It reads catalog
-and release manifests from the same origin. Its self-only script CSP also blocks
-the Cloudflare-injected analytics beacon observed during browser checks.
+The website source is now React/TypeScript with TanStack Start and Vite. Drizzle
+SQLite runs during the catalog import/query/export build step, not in nginx.
+Only compiled `website/dist/client/` is packaged. No database, account backend,
+recovered previews, or native installers are added to the cluster. The public
+site reads showcase/release manifests from the same origin. Its self-only plus
+exact script-hash CSP blocks unapproved external scripts, including the
+Cloudflare-injected analytics beacon observed during earlier browser checks.
 
-As of October 29, 2026, the shared app-repository `website/media-policy.json` is
+As of October 30, 2026, the shared app-repository `website/media-policy.json` is
 paused with `allowNativeDownloads: false` and `approvedMedia: []`. No real IDs are
 approved. Public `catalog.json` is `[]` and `release.json` has no downloads.
-The 159 source candidates are not cleared for publication. Paused CSP is
-`media-src 'none'` and `img-src 'self'`. Keep this policy enforced in generated
-resources; do not publish source candidate manifests directly.
+The old NASA candidate catalog is not used by the new showcase. A separate
+`showcase.json` contains only Motion's original Aurora demo. The CSP permits
+`media-src 'self'` and `img-src 'self'`, not external media. The original demo
+is not approval of any third-party entry. The loopback-only development command
+`bun run dev:recovered` displays 353 cached original-app thumbnails locally;
+never expose that server or publish `.generated/`, its database, or recovered
+image screenshots. Production build/packaging independently refuse recovered
+snapshots. Keep those checks enforced; never publish source manifests directly.
 
 Native 0.2.2 is a local-only demo/import build with zero bundled remote entries.
 Earlier 0.2.0/0.2.1 previews and the historical recovery release are drafts.
@@ -54,8 +68,11 @@ Developer ID signing/notarization and explicit publication approval are required
 before advertising trusted public distribution. An available source URL or
 metadata screening is not item-specific rights clearance.
 
-Verified paused snapshot: `motion-site-c9ab4bdb8d56`, content/configuration SHA-256
-`c9ab4bdb8d569663e5428fd34c1abd4cf7c4989e3a1ef3022990f68fec48c45e`.
+TypeScript original-only snapshot: `motion-site-07559a8c758a`, content/configuration SHA-256
+`07559a8c758ac5c9d36852eda4ae78c369e3cf2b5ceb97d6e94806d01dd19fe9`.
 The app repository documents the exact approval schema in
 `website/MEDIA-POLICY.md`, audit in `website/MEDIA-LICENSE-AUDIT.md`, and current
-native/browser checks in `docs/RELEASE-VALIDATION.md`.
+native checks in `docs/RELEASE-VALIDATION.md` and current website checks in
+`docs/WEBSITE-TYPESCRIPT.md`. Live acceptance must confirm the one original
+showcase item, empty third-party catalog/downloads, paused policy, 404 recovered
+paths, and two ready replicas.
